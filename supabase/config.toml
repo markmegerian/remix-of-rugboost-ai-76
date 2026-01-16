@@ -1,1 +1,4 @@
 project_id = "tviommdnpvfceuprrwzf"
+
+[functions.analyze-rug]
+verify_jwt = false

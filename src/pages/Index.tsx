@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import RugInspectionForm from '@/components/RugInspectionForm';
 import AnalysisReport from '@/components/AnalysisReport';
 
@@ -20,69 +21,88 @@ const Index = () => {
   const [analysisReport, setAnalysisReport] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<FormData | null>(null);
 
+  const uploadPhotos = async (photos: File[]): Promise<string[]> => {
+    const uploadedUrls: string[] = [];
+    
+    for (const photo of photos) {
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
+      
+      const { data, error } = await supabase.storage
+        .from('rug-photos')
+        .upload(fileName, photo, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) {
+        console.error('Upload error:', error);
+        throw new Error(`Failed to upload ${photo.name}`);
+      }
+      
+      const { data: urlData } = supabase.storage
+        .from('rug-photos')
+        .getPublicUrl(data.path);
+      
+      uploadedUrls.push(urlData.publicUrl);
+    }
+    
+    return uploadedUrls;
+  };
+
   const handleSubmit = async (formData: FormData, photos: File[]) => {
     setIsLoading(true);
     
     try {
-      // For now, simulate AI analysis since we need to set up the backend
-      // This will be replaced with actual API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      toast.info('Uploading photos...');
       
-      const mockReport = `# Rug Condition Assessment
+      // Upload photos to storage
+      const photoUrls = await uploadPhotos(photos);
+      
+      toast.info('Analyzing rug with AI...');
+      
+      // Call the edge function to analyze the rug
+      const { data, error } = await supabase.functions.invoke('analyze-rug', {
+        body: {
+          photos: photoUrls,
+          rugInfo: {
+            clientName: formData.clientName,
+            rugNumber: formData.rugNumber,
+            rugType: formData.rugType,
+            length: formData.length,
+            width: formData.width,
+            notes: formData.notes
+          }
+        }
+      });
 
-## Overall Condition
-The ${formData.rugType} rug (${formData.length}' x ${formData.width}') has been thoroughly analyzed based on the ${photos.length} provided images.
+      if (error) {
+        throw error;
+      }
 
-## Identified Issues
+      if (data.error) {
+        throw new Error(data.error);
+      }
 
-### Wear & Tear
-- Moderate pile wear observed in high-traffic areas
-- Fringe shows signs of unraveling on the eastern edge
-- Minor foundation exposure in central medallion area
+      // Save the inspection to the database
+      await supabase.from('inspections').insert({
+        client_name: formData.clientName,
+        client_email: formData.clientEmail || null,
+        client_phone: formData.clientPhone || null,
+        rug_number: formData.rugNumber,
+        rug_type: formData.rugType,
+        length: formData.length ? parseFloat(formData.length) : null,
+        width: formData.width ? parseFloat(formData.width) : null,
+        notes: formData.notes || null,
+        photo_urls: photoUrls,
+        analysis_report: data.report
+      });
 
-### Staining & Discoloration
-- Light water staining detected in northwest quadrant
-- General fading consistent with age and sun exposure
-- Slight color bleeding around red dye areas
-
-### Structural Concerns
-- Edge binding loosening on two sides
-- Minor moth damage in isolated areas
-- Overall foundation integrity is sound
-
-## Recommended Services
-
-**Priority 1 - Essential Repairs**
-- Full professional cleaning: $${(parseFloat(formData.length || '1') * parseFloat(formData.width || '1') * 8).toFixed(0)}
-- Fringe repair and stabilization: $180-280
-- Edge binding restoration: $150-250
-
-**Priority 2 - Recommended Restoration**
-- Color restoration and touch-up: $200-400
-- Moth damage repair: $120-200
-- Pile reconstruction in worn areas: $300-500
-
-**Priority 3 - Optional Preservation**
-- Protective backing application: $150
-- Stain-resistant treatment: $85
-- Museum-quality storage preparation: $200
-
-## Estimated Total
-- Essential repairs only: $${(parseFloat(formData.length || '1') * parseFloat(formData.width || '1') * 8 + 330).toFixed(0)} - $${(parseFloat(formData.length || '1') * parseFloat(formData.width || '1') * 8 + 530).toFixed(0)}
-- Full restoration package: $${(parseFloat(formData.length || '1') * parseFloat(formData.width || '1') * 8 + 950).toFixed(0)} - $${(parseFloat(formData.length || '1') * parseFloat(formData.width || '1') * 8 + 1630).toFixed(0)}
-
-## Timeline
-Estimated completion: 3-4 weeks for full restoration
-
-## Notes
-${formData.notes || 'No additional notes provided.'}`;
-
-      setAnalysisReport(mockReport);
+      setAnalysisReport(data.report);
       setSubmittedData(formData);
       toast.success('Analysis complete!');
     } catch (error) {
       console.error('Analysis failed:', error);
-      toast.error('Failed to analyze rug. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to analyze rug. Please try again.');
     } finally {
       setIsLoading(false);
     }

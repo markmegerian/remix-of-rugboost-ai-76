@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      inspections: {
+        Row: {
+          analysis_report: string | null
+          client_email: string | null
+          client_name: string
+          client_phone: string | null
+          created_at: string
+          id: string
+          length: number | null
+          notes: string | null
+          photo_urls: string[] | null
+          rug_number: string
+          rug_type: string
+          width: number | null
+        }
+        Insert: {
+          analysis_report?: string | null
+          client_email?: string | null
+          client_name: string
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          length?: number | null
+          notes?: string | null
+          photo_urls?: string[] | null
+          rug_number: string
+          rug_type: string
+          width?: number | null
+        }
+        Update: {
+          analysis_report?: string | null
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          length?: number | null
+          notes?: string | null
+          photo_urls?: string[] | null
+          rug_number?: string
+          rug_type?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
