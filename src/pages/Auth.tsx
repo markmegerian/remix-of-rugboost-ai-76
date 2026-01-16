@@ -114,7 +114,7 @@ const Auth = () => {
                 RugBoost
               </h1>
               <p className="text-xs text-muted-foreground">
-                AI-Powered Analysis
+                Rug Concierge
               </p>
             </div>
           </div>
