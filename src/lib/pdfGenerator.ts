@@ -27,6 +27,40 @@ interface Job {
   created_at: string;
 }
 
+// RugBoost logo as base64 PNG (embedded for PDF compatibility)
+const RUGBOOST_LOGO_BASE64 = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MDAgODkwIiBmaWxsPSJub25lIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZCIgeDE9IjAlIiB5MT0iMjAlIiB4Mj0iMTAwJSIgeTI9IjgwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMyMTc0QzYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjNkU1NEQxIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNMTIwIDQ0NUMxMjAgMzY4IDI2My41NyAyNDMuNTcgMzAwIDE2MCAzNTQuMjMgMjIzLjkgNDc0IDM2MiA0ODAgNDQ1IDQ4MCA1MjAgNDIwIDY5MCAzMDAgNjkwIDE4MCA2OTAgMTIwIDUyMCAxMjAgNDQ1WiIgZmlsbD0idXJsKCNncmFkKSIvPgogIDxwYXRoIGQ9Ik0yMDAgNDYwQzIwMCAzNjAgMzQwIDMwMCAzMDAgMjIwIDI2MCAzMDAgNDAwIDM2MCA0MDAgNDYwIDQwMCA1NjAgMzIwIDYyMCAzMDAgNjIwIDI4MCA2MjAgMjAwIDU2MCAyMDAgNDYwWiIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4zIi8+Cjwvc3ZnPg==`;
+
+// Helper function to add logo header to a page
+const addLogoHeader = (doc: jsPDF, pageWidth: number): number => {
+  const logoWidth = 20;
+  const logoHeight = 30;
+  const logoX = 15;
+  const logoY = 8;
+  
+  try {
+    doc.addImage(RUGBOOST_LOGO_BASE64, 'SVG', logoX, logoY, logoWidth, logoHeight);
+  } catch (error) {
+    console.error('Failed to add logo to PDF:', error);
+  }
+  
+  // Add company name next to logo
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(33, 116, 198); // RugBoost blue
+  doc.text('RugBoost', logoX + logoWidth + 5, logoY + 18);
+  
+  // Reset text color
+  doc.setTextColor(0, 0, 0);
+  
+  // Draw a subtle line under the header
+  doc.setDrawColor(33, 116, 198);
+  doc.setLineWidth(0.5);
+  doc.line(15, logoY + logoHeight + 5, pageWidth - 15, logoY + logoHeight + 5);
+  
+  // Return the Y position after header
+  return logoY + logoHeight + 15;
+};
+
 // Helper function to load image and convert to base64
 const loadImageAsBase64 = async (url: string): Promise<string | null> => {
   try {
@@ -109,7 +143,10 @@ export const generatePDF = async (inspection: Inspection): Promise<void> => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
-  let yPos = 20;
+  
+  // Add logo header
+  let yPos = addLogoHeader(doc, pageWidth);
+  yPos += 5;
 
   // Title
   doc.setFontSize(24);
@@ -126,7 +163,7 @@ export const generatePDF = async (inspection: Inspection): Promise<void> => {
     yPos,
     { align: 'center' }
   );
-  yPos += 20;
+  yPos += 15;
 
   // Client Information Section
   doc.setFontSize(14);
@@ -229,12 +266,19 @@ export const generatePDF = async (inspection: Inspection): Promise<void> => {
     }
   }
 
-  // Footer
+  // Footer and header on all pages
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
+    
+    // Add logo header on pages after the first (first page already has it)
+    if (i > 1) {
+      addLogoHeader(doc, pageWidth);
+    }
+    
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(
       `Page ${i} of ${totalPages}`,
       pageWidth / 2,
@@ -261,7 +305,10 @@ export const generateJobPDF = async (job: Job, rugs: Inspection[]): Promise<void
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
-  let yPos = 20;
+  
+  // Add logo header
+  let yPos = addLogoHeader(doc, pageWidth);
+  yPos += 5;
 
   // Title Page
   doc.setFontSize(28);
@@ -272,7 +319,7 @@ export const generateJobPDF = async (job: Job, rugs: Inspection[]): Promise<void
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
   doc.text(`Job #${job.job_number}`, pageWidth / 2, yPos, { align: 'center' });
-  yPos += 25;
+  yPos += 20;
 
   // Job Details
   doc.setFontSize(14);
@@ -361,7 +408,7 @@ export const generateJobPDF = async (job: Job, rugs: Inspection[]): Promise<void
     body: rugsSummary,
     theme: 'striped',
     styles: { fontSize: 9 },
-    headStyles: { fillColor: [139, 90, 43] },
+    headStyles: { fillColor: [33, 116, 198] }, // RugBoost blue
     margin: { left: margin, right: margin },
   });
 
@@ -369,7 +416,10 @@ export const generateJobPDF = async (job: Job, rugs: Inspection[]): Promise<void
   for (let i = 0; i < rugs.length; i++) {
     const rug = rugs[i];
     doc.addPage();
-    yPos = 20;
+    
+    // Add logo header to new page
+    yPos = addLogoHeader(doc, pageWidth);
+    yPos += 5;
 
     // Rug Header
     doc.setFontSize(18);
@@ -451,6 +501,7 @@ export const generateJobPDF = async (job: Job, rugs: Inspection[]): Promise<void
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     doc.text(
       `Page ${i} of ${totalPages}`,
       pageWidth / 2,
