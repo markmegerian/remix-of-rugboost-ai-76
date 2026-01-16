@@ -27,6 +27,7 @@ export type Database = {
           photo_urls: string[] | null
           rug_number: string
           rug_type: string
+          user_id: string | null
           width: number | null
         }
         Insert: {
@@ -41,6 +42,7 @@ export type Database = {
           photo_urls?: string[] | null
           rug_number: string
           rug_type: string
+          user_id?: string | null
           width?: number | null
         }
         Update: {
@@ -55,7 +57,32 @@ export type Database = {
           photo_urls?: string[] | null
           rug_number?: string
           rug_type?: string
+          user_id?: string | null
           width?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Sparkles, LayoutDashboard, LogOut, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 import RugInspectionForm from '@/components/RugInspectionForm';
 import AnalysisReport from '@/components/AnalysisReport';
 
@@ -17,9 +20,17 @@ interface FormData {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [analysisReport, setAnalysisReport] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<FormData | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
 
   const uploadPhotos = async (photos: File[]): Promise<string[]> => {
     const uploadedUrls: string[] = [];
@@ -50,6 +61,12 @@ const Index = () => {
   };
 
   const handleSubmit = async (formData: FormData, photos: File[]) => {
+    if (!user) {
+      toast.error('Please sign in to create an inspection');
+      navigate('/auth');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -83,8 +100,9 @@ const Index = () => {
         throw new Error(data.error);
       }
 
-      // Save the inspection to the database
-      await supabase.from('inspections').insert({
+      // Save the inspection to the database with user_id
+      const { error: insertError } = await supabase.from('inspections').insert({
+        user_id: user.id,
         client_name: formData.clientName,
         client_email: formData.clientEmail || null,
         client_phone: formData.clientPhone || null,
@@ -96,6 +114,10 @@ const Index = () => {
         photo_urls: photoUrls,
         analysis_report: data.report
       });
+
+      if (insertError) {
+        throw insertError;
+      }
 
       setAnalysisReport(data.report);
       setSubmittedData(formData);
@@ -112,6 +134,19 @@ const Index = () => {
     setAnalysisReport(null);
     setSubmittedData(null);
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -130,6 +165,16 @@ const Index = () => {
                 AI-Powered Analysis
               </p>
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Button>
+            <Button onClick={handleSignOut} variant="ghost" size="sm" className="gap-2">
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
         </div>
       </header>

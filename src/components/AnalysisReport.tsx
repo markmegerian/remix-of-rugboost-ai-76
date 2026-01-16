@@ -1,7 +1,9 @@
 import React from 'react';
-import { FileText, DollarSign, Wrench, AlertTriangle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { FileText, DollarSign, Wrench, ArrowLeft, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+import { generatePDF } from '@/lib/pdfGenerator';
 
 interface AnalysisReportProps {
   report: string;
@@ -14,11 +16,40 @@ interface AnalysisReportProps {
   onNewInspection: () => void;
 }
 
+
 const AnalysisReport: React.FC<AnalysisReportProps> = ({
   report,
   rugInfo,
   onNewInspection,
 }) => {
+  const handleDownloadPDF = async () => {
+    try {
+      // Parse dimensions
+      const dimMatch = rugInfo.dimensions.match(/([0-9.]+)'?\s*[×x]\s*([0-9.]+)/);
+      const length = dimMatch ? parseFloat(dimMatch[1]) : null;
+      const width = dimMatch ? parseFloat(dimMatch[2]) : null;
+
+      await generatePDF({
+        id: '',
+        client_name: rugInfo.clientName,
+        client_email: null,
+        client_phone: null,
+        rug_number: rugInfo.rugNumber,
+        rug_type: rugInfo.rugType,
+        length,
+        width,
+        notes: null,
+        photo_urls: null,
+        analysis_report: report,
+        created_at: new Date().toISOString(),
+      });
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('Failed to generate PDF');
+    }
+  };
+
   // Parse the report into sections for better display
   const formatReport = (text: string) => {
     return text.split('\n').map((line, index) => {
@@ -123,8 +154,13 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Button variant="default" size="lg" className="flex-1 gap-2">
-          <FileText className="h-4 w-4" />
+        <Button 
+          variant="default" 
+          size="lg" 
+          className="flex-1 gap-2"
+          onClick={handleDownloadPDF}
+        >
+          <Download className="h-4 w-4" />
           Download PDF Report
         </Button>
         <Button variant="outline" size="lg" className="flex-1 gap-2">
