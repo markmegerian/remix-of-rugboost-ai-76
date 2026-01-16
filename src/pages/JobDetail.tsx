@@ -59,7 +59,9 @@ const JobDetail = () => {
   const [isAddingRug, setIsAddingRug] = useState(false);
   const [isEditingJob, setIsEditingJob] = useState(false);
   const [editingRug, setEditingRug] = useState<Rug | null>(null);
-  const [analyzingRug, setAnalyzingRug] = useState(false);
+  const [addingRug, setAddingRug] = useState(false);
+  const [analyzingAll, setAnalyzingAll] = useState(false);
+  const [analyzingRugId, setAnalyzingRugId] = useState<string | null>(null);
   const [savingJob, setSavingJob] = useState(false);
   const [savingRug, setSavingRug] = useState(false);
   const [selectedRug, setSelectedRug] = useState<Rug | null>(null);
@@ -229,31 +231,13 @@ const JobDetail = () => {
   ) => {
     if (!user || !job) return;
 
-    setAnalyzingRug(true);
+    setAddingRug(true);
     
     try {
       toast.info('Uploading photos...');
       const photoUrls = await uploadPhotos(photos);
-      
-      toast.info('Analyzing rug with AI...');
-      
-      const { data, error } = await supabase.functions.invoke('analyze-rug', {
-        body: {
-          photos: photoUrls,
-          rugInfo: {
-            clientName: job.client_name,
-            rugNumber: formData.rugNumber,
-            rugType: formData.rugType,
-            length: formData.length,
-            width: formData.width,
-            notes: formData.notes
-          }
-        }
-      });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
+      // Just save the rug without AI analysis
       const { error: insertError } = await supabase.from('inspections').insert({
         user_id: user.id,
         job_id: job.id,
@@ -264,19 +248,118 @@ const JobDetail = () => {
         width: formData.width ? parseFloat(formData.width) : null,
         notes: formData.notes || null,
         photo_urls: photoUrls,
-        analysis_report: data.report
+        analysis_report: null // No analysis yet
       });
 
       if (insertError) throw insertError;
 
-      toast.success('Rug analyzed and added to job!');
+      toast.success('Rug added to job!');
       setIsAddingRug(false);
       fetchJobDetails();
     } catch (error) {
-      console.error('Analysis failed:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to analyze rug');
+      console.error('Add rug failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add rug');
     } finally {
-      setAnalyzingRug(false);
+      setAddingRug(false);
+    }
+  };
+
+  const analyzeRug = async (rug: Rug) => {
+    if (!job) return;
+
+    setAnalyzingRugId(rug.id);
+    
+    try {
+      toast.info(`Analyzing ${rug.rug_number}...`);
+      
+      const { data, error } = await supabase.functions.invoke('analyze-rug', {
+        body: {
+          photos: rug.photo_urls || [],
+          rugInfo: {
+            clientName: job.client_name,
+            rugNumber: rug.rug_number,
+            rugType: rug.rug_type,
+            length: rug.length?.toString() || '',
+            width: rug.width?.toString() || '',
+            notes: rug.notes || ''
+          }
+        }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      // Update the rug with analysis
+      const { error: updateError } = await supabase
+        .from('inspections')
+        .update({ analysis_report: data.report })
+        .eq('id', rug.id);
+
+      if (updateError) throw updateError;
+
+      toast.success(`${rug.rug_number} analyzed!`);
+      fetchJobDetails();
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      toast.error(error instanceof Error ? error.message : `Failed to analyze ${rug.rug_number}`);
+    } finally {
+      setAnalyzingRugId(null);
+    }
+  };
+
+  const handleAnalyzeAllRugs = async () => {
+    if (!job) return;
+
+    const pendingRugs = rugs.filter(r => !r.analysis_report);
+    if (pendingRugs.length === 0) {
+      toast.info('All rugs have already been analyzed');
+      return;
+    }
+
+    setAnalyzingAll(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const rug of pendingRugs) {
+      try {
+        toast.info(`Analyzing ${rug.rug_number} (${successCount + errorCount + 1}/${pendingRugs.length})...`);
+        
+        const { data, error } = await supabase.functions.invoke('analyze-rug', {
+          body: {
+            photos: rug.photo_urls || [],
+            rugInfo: {
+              clientName: job.client_name,
+              rugNumber: rug.rug_number,
+              rugType: rug.rug_type,
+              length: rug.length?.toString() || '',
+              width: rug.width?.toString() || '',
+              notes: rug.notes || ''
+            }
+          }
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        await supabase
+          .from('inspections')
+          .update({ analysis_report: data.report })
+          .eq('id', rug.id);
+
+        successCount++;
+      } catch (error) {
+        console.error(`Analysis failed for ${rug.rug_number}:`, error);
+        errorCount++;
+      }
+    }
+
+    setAnalyzingAll(false);
+    fetchJobDetails();
+
+    if (errorCount === 0) {
+      toast.success(`All ${successCount} rugs analyzed successfully!`);
+    } else {
+      toast.warning(`Analyzed ${successCount} rugs, ${errorCount} failed`);
     }
   };
 
@@ -517,11 +600,38 @@ const JobDetail = () => {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <CardTitle className="font-display text-xl">
-                Rugs ({rugs.length})
-              </CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <CardTitle className="font-display text-xl">
+                  Rugs ({rugs.length})
+                </CardTitle>
                 {rugs.length > 0 && (
+                  <Badge variant="secondary">
+                    {rugs.filter(r => r.analysis_report).length}/{rugs.length} analyzed
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {rugs.length > 0 && rugs.some(r => !r.analysis_report) && (
+                  <Button 
+                    variant="warm"
+                    className="gap-2"
+                    onClick={handleAnalyzeAllRugs}
+                    disabled={analyzingAll}
+                  >
+                    {analyzingAll ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Analyze All Rugs
+                      </>
+                    )}
+                  </Button>
+                )}
+                {rugs.length > 0 && rugs.every(r => r.analysis_report) && (
                   <Button 
                     variant="outline" 
                     className="gap-2"
@@ -544,7 +654,7 @@ const JobDetail = () => {
                     </DialogHeader>
                     <RugForm
                       onSubmit={handleAddRug}
-                      isLoading={analyzingRug}
+                      isLoading={addingRug}
                       rugIndex={rugs.length}
                     />
                   </DialogContent>
@@ -557,7 +667,7 @@ const JobDetail = () => {
               <div className="text-center py-12 text-muted-foreground">
                 <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No rugs added yet</p>
-                <p className="text-sm mt-1">Click "Add Rug" to start inspecting rugs for this job</p>
+                <p className="text-sm mt-1">Click "Add Rug" to add rugs, then analyze them all at once</p>
               </div>
             ) : (
               <Table>
@@ -567,7 +677,7 @@ const JobDetail = () => {
                     <TableHead>Type</TableHead>
                     <TableHead>Dimensions</TableHead>
                     <TableHead>Photos</TableHead>
-                    <TableHead>Added</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -580,17 +690,56 @@ const JobDetail = () => {
                         {rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—'}
                       </TableCell>
                       <TableCell>{rug.photo_urls?.length || 0}</TableCell>
-                      <TableCell>{format(new Date(rug.created_at), 'MMM d')}</TableCell>
+                      <TableCell>
+                        {rug.analysis_report ? (
+                          <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
+                            <CheckCircle className="h-3 w-3" />
+                            Analyzed
+                          </Badge>
+                        ) : analyzingRugId === rug.id ? (
+                          <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Analyzing
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1 border-muted-foreground text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            Pending
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewReport(rug)}
-                            title="View Report"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          {rug.analysis_report ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewReport(rug)}
+                                title="View Report"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownloadPDF(rug)}
+                                title="Download PDF"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => analyzeRug(rug)}
+                              disabled={!!analyzingRugId || analyzingAll}
+                              title="Analyze Rug"
+                            >
+                              <Sparkles className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -598,14 +747,6 @@ const JobDetail = () => {
                             title="Edit Rug"
                           >
                             <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownloadPDF(rug)}
-                            title="Download PDF"
-                          >
-                            <Download className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"

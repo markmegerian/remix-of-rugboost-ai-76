@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, Send, Hash, Ruler, Sparkles } from 'lucide-react';
+import { Loader2, Plus, Hash, Ruler, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -163,7 +163,7 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
       <section className="space-y-4">
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-primary/10 p-2">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Camera className="h-4 w-4 text-primary" />
           </div>
           <h2 className="font-display text-xl font-semibold text-foreground">
             Inspection Photos
@@ -192,7 +192,6 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
       <div className="pt-4">
         <Button
           type="submit"
-          variant="warm"
           size="xl"
           className="w-full"
           disabled={isLoading}
@@ -200,12 +199,12 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
           {isLoading ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin" />
-              Analyzing Rug...
+              Adding Rug...
             </>
           ) : (
             <>
-              <Send className="h-5 w-5" />
-              Submit for AI Analysis
+              <Plus className="h-5 w-5" />
+              Add Rug to Job
             </>
           )}
         </Button>
