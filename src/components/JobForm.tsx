@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import ClientSearch from './ClientSearch';
 
 interface JobFormData {
   jobNumber: string;
@@ -18,9 +19,10 @@ interface JobFormProps {
   onSubmit: (data: JobFormData) => Promise<void>;
   isLoading: boolean;
   initialData?: Partial<JobFormData>;
+  mode?: 'create' | 'edit';
 }
 
-const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData }) => {
+const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mode = 'create' }) => {
   const [formData, setFormData] = useState<JobFormData>({
     jobNumber: initialData?.jobNumber || '',
     clientName: initialData?.clientName || '',
@@ -29,11 +31,32 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData }) =
     notes: initialData?.notes || '',
   });
 
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        jobNumber: initialData.jobNumber || '',
+        clientName: initialData.clientName || '',
+        clientEmail: initialData.clientEmail || '',
+        clientPhone: initialData.clientPhone || '',
+        notes: initialData.notes || '',
+      });
+    }
+  }, [initialData]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClientSelect = (client: { client_name: string; client_email: string | null; client_phone: string | null }) => {
+    setFormData((prev) => ({
+      ...prev,
+      clientName: client.client_name,
+      clientEmail: client.client_email || '',
+      clientPhone: client.client_phone || '',
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,6 +106,19 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData }) =
             Client Information
           </h2>
         </div>
+
+        {mode === 'create' && (
+          <div className="space-y-2">
+            <Label>Search Existing Client</Label>
+            <ClientSearch 
+              onSelectClient={handleClientSelect}
+              initialValue={formData.clientName}
+            />
+            <p className="text-xs text-muted-foreground">
+              Start typing to search existing clients, or enter a new client below
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
@@ -141,7 +177,10 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData }) =
       {/* Submit Button */}
       <div className="pt-4">
         <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? 'Creating Job...' : 'Create Job'}
+          {isLoading 
+            ? (mode === 'edit' ? 'Saving...' : 'Creating Job...') 
+            : (mode === 'edit' ? 'Save Changes' : 'Create Job')
+          }
         </Button>
       </div>
     </form>

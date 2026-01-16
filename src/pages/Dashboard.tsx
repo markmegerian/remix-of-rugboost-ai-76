@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Search, Calendar, Briefcase, Eye, Plus, LogOut, Loader2, ChevronRight } from 'lucide-react';
+import { Sparkles, Search, Calendar, Briefcase, Eye, Plus, LogOut, Loader2, ChevronRight, PlayCircle, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,32 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return (
+        <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
+          <CheckCircle className="h-3 w-3" />
+          Completed
+        </Badge>
+      );
+    case 'in-progress':
+      return (
+        <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600">
+          <Clock className="h-3 w-3" />
+          In Progress
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="outline" className="gap-1 border-blue-500 text-blue-600">
+          <PlayCircle className="h-3 w-3" />
+          Active
+        </Badge>
+      );
+  }
+};
 
 interface Job {
   id: string;
@@ -174,6 +200,7 @@ const Dashboard = () => {
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
@@ -248,9 +275,7 @@ const Dashboard = () => {
                             <Badge variant="secondary">{job.rug_count} rugs</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={job.status === 'active' ? 'default' : 'outline'}>
-                              {job.status}
-                            </Badge>
+                            {getStatusBadge(job.status)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" className="gap-1">

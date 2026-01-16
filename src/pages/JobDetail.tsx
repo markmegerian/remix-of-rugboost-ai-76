@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Sparkles, ArrowLeft, Plus, Loader2, Eye, Download, Trash2 } from 'lucide-react';
+import { 
+  Sparkles, ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
+  Edit2, FileText, CheckCircle, Clock, PlayCircle 
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,9 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { generatePDF } from '@/lib/pdfGenerator';
+import { generatePDF, generateJobPDF } from '@/lib/pdfGenerator';
 import RugForm from '@/components/RugForm';
+import JobForm from '@/components/JobForm';
+import EditRugDialog from '@/components/EditRugDialog';
 import AnalysisReport from '@/components/AnalysisReport';
 
 interface Job {
@@ -37,6 +43,12 @@ interface Rug {
   created_at: string;
 }
 
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active', icon: PlayCircle, color: 'bg-blue-500' },
+  { value: 'in-progress', label: 'In Progress', icon: Clock, color: 'bg-yellow-500' },
+  { value: 'completed', label: 'Completed', icon: CheckCircle, color: 'bg-green-500' },
+];
+
 const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
@@ -45,7 +57,11 @@ const JobDetail = () => {
   const [rugs, setRugs] = useState<Rug[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddingRug, setIsAddingRug] = useState(false);
+  const [isEditingJob, setIsEditingJob] = useState(false);
+  const [editingRug, setEditingRug] = useState<Rug | null>(null);
   const [analyzingRug, setAnalyzingRug] = useState(false);
+  const [savingJob, setSavingJob] = useState(false);
+  const [savingRug, setSavingRug] = useState(false);
   const [selectedRug, setSelectedRug] = useState<Rug | null>(null);
   const [showReport, setShowReport] = useState(false);
 
@@ -64,7 +80,6 @@ const JobDetail = () => {
   const fetchJobDetails = async () => {
     setLoading(true);
     try {
-      // Fetch job
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
         .select('*')
@@ -80,7 +95,6 @@ const JobDetail = () => {
 
       setJob(jobData);
 
-      // Fetch rugs for this job
       const { data: rugsData, error: rugsError } = await supabase
         .from('inspections')
         .select('*')
@@ -125,6 +139,90 @@ const JobDetail = () => {
     return uploadedUrls;
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (!job) return;
+
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: newStatus })
+        .eq('id', job.id);
+
+      if (error) throw error;
+      
+      setJob({ ...job, status: newStatus });
+      toast.success(`Job status updated to ${newStatus}`);
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast.error('Failed to update status');
+    }
+  };
+
+  const handleEditJob = async (formData: {
+    jobNumber: string;
+    clientName: string;
+    clientEmail: string;
+    clientPhone: string;
+    notes: string;
+  }) => {
+    if (!job) return;
+
+    setSavingJob(true);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({
+          job_number: formData.jobNumber,
+          client_name: formData.clientName,
+          client_email: formData.clientEmail || null,
+          client_phone: formData.clientPhone || null,
+          notes: formData.notes || null,
+        })
+        .eq('id', job.id);
+
+      if (error) throw error;
+
+      toast.success('Job updated successfully!');
+      setIsEditingJob(false);
+      fetchJobDetails();
+    } catch (error) {
+      console.error('Update job error:', error);
+      toast.error('Failed to update job');
+    } finally {
+      setSavingJob(false);
+    }
+  };
+
+  const handleEditRug = async (
+    rugId: string,
+    formData: { rugNumber: string; rugType: string; length: string; width: string; notes: string }
+  ) => {
+    setSavingRug(true);
+    try {
+      const { error } = await supabase
+        .from('inspections')
+        .update({
+          rug_number: formData.rugNumber,
+          rug_type: formData.rugType,
+          length: formData.length ? parseFloat(formData.length) : null,
+          width: formData.width ? parseFloat(formData.width) : null,
+          notes: formData.notes || null,
+        })
+        .eq('id', rugId);
+
+      if (error) throw error;
+
+      toast.success('Rug updated successfully!');
+      setEditingRug(null);
+      fetchJobDetails();
+    } catch (error) {
+      console.error('Update rug error:', error);
+      toast.error('Failed to update rug');
+    } finally {
+      setSavingRug(false);
+    }
+  };
+
   const handleAddRug = async (
     formData: { rugNumber: string; length: string; width: string; rugType: string; notes: string },
     photos: File[]
@@ -139,7 +237,6 @@ const JobDetail = () => {
       
       toast.info('Analyzing rug with AI...');
       
-      // Call the edge function to analyze the rug
       const { data, error } = await supabase.functions.invoke('analyze-rug', {
         body: {
           photos: photoUrls,
@@ -157,7 +254,6 @@ const JobDetail = () => {
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      // Save the rug to the database
       const { error: insertError } = await supabase.from('inspections').insert({
         user_id: user.id,
         job_id: job.id,
@@ -206,6 +302,28 @@ const JobDetail = () => {
     }
   };
 
+  const handleDownloadJobPDF = async () => {
+    if (!job || rugs.length === 0) {
+      toast.error('No rugs to include in the report');
+      return;
+    }
+
+    try {
+      const rugsWithClient = rugs.map(rug => ({
+        ...rug,
+        client_name: job.client_name,
+        client_email: job.client_email,
+        client_phone: job.client_phone,
+      }));
+
+      await generateJobPDF(job, rugsWithClient);
+      toast.success('Complete job report downloaded!');
+    } catch (error) {
+      console.error('Job PDF generation error:', error);
+      toast.error('Failed to generate job report');
+    }
+  };
+
   const handleDeleteRug = async (rugId: string) => {
     if (!confirm('Are you sure you want to delete this rug?')) return;
 
@@ -222,6 +340,25 @@ const JobDetail = () => {
       console.error('Delete error:', error);
       toast.error('Failed to delete rug');
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
+    const Icon = statusConfig.icon;
+    
+    return (
+      <Badge 
+        variant="outline" 
+        className={`gap-1 ${
+          status === 'completed' ? 'border-green-500 text-green-600' :
+          status === 'in-progress' ? 'border-yellow-500 text-yellow-600' :
+          'border-blue-500 text-blue-600'
+        }`}
+      >
+        <Icon className="h-3 w-3" />
+        {statusConfig.label}
+      </Badge>
+    );
   };
 
   if (authLoading || loading) {
@@ -297,13 +434,55 @@ const JobDetail = () => {
         {/* Job Info Card */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="font-display text-2xl">
-                Job {job.job_number}
-              </CardTitle>
-              <Badge variant={job.status === 'active' ? 'default' : 'secondary'}>
-                {job.status}
-              </Badge>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <CardTitle className="font-display text-2xl">
+                  Job {job.job_number}
+                </CardTitle>
+                {getStatusBadge(job.status)}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={job.status} onValueChange={handleStatusChange}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex items-center gap-2">
+                          <option.icon className="h-4 w-4" />
+                          {option.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Dialog open={isEditingJob} onOpenChange={setIsEditingJob}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Edit2 className="h-4 w-4" />
+                      Edit Job
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="font-display text-xl">Edit Job</DialogTitle>
+                    </DialogHeader>
+                    <JobForm
+                      onSubmit={handleEditJob}
+                      isLoading={savingJob}
+                      mode="edit"
+                      initialData={{
+                        jobNumber: job.job_number,
+                        clientName: job.client_name,
+                        clientEmail: job.client_email || '',
+                        clientPhone: job.client_phone || '',
+                        notes: job.notes || '',
+                      }}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -337,28 +516,40 @@ const JobDetail = () => {
         {/* Rugs Section */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <CardTitle className="font-display text-xl">
                 Rugs ({rugs.length})
               </CardTitle>
-              <Dialog open={isAddingRug} onOpenChange={setIsAddingRug}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Rug
+              <div className="flex items-center gap-2">
+                {rugs.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={handleDownloadJobPDF}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Download Full Report
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="font-display text-xl">Add Rug to Job</DialogTitle>
-                  </DialogHeader>
-                  <RugForm
-                    onSubmit={handleAddRug}
-                    isLoading={analyzingRug}
-                    rugIndex={rugs.length}
-                  />
-                </DialogContent>
-              </Dialog>
+                )}
+                <Dialog open={isAddingRug} onOpenChange={setIsAddingRug}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Rug
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="font-display text-xl">Add Rug to Job</DialogTitle>
+                    </DialogHeader>
+                    <RugForm
+                      onSubmit={handleAddRug}
+                      isLoading={analyzingRug}
+                      rugIndex={rugs.length}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -396,13 +587,23 @@ const JobDetail = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewReport(rug)}
+                            title="View Report"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => setEditingRug(rug)}
+                            title="Edit Rug"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleDownloadPDF(rug)}
+                            title="Download PDF"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -411,6 +612,7 @@ const JobDetail = () => {
                             size="sm"
                             onClick={() => handleDeleteRug(rug.id)}
                             className="text-destructive hover:text-destructive"
+                            title="Delete Rug"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -424,6 +626,15 @@ const JobDetail = () => {
           </CardContent>
         </Card>
       </main>
+
+      {/* Edit Rug Dialog */}
+      <EditRugDialog
+        rug={editingRug}
+        open={!!editingRug}
+        onOpenChange={(open) => !open && setEditingRug(null)}
+        onSave={handleEditRug}
+        isLoading={savingRug}
+      />
     </div>
   );
 };
