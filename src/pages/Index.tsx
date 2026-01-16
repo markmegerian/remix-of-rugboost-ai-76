@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import rugboostLogo from '@/assets/rugboost-logo.svg';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -20,11 +21,9 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center space-y-4">
-        <div className="rounded-xl bg-gradient-to-br from-primary to-terracotta-light p-4 shadow-soft mx-auto w-fit">
-          <Sparkles className="h-8 w-8 text-primary-foreground" />
-        </div>
+        <img src={rugboostLogo} alt="RugBoost" className="h-16 w-16 mx-auto" />
         <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-        <p className="text-muted-foreground">Loading RugInspect...</p>
+        <p className="text-muted-foreground">Loading RugBoost...</p>
       </div>
     </div>
   );

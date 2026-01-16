@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { z } from 'zod';
+import rugboostLogo from '@/assets/rugboost-logo.svg';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -107,12 +108,10 @@ const Auth = () => {
       <header className="border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto flex items-center justify-center px-4 py-6">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-gradient-to-br from-primary to-terracotta-light p-2.5 shadow-soft">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
             <div>
               <h1 className="font-display text-xl font-bold text-foreground">
-                RugInspect
+                RugBoost
               </h1>
               <p className="text-xs text-muted-foreground">
                 AI-Powered Analysis

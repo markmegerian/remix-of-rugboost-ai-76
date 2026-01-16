@@ -51,10 +51,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        terracotta: {
-          DEFAULT: "hsl(var(--terracotta))",
-          light: "hsl(var(--terracotta-light))",
-          dark: "hsl(var(--terracotta-dark))",
+        rugboost: {
+          blue: "hsl(var(--rugboost-blue))",
+          "blue-light": "hsl(var(--rugboost-blue-light))",
+          purple: "hsl(var(--rugboost-purple))",
+          "purple-light": "hsl(var(--rugboost-purple-light))",
         },
         cream: {
           DEFAULT: "hsl(var(--cream))",
