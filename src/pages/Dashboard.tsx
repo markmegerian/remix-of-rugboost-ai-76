@@ -1,56 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Search, Calendar, FileText, Eye, Download, Plus, LogOut, Loader2 } from 'lucide-react';
+import { Sparkles, Search, Calendar, Briefcase, Eye, Plus, LogOut, Loader2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
-import { generatePDF } from '@/lib/pdfGenerator';
 
-interface Inspection {
+interface Job {
   id: string;
+  job_number: string;
   client_name: string;
   client_email: string | null;
   client_phone: string | null;
-  rug_number: string;
-  rug_type: string;
-  length: number | null;
-  width: number | null;
   notes: string | null;
-  photo_urls: string[] | null;
-  analysis_report: string | null;
+  status: string;
   created_at: string;
+  rug_count?: number;
 }
-
-const RUG_TYPES = [
-  'All Types',
-  'Persian',
-  'Turkish',
-  'Afghan',
-  'Chinese',
-  'Indian',
-  'Moroccan',
-  'Kilim',
-  'Navajo',
-  'Other',
-];
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
-  const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [rugTypeFilter, setRugTypeFilter] = useState('All Types');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -60,23 +41,37 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (user) {
-      fetchInspections();
+      fetchJobs();
     }
   }, [user]);
 
-  const fetchInspections = async () => {
+  const fetchJobs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('inspections')
+      // Fetch jobs
+      const { data: jobsData, error: jobsError } = await supabase
+        .from('jobs')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setInspections(data || []);
+      if (jobsError) throw jobsError;
+
+      // Fetch rug counts for each job
+      const jobsWithCounts = await Promise.all(
+        (jobsData || []).map(async (job) => {
+          const { count } = await supabase
+            .from('inspections')
+            .select('*', { count: 'exact', head: true })
+            .eq('job_id', job.id);
+
+          return { ...job, rug_count: count || 0 };
+        })
+      );
+
+      setJobs(jobsWithCounts);
     } catch (error) {
-      console.error('Error fetching inspections:', error);
-      toast.error('Failed to load inspections');
+      console.error('Error fetching jobs:', error);
+      toast.error('Failed to load jobs');
     } finally {
       setLoading(false);
     }
@@ -87,48 +82,32 @@ const Dashboard = () => {
     navigate('/auth');
   };
 
-  const handleViewInspection = (inspection: Inspection) => {
-    setSelectedInspection(inspection);
-    setIsViewDialogOpen(true);
-  };
-
-  const handleDownloadPDF = async (inspection: Inspection) => {
-    try {
-      await generatePDF(inspection);
-      toast.success('PDF downloaded successfully!');
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
-    }
-  };
-
-  const filteredInspections = inspections.filter((inspection) => {
+  const filteredJobs = jobs.filter((job) => {
     // Search filter
     const matchesSearch =
-      inspection.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inspection.rug_number.toLowerCase().includes(searchQuery.toLowerCase());
+      job.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.job_number.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Rug type filter
-    const matchesRugType =
-      rugTypeFilter === 'All Types' || inspection.rug_type === rugTypeFilter;
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
 
     // Date filter
     let matchesDate = true;
     if (dateFilter !== 'all') {
-      const inspectionDate = new Date(inspection.created_at);
+      const jobDate = new Date(job.created_at);
       const now = new Date();
       if (dateFilter === 'today') {
-        matchesDate = inspectionDate.toDateString() === now.toDateString();
+        matchesDate = jobDate.toDateString() === now.toDateString();
       } else if (dateFilter === 'week') {
-        const weekAgo = new Date(now.setDate(now.getDate() - 7));
-        matchesDate = inspectionDate >= weekAgo;
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        matchesDate = jobDate >= weekAgo;
       } else if (dateFilter === 'month') {
-        const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
-        matchesDate = inspectionDate >= monthAgo;
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        matchesDate = jobDate >= monthAgo;
       }
     }
 
-    return matchesSearch && matchesRugType && matchesDate;
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   if (authLoading) {
@@ -149,18 +128,14 @@ const Dashboard = () => {
               <Sparkles className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground">
-                RugInspect
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Inspection Dashboard
-              </p>
+              <h1 className="font-display text-xl font-bold text-foreground">RugInspect</h1>
+              <p className="text-xs text-muted-foreground">Job Dashboard</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={() => navigate('/')} size="sm" className="gap-2">
+            <Button onClick={() => navigate('/jobs/new')} size="sm" className="gap-2">
               <Plus className="h-4 w-4" />
-              New Inspection
+              New Job
             </Button>
             <Button onClick={handleSignOut} variant="outline" size="sm" className="gap-2">
               <LogOut className="h-4 w-4" />
@@ -186,22 +161,20 @@ const Dashboard = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by client or rug number..."
+                    placeholder="Search by client or job number..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
                   />
                 </div>
-                <Select value={rugTypeFilter} onValueChange={setRugTypeFilter}>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Rug Type" />
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {RUG_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={dateFilter} onValueChange={setDateFilter}>
@@ -220,14 +193,14 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Inspections Table */}
+          {/* Jobs Table */}
           <Card className="shadow-medium">
             <CardHeader>
               <CardTitle className="font-display text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Inspection History
+                <Briefcase className="h-5 w-5 text-primary" />
+                Jobs
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({filteredInspections.length} records)
+                  ({filteredJobs.length} total)
                 </span>
               </CardTitle>
             </CardHeader>
@@ -236,13 +209,13 @@ const Dashboard = () => {
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-              ) : filteredInspections.length === 0 ? (
+              ) : filteredJobs.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No inspections found</p>
-                  {inspections.length === 0 && (
-                    <Button onClick={() => navigate('/')} className="mt-4">
-                      Create Your First Inspection
+                  <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No jobs found</p>
+                  {jobs.length === 0 && (
+                    <Button onClick={() => navigate('/jobs/new')} className="mt-4">
+                      Create Your First Job
                     </Button>
                   )}
                 </div>
@@ -252,48 +225,39 @@ const Dashboard = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
+                        <TableHead>Job #</TableHead>
                         <TableHead>Client</TableHead>
-                        <TableHead>Rug #</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Dimensions</TableHead>
+                        <TableHead>Rugs</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInspections.map((inspection) => (
-                        <TableRow key={inspection.id}>
+                      {filteredJobs.map((job) => (
+                        <TableRow
+                          key={job.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/jobs/${job.id}`)}
+                        >
                           <TableCell className="font-medium">
-                            {format(new Date(inspection.created_at), 'MMM d, yyyy')}
+                            {format(new Date(job.created_at), 'MMM d, yyyy')}
                           </TableCell>
-                          <TableCell>{inspection.client_name}</TableCell>
-                          <TableCell>{inspection.rug_number}</TableCell>
-                          <TableCell>{inspection.rug_type}</TableCell>
+                          <TableCell className="font-mono">{job.job_number}</TableCell>
+                          <TableCell>{job.client_name}</TableCell>
                           <TableCell>
-                            {inspection.length && inspection.width
-                              ? `${inspection.length}' × ${inspection.width}'`
-                              : '—'}
+                            <Badge variant="secondary">{job.rug_count} rugs</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={job.status === 'active' ? 'default' : 'outline'}>
+                              {job.status}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewInspection(inspection)}
-                                className="gap-1"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDownloadPDF(inspection)}
-                                className="gap-1"
-                              >
-                                <Download className="h-4 w-4" />
-                                PDF
-                              </Button>
-                            </div>
+                            <Button variant="ghost" size="sm" className="gap-1">
+                              <Eye className="h-4 w-4" />
+                              View
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -305,90 +269,6 @@ const Dashboard = () => {
           </Card>
         </div>
       </main>
-
-      {/* View Inspection Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl">
-              Inspection Report
-            </DialogTitle>
-          </DialogHeader>
-          {selectedInspection && (
-            <div className="space-y-6">
-              {/* Rug Details */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Client</p>
-                  <p className="font-medium">{selectedInspection.client_name}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Rug Number</p>
-                  <p className="font-medium">{selectedInspection.rug_number}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Type</p>
-                  <p className="font-medium">{selectedInspection.rug_type}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Dimensions</p>
-                  <p className="font-medium">
-                    {selectedInspection.length && selectedInspection.width
-                      ? `${selectedInspection.length}' × ${selectedInspection.width}'`
-                      : '—'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Photos */}
-              {selectedInspection.photo_urls && selectedInspection.photo_urls.length > 0 && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Photos</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedInspection.photo_urls.map((url, index) => (
-                      <img
-                        key={index}
-                        src={url}
-                        alt={`Rug photo ${index + 1}`}
-                        className="h-20 w-20 object-cover rounded-lg border"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Analysis Report */}
-              {selectedInspection.analysis_report && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">AI Analysis</p>
-                  <div className="bg-muted/50 rounded-lg p-4 prose prose-sm max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm font-sans">
-                      {selectedInspection.analysis_report}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsViewDialogOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => handleDownloadPDF(selectedInspection)}
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" />
-                  Download PDF
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

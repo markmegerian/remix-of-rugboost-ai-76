@@ -18,10 +18,11 @@ export type Database = {
         Row: {
           analysis_report: string | null
           client_email: string | null
-          client_name: string
+          client_name: string | null
           client_phone: string | null
           created_at: string
           id: string
+          job_id: string | null
           length: number | null
           notes: string | null
           photo_urls: string[] | null
@@ -33,10 +34,11 @@ export type Database = {
         Insert: {
           analysis_report?: string | null
           client_email?: string | null
-          client_name: string
+          client_name?: string | null
           client_phone?: string | null
           created_at?: string
           id?: string
+          job_id?: string | null
           length?: number | null
           notes?: string | null
           photo_urls?: string[] | null
@@ -48,10 +50,11 @@ export type Database = {
         Update: {
           analysis_report?: string | null
           client_email?: string | null
-          client_name?: string
+          client_name?: string | null
           client_phone?: string | null
           created_at?: string
           id?: string
+          job_id?: string | null
           length?: number | null
           notes?: string | null
           photo_urls?: string[] | null
@@ -59,6 +62,53 @@ export type Database = {
           rug_type?: string
           user_id?: string | null
           width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspections_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          client_email: string | null
+          client_name: string
+          client_phone: string | null
+          created_at: string
+          id: string
+          job_number: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_email?: string | null
+          client_name: string
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          job_number: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_email?: string | null
+          client_name?: string
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          job_number?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
