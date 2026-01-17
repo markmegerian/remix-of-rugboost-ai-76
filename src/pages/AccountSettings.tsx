@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import ServicePricing from "@/components/ServicePricing";
 
 interface Profile {
   id: string;
@@ -417,6 +418,9 @@ const AccountSettings = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Service Pricing */}
+          {user && <ServicePricing userId={user.id} />}
 
           {/* Business Branding */}
           <Card>
