@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { generatePDF, generateJobPDF } from '@/lib/pdfGenerator';
+import { generatePDF, generateJobPDF, BusinessBranding } from '@/lib/pdfGenerator';
 import RugForm from '@/components/RugForm';
 import JobForm from '@/components/JobForm';
 import EditRugDialog from '@/components/EditRugDialog';
@@ -67,6 +67,7 @@ const JobDetail = () => {
   const [savingRug, setSavingRug] = useState(false);
   const [selectedRug, setSelectedRug] = useState<Rug | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [branding, setBranding] = useState<BusinessBranding | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -77,8 +78,30 @@ const JobDetail = () => {
   useEffect(() => {
     if (user && jobId) {
       fetchJobDetails();
+      fetchBranding();
     }
   }, [user, jobId]);
+
+  const fetchBranding = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('business_name, business_address, business_phone, business_email, logo_url')
+        .eq('user_id', user!.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching branding:', error);
+        return;
+      }
+
+      if (data) {
+        setBranding(data);
+      }
+    } catch (error) {
+      console.error('Error fetching branding:', error);
+    }
+  };
 
   const fetchJobDetails = async () => {
     setLoading(true);
@@ -378,7 +401,7 @@ const JobDetail = () => {
         client_name: job.client_name,
         client_email: job.client_email,
         client_phone: job.client_phone,
-      });
+      }, branding);
       toast.success('PDF downloaded successfully!');
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -400,7 +423,7 @@ const JobDetail = () => {
         client_phone: job.client_phone,
       }));
 
-      await generateJobPDF(job, rugsWithClient);
+      await generateJobPDF(job, rugsWithClient, branding);
       toast.success('Complete job report downloaded!');
     } catch (error) {
       console.error('Job PDF generation error:', error);

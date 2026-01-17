@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Building2, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Profile {
@@ -31,6 +33,9 @@ const AccountSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -38,6 +43,18 @@ const AccountSettings = () => {
     business_address: "",
     business_phone: "",
     business_email: "",
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  const [notifications, setNotifications] = useState({
+    emailReports: true,
+    jobUpdates: true,
+    marketingEmails: false,
   });
 
   useEffect(() => {
@@ -87,17 +104,20 @@ const AccountSettings = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file");
       return;
     }
 
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast.error("Image must be less than 2MB");
       return;
@@ -119,7 +139,6 @@ const AccountSettings = () => {
         .from("rug-photos")
         .getPublicUrl(filePath);
 
-      // Update profile with new logo URL
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ logo_url: urlData.publicUrl })
@@ -159,6 +178,39 @@ const AccountSettings = () => {
       toast.error("Failed to save settings");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password updated successfully");
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      toast.error(error.message || "Failed to change password");
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -203,7 +255,7 @@ const AccountSettings = () => {
           <div>
             <h1 className="text-3xl font-bold">Account Settings</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your account and business branding
+              Manage your account, security, and business branding
             </p>
           </div>
 
@@ -236,6 +288,132 @@ const AccountSettings = () => {
                 <p className="text-xs text-muted-foreground">
                   Email cannot be changed
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Password & Security */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Password & Security
+              </CardTitle>
+              <CardDescription>
+                Update your password to keep your account secure
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <div className="relative">
+                  <Input
+                    id="newPassword"
+                    name="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    value={passwordData.newPassword}
+                    onChange={handlePasswordInputChange}
+                    placeholder="Enter new password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordInputChange}
+                  placeholder="Confirm new password"
+                />
+              </div>
+              <Button
+                onClick={handlePasswordChange}
+                disabled={changingPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                variant="outline"
+              >
+                {changingPassword ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Lock className="mr-2 h-4 w-4" />
+                )}
+                Update Password
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Notification Preferences */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription>
+                Choose what notifications you want to receive
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="emailReports">Email Reports</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive analysis reports via email
+                  </p>
+                </div>
+                <Switch
+                  id="emailReports"
+                  checked={notifications.emailReports}
+                  onCheckedChange={(checked) =>
+                    setNotifications((prev) => ({ ...prev, emailReports: checked }))
+                  }
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="jobUpdates">Job Updates</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified when job status changes
+                  </p>
+                </div>
+                <Switch
+                  id="jobUpdates"
+                  checked={notifications.jobUpdates}
+                  onCheckedChange={(checked) =>
+                    setNotifications((prev) => ({ ...prev, jobUpdates: checked }))
+                  }
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="marketingEmails">Marketing Emails</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive tips, updates, and promotions
+                  </p>
+                </div>
+                <Switch
+                  id="marketingEmails"
+                  checked={notifications.marketingEmails}
+                  onCheckedChange={(checked) =>
+                    setNotifications((prev) => ({ ...prev, marketingEmails: checked }))
+                  }
+                />
               </div>
             </CardContent>
           </Card>
