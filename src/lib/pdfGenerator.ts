@@ -68,9 +68,9 @@ const RUGBOOST_LOGO_BASE64 = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDov
 // Helper function to compress and convert image to base64
 const compressImage = (
   img: HTMLImageElement,
-  maxWidth: number = 800,
-  maxHeight: number = 600,
-  quality: number = 0.7
+  maxWidth: number = 600,
+  maxHeight: number = 450,
+  quality: number = 0.5
 ): string => {
   const canvas = document.createElement('canvas');
   let { width, height } = img;
@@ -96,26 +96,22 @@ const compressImage = (
 };
 
 // Helper function to load image, compress it, and convert to base64
-const loadImageAsBase64 = async (url: string, compress: boolean = true): Promise<string | null> => {
+// forEmail: use more aggressive compression for email attachments
+const loadImageAsBase64 = async (url: string, forEmail: boolean = false): Promise<string | null> => {
   try {
     const response = await fetch(url);
     const blob = await response.blob();
     
-    if (!compress) {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-    }
-    
-    // Compress images for smaller PDF size
+    // Compress images for PDF (especially for email to keep size down)
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
         try {
-          const compressed = compressImage(img, 800, 600, 0.65);
+          // More aggressive compression for email PDFs
+          const maxW = forEmail ? 400 : 600;
+          const maxH = forEmail ? 300 : 450;
+          const quality = forEmail ? 0.35 : 0.5;
+          const compressed = compressImage(img, maxW, maxH, quality);
           resolve(compressed || null);
         } catch (e) {
           console.error('Compression failed, using original:', e);
@@ -471,7 +467,8 @@ const addPhotosToPDF = async (
   pageHeight: number,
   branding?: BusinessBranding | null,
   cachedLogoBase64?: string | null,
-  imageAnnotations?: PhotoAnnotations[] | unknown | null
+  imageAnnotations?: PhotoAnnotations[] | unknown | null,
+  forEmail: boolean = false
 ): Promise<number> => {
   let yPos = startY;
   
@@ -500,7 +497,7 @@ const addPhotosToPDF = async (
     }
     
     try {
-      const base64 = await loadImageAsBase64(url);
+      const base64 = await loadImageAsBase64(url, forEmail);
       if (base64) {
         // Photo label
         doc.setFontSize(9);
@@ -985,7 +982,7 @@ export const generateJobPDFBase64 = async (
     yPos += 5;
     
     if (rug.photo_urls && rug.photo_urls.length > 0) {
-      yPos = await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64, rug.image_annotations);
+      yPos = await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64, rug.image_annotations, true);
     }
     
     if (rug.analysis_report) {
