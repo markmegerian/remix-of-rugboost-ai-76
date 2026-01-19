@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Loader2, Plus, Hash, Ruler, Camera } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Loader2, Plus, Hash, Ruler, Camera, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,6 +50,7 @@ interface RugFormProps {
 
 const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
   const [photos, setPhotos] = useState<File[]>([]);
+  const [requiredPhotosComplete, setRequiredPhotosComplete] = useState(false);
   const [formData, setFormData] = useState<RugFormData>({
     rugNumber: `RUG-${String(rugIndex + 1).padStart(3, '0')}`,
     length: '',
@@ -69,11 +70,15 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
     setFormData((prev) => ({ ...prev, rugType: value }));
   };
 
+  const handleRequiredComplete = useCallback((complete: boolean) => {
+    setRequiredPhotosComplete(complete);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (photos.length === 0) {
-      toast.error('Please add at least one photo of the rug');
+    if (!requiredPhotosComplete) {
+      toast.error('Please capture all 6 required photos before submitting');
       return;
     }
 
@@ -170,7 +175,12 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
           </h2>
         </div>
 
-        <GuidedPhotoCapture photos={photos} onPhotosChange={setPhotos} maxPhotos={10} />
+        <GuidedPhotoCapture 
+          photos={photos} 
+          onPhotosChange={setPhotos} 
+          onRequiredComplete={handleRequiredComplete}
+          maxPhotos={50} 
+        />
       </section>
 
       {/* Additional Notes */}
@@ -189,12 +199,18 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
       </section>
 
       {/* Submit Button */}
-      <div className="pt-4">
+      <div className="pt-4 space-y-2">
+        {!requiredPhotosComplete && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span>All 6 required photos must be captured before submitting</span>
+          </div>
+        )}
         <Button
           type="submit"
           size="xl"
           className="w-full"
-          disabled={isLoading}
+          disabled={isLoading || !requiredPhotosComplete}
         >
           {isLoading ? (
             <>

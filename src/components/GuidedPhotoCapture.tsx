@@ -1,7 +1,14 @@
-import React, { useRef, useState } from 'react';
-import { Camera, X, Check, ChevronLeft, ChevronRight, AlertCircle, Plus } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Camera, X, Check, ChevronLeft, ChevronRight, AlertCircle, Plus, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+// Import reference images
+import guideOverallFront from '@/assets/photo-guide-overall-front.png';
+import guideOverallBack from '@/assets/photo-guide-overall-back.png';
+import guideFringe from '@/assets/photo-guide-fringe.png';
+import guideEdge from '@/assets/photo-guide-edge.png';
+import guideIssue from '@/assets/photo-guide-issue.png';
 
 // Photo step definitions with guidance
 const PHOTO_STEPS = [
@@ -12,6 +19,7 @@ const PHOTO_STEPS = [
     tip: 'Stand back far enough to fit the whole rug in frame',
     required: true,
     icon: '📷',
+    guideImage: guideOverallFront,
   },
   {
     id: 'overall-back',
@@ -20,6 +28,7 @@ const PHOTO_STEPS = [
     tip: 'This helps identify construction type and hidden damage',
     required: true,
     icon: '🔄',
+    guideImage: guideOverallBack,
   },
   {
     id: 'fringe-end-a',
@@ -28,6 +37,7 @@ const PHOTO_STEPS = [
     tip: 'Show the full width of the fringe clearly',
     required: true,
     icon: '〰️',
+    guideImage: guideFringe,
   },
   {
     id: 'fringe-end-b',
@@ -36,6 +46,7 @@ const PHOTO_STEPS = [
     tip: 'Capture any differences in condition from End A',
     required: true,
     icon: '〰️',
+    guideImage: guideFringe,
   },
   {
     id: 'edge-side-a',
@@ -44,6 +55,7 @@ const PHOTO_STEPS = [
     tip: 'Show the binding or selvedge condition',
     required: true,
     icon: '📏',
+    guideImage: guideEdge,
   },
   {
     id: 'edge-side-b',
@@ -52,11 +64,9 @@ const PHOTO_STEPS = [
     tip: 'Note any wear, loose threads, or damage',
     required: true,
     icon: '📏',
+    guideImage: guideEdge,
   },
 ] as const;
-
-// Optional damage/issue photos
-const OPTIONAL_PHOTO_SLOTS = 4; // Photos 7-10
 
 interface PhotoData {
   file: File;
@@ -67,13 +77,15 @@ interface PhotoData {
 interface GuidedPhotoCaptureProps {
   photos: File[];
   onPhotosChange: (photos: File[]) => void;
+  onRequiredComplete?: (complete: boolean) => void;
   maxPhotos?: number;
 }
 
 const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
   photos,
   onPhotosChange,
-  maxPhotos = 10,
+  onRequiredComplete,
+  maxPhotos = 50, // Allow many optional photos
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -85,6 +97,13 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
     PHOTO_STEPS.some(s => s.id === p.stepId)
   ).length;
   const additionalPhotos = photoData.filter(p => p.stepId.startsWith('additional-'));
+  const allRequiredComplete = completedRequiredSteps === totalRequiredSteps;
+  const remainingOptionalSlots = maxPhotos - totalRequiredSteps - additionalPhotos.length;
+
+  // Notify parent of required completion status
+  useEffect(() => {
+    onRequiredComplete?.(allRequiredComplete);
+  }, [allRequiredComplete, onRequiredComplete]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -114,21 +133,22 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
       setPhotoData(updatedPhotoData);
       syncPhotos(updatedPhotoData);
 
-      // Auto-advance to next step if not on last required step
-      if (currentStep < totalRequiredSteps - 1) {
-        setTimeout(() => setCurrentStep(currentStep + 1), 300);
-      } else if (currentStep === totalRequiredSteps - 1) {
-        // After last required step, switch to additional mode
+      // Auto-advance to next uncaptured step or additional mode
+      const nextUncapturedStep = findNextUncapturedStep(currentStep, updatedPhotoData);
+      if (nextUncapturedStep !== null) {
+        setTimeout(() => setCurrentStep(nextUncapturedStep), 300);
+      } else {
+        // All required done, switch to additional mode
         setTimeout(() => setCaptureMode('additional'), 300);
       }
     } else {
-      // Additional photo mode
+      // Additional photo mode - allow unlimited
       const additionalCount = photoData.filter(p => p.stepId.startsWith('additional-')).length;
-      if (additionalCount >= OPTIONAL_PHOTO_SLOTS) return;
+      if (additionalCount >= remainingOptionalSlots + additionalPhotos.length) return;
 
       const newPhotoData: PhotoData = {
         file,
-        stepId: `additional-${additionalCount + 1}`,
+        stepId: `additional-${Date.now()}`,
         label: `Issue Close-up ${additionalCount + 1}`,
       };
 
@@ -141,6 +161,22 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const findNextUncapturedStep = (fromStep: number, data: PhotoData[]): number | null => {
+    // First check steps after current
+    for (let i = fromStep + 1; i < totalRequiredSteps; i++) {
+      if (!data.find(p => p.stepId === PHOTO_STEPS[i].id)) {
+        return i;
+      }
+    }
+    // Then check steps before current
+    for (let i = 0; i <= fromStep; i++) {
+      if (!data.find(p => p.stepId === PHOTO_STEPS[i].id)) {
+        return i;
+      }
+    }
+    return null; // All complete
   };
 
   const syncPhotos = (data: PhotoData[]) => {
@@ -156,7 +192,6 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
     // Add additional photos
     data
       .filter(p => p.stepId.startsWith('additional-'))
-      .sort((a, b) => a.stepId.localeCompare(b.stepId))
       .forEach(p => orderedPhotos.push(p.file));
 
     onPhotosChange(orderedPhotos);
@@ -183,7 +218,9 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
     return photoData.find(p => p.stepId === stepId);
   };
 
-  const canProceedToAdditional = completedRequiredSteps === totalRequiredSteps;
+  const skipToAdditional = () => {
+    setCaptureMode('additional');
+  };
 
   return (
     <div className="space-y-6">
@@ -202,11 +239,21 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
           <span className="font-medium text-foreground">
             {captureMode === 'guided' 
               ? `Step ${currentStep + 1} of ${totalRequiredSteps}: ${PHOTO_STEPS[currentStep].title}`
-              : 'Additional Photos (Optional)'
+              : 'Additional Issue Photos (Optional)'
             }
           </span>
-          <span className="text-muted-foreground">
-            {completedRequiredSteps}/{totalRequiredSteps} required
+          <span className={cn(
+            "text-sm font-medium",
+            allRequiredComplete ? "text-primary" : "text-muted-foreground"
+          )}>
+            {allRequiredComplete ? (
+              <span className="flex items-center gap-1">
+                <Check className="h-4 w-4" />
+                {completedRequiredSteps}/{totalRequiredSteps} required
+              </span>
+            ) : (
+              `${completedRequiredSteps}/${totalRequiredSteps} required`
+            )}
           </span>
         </div>
         <div className="flex gap-1">
@@ -239,17 +286,16 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
           onClick={() => setCaptureMode('guided')}
           className="flex-1"
         >
-          Required Photos
+          Required Photos ({completedRequiredSteps}/{totalRequiredSteps})
         </Button>
         <Button
           type="button"
           variant={captureMode === 'additional' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setCaptureMode('additional')}
-          disabled={!canProceedToAdditional}
           className="flex-1"
         >
-          Issue Close-ups ({additionalPhotos.length}/{OPTIONAL_PHOTO_SLOTS})
+          Issue Close-ups ({additionalPhotos.length})
         </Button>
       </div>
 
@@ -257,72 +303,81 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
       {captureMode === 'guided' && (
         <div className="space-y-4">
           {/* Current Step Card */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">{PHOTO_STEPS[currentStep].icon}</span>
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground">
-                  {PHOTO_STEPS[currentStep].title}
-                  {PHOTO_STEPS[currentStep].required && (
-                    <span className="ml-2 text-xs text-destructive">Required</span>
-                  )}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {PHOTO_STEPS[currentStep].instruction}
-                </p>
-                <p className="text-xs text-primary mt-2 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {PHOTO_STEPS[currentStep].tip}
-                </p>
-              </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            {/* Reference Image */}
+            <div className="bg-muted/50 p-4 flex justify-center">
+              <img 
+                src={PHOTO_STEPS[currentStep].guideImage} 
+                alt={`Guide for ${PHOTO_STEPS[currentStep].title}`}
+                className="h-32 w-auto object-contain rounded-lg opacity-80"
+              />
             </div>
-
-            {/* Photo Preview or Capture Button */}
-            {getPhotoForStep(PHOTO_STEPS[currentStep].id) ? (
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
-                <img
-                  src={URL.createObjectURL(getPhotoForStep(PHOTO_STEPS[currentStep].id)!.file)}
-                  alt={PHOTO_STEPS[currentStep].title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-2 right-2 flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={openCamera}
-                    className="gap-1"
-                  >
-                    <Camera className="h-3 w-3" />
-                    Retake
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(PHOTO_STEPS[currentStep].id)}
-                    className="rounded-full bg-destructive p-1.5 text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-                <div className="absolute bottom-2 left-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground flex items-center gap-1">
-                  <Check className="h-3 w-3" />
-                  Captured
+            
+            <div className="p-4 space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">{PHOTO_STEPS[currentStep].icon}</span>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-foreground">
+                    {PHOTO_STEPS[currentStep].title}
+                    <span className="ml-2 text-xs text-destructive">Required</span>
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {PHOTO_STEPS[currentStep].instruction}
+                  </p>
+                  <p className="text-xs text-primary mt-2 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {PHOTO_STEPS[currentStep].tip}
+                  </p>
                 </div>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={openCamera}
-                className="w-full aspect-video rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/10 transition-all"
-              >
-                <div className="rounded-full bg-primary/20 p-4">
-                  <Camera className="h-8 w-8 text-primary" />
+
+              {/* Photo Preview or Capture Button */}
+              {getPhotoForStep(PHOTO_STEPS[currentStep].id) ? (
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+                  <img
+                    src={URL.createObjectURL(getPhotoForStep(PHOTO_STEPS[currentStep].id)!.file)}
+                    alt={PHOTO_STEPS[currentStep].title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={openCamera}
+                      className="gap-1"
+                    >
+                      <Camera className="h-3 w-3" />
+                      Retake
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(PHOTO_STEPS[currentStep].id)}
+                      className="rounded-full bg-destructive p-1.5 text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="absolute bottom-2 left-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground flex items-center gap-1">
+                    <Check className="h-3 w-3" />
+                    Captured
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-primary">
-                  Tap to capture {PHOTO_STEPS[currentStep].title}
-                </span>
-              </button>
-            )}
+              ) : (
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="w-full aspect-video rounded-lg border-2 border-dashed border-primary/50 bg-primary/5 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-primary hover:bg-primary/10 transition-all"
+                >
+                  <div className="rounded-full bg-primary/20 p-4">
+                    <Camera className="h-8 w-8 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-primary">
+                    Tap to capture {PHOTO_STEPS[currentStep].title}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Step Navigation */}
@@ -337,65 +392,86 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
               <ChevronLeft className="h-4 w-4 mr-1" />
               Previous
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (currentStep < totalRequiredSteps - 1) {
-                  setCurrentStep(currentStep + 1);
-                } else {
-                  setCaptureMode('additional');
-                }
-              }}
-              disabled={currentStep === totalRequiredSteps - 1 && !canProceedToAdditional}
-              className="flex-1"
-            >
-              {currentStep < totalRequiredSteps - 1 ? 'Next' : 'Add Issue Photos'}
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            {currentStep < totalRequiredSteps - 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCurrentStep(currentStep + 1)}
+                className="flex-1"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant={allRequiredComplete ? "default" : "outline"}
+                onClick={skipToAdditional}
+                className="flex-1"
+              >
+                {allRequiredComplete ? "Add Issue Photos" : "Skip to Issues"}
+                <SkipForward className="h-4 w-4 ml-1" />
+              </Button>
+            )}
           </div>
+
+          {/* Quick skip option */}
+          {!allRequiredComplete && (
+            <p className="text-center text-xs text-muted-foreground">
+              Complete all 6 required photos to submit the rug
+            </p>
+          )}
         </div>
       )}
 
       {/* Additional Photos View */}
       {captureMode === 'additional' && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-start gap-3 mb-4">
-              <span className="text-2xl">🔍</span>
-              <div>
-                <h3 className="font-semibold text-foreground">Issue Close-ups</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Capture close-up photos of any stains, damage, wear, moth damage, or notable areas
-                </p>
-              </div>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            {/* Reference Image */}
+            <div className="bg-muted/50 p-4 flex justify-center">
+              <img 
+                src={guideIssue} 
+                alt="Guide for issue close-ups"
+                className="h-24 w-auto object-contain rounded-lg opacity-80"
+              />
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {additionalPhotos.map((photo, index) => (
-                <div
-                  key={photo.stepId}
-                  className="relative aspect-square rounded-lg overflow-hidden bg-muted"
-                >
-                  <img
-                    src={URL.createObjectURL(photo.file)}
-                    alt={photo.label}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(photo.stepId)}
-                    className="absolute top-2 right-2 rounded-full bg-destructive p-1.5 text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                  <div className="absolute bottom-2 left-2 rounded-full bg-foreground/70 px-2 py-0.5 text-xs text-background">
-                    Issue {index + 1}
-                  </div>
+            
+            <div className="p-4">
+              <div className="flex items-start gap-3 mb-4">
+                <span className="text-2xl">🔍</span>
+                <div>
+                  <h3 className="font-semibold text-foreground">Issue Close-ups</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Capture close-up photos of any stains, damage, wear, moth damage, or notable areas. Add as many as needed.
+                  </p>
                 </div>
-              ))}
+              </div>
 
-              {additionalPhotos.length < OPTIONAL_PHOTO_SLOTS && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {additionalPhotos.map((photo, index) => (
+                  <div
+                    key={photo.stepId}
+                    className="relative aspect-square rounded-lg overflow-hidden bg-muted"
+                  >
+                    <img
+                      src={URL.createObjectURL(photo.file)}
+                      alt={photo.label}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(photo.stepId)}
+                      className="absolute top-2 right-2 rounded-full bg-destructive p-1.5 text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                    <div className="absolute bottom-2 left-2 rounded-full bg-foreground/70 px-2 py-0.5 text-xs text-background">
+                      Issue {index + 1}
+                    </div>
+                  </div>
+                ))}
+
                 <button
                   type="button"
                   onClick={openCamera}
@@ -404,7 +480,7 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                   <Plus className="h-6 w-6 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">Add Issue</span>
                 </button>
-              )}
+              </div>
             </div>
           </div>
 
@@ -413,6 +489,25 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
               No issues to document? You can skip this step.
             </p>
           )}
+
+          {/* Back to required photos button */}
+          {!allRequiredComplete && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const nextRequired = findNextUncapturedStep(-1, photoData);
+                if (nextRequired !== null) {
+                  setCaptureMode('guided');
+                  setCurrentStep(nextRequired);
+                }
+              }}
+              className="w-full"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back to Required Photos ({totalRequiredSteps - completedRequiredSteps} remaining)
+            </Button>
+          )}
         </div>
       )}
 
@@ -420,9 +515,9 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
       {photoData.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-foreground">
-            All Photos ({photoData.length}/{maxPhotos})
+            All Photos ({photoData.length})
           </h4>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
             {PHOTO_STEPS.map((step, index) => {
               const photo = getPhotoForStep(step.id);
               return (
@@ -435,9 +530,10 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                   className={cn(
                     "aspect-square rounded-lg overflow-hidden cursor-pointer transition-all",
                     photo 
-                      ? "ring-2 ring-primary ring-offset-2" 
-                      : "border-2 border-dashed border-muted-foreground/30 bg-muted/30"
+                      ? "ring-2 ring-primary ring-offset-1" 
+                      : "border-2 border-dashed border-destructive/30 bg-destructive/5"
                   )}
+                  title={step.title}
                 >
                   {photo ? (
                     <img
@@ -447,7 +543,7 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-lg opacity-50">{step.icon}</span>
+                      <span className="text-sm opacity-50">{step.icon}</span>
                     </div>
                   )}
                 </div>
@@ -457,7 +553,8 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
               <div
                 key={photo.stepId}
                 onClick={() => setCaptureMode('additional')}
-                className="aspect-square rounded-lg overflow-hidden cursor-pointer ring-2 ring-secondary ring-offset-2"
+                className="aspect-square rounded-lg overflow-hidden cursor-pointer ring-2 ring-secondary ring-offset-1"
+                title={photo.label}
               >
                 <img
                   src={URL.createObjectURL(photo.file)}
@@ -467,6 +564,12 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
               </div>
             ))}
           </div>
+          <p className="text-xs text-muted-foreground">
+            {allRequiredComplete 
+              ? "✓ All required photos captured" 
+              : `⚠ ${totalRequiredSteps - completedRequiredSteps} required photos missing`
+            }
+          </p>
         </div>
       )}
     </div>
