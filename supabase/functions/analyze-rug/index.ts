@@ -9,7 +9,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are an expert rug restoration specialist at Megerian Rug Cleaners. Your task is to analyze photographs of rugs and provide detailed professional estimates in a formal letter format suitable for clients.
+// Dynamic system prompt that includes business name
+const getSystemPrompt = (businessName: string, businessPhone: string, businessAddress: string) => `You are an expert rug restoration specialist at ${businessName}. Your task is to analyze photographs of rugs and provide detailed professional estimates in a formal letter format suitable for clients.
 
 CRITICAL FORMATTING RULES:
 - Do NOT use markdown formatting (no #, ##, **, -, etc.)
@@ -62,9 +63,9 @@ Subtotal: $[total]
 
 5. ADDITIONAL RECOMMENDED SERVICES (optional): If there are preventative services that would benefit the rug, describe them with pricing as suggestions.
 
-6. NEXT STEPS: Explain the assessment basis, offer to discuss priorities or budget, and provide timeline estimate.
+6. NEXT STEPS: Explain the assessment basis, offer to discuss priorities or budget, and provide timeline estimate. Include contact information: ${businessPhone ? `Please contact us at ${businessPhone}` : 'Please contact us'} to discuss these recommendations.
 
-7. CLOSING: Professional sign-off.
+7. CLOSING: Sign off with "Sincerely," followed by "${businessName}"${businessAddress ? ` at ${businessAddress}` : ''}.
 
 Use the provided service pricing to calculate costs. Calculate costs based on square footage where applicable (multiply price per sq ft by total square feet). For linear foot services (overcasting, binding), estimate based on rug perimeter.`;
 
@@ -83,24 +84,29 @@ serve(async (req) => {
 
     console.log(`Analyzing rug inspection for ${rugInfo.rugNumber} with ${photos.length} photos using Gemini`);
 
-    // Fetch user's service prices if userId is provided
+    // Fetch user's service prices and business info if userId is provided
     let servicePricesText = "";
+    let businessName = "Rug Restoration Services";
+    let businessPhone = "";
+    let businessAddress = "";
+    
     if (userId) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+        // Fetch service prices
         const { data: prices, error } = await supabase
           .from("service_prices")
           .select("service_name, unit_price")
           .eq("user_id", userId);
 
         if (!error && prices && prices.length > 0) {
-          servicePricesText = "\n\n**Service Pricing (per square foot):**\n";
+          servicePricesText = "\n\nSERVICE PRICING (per square foot):\n";
           prices.forEach((price: { service_name: string; unit_price: number }) => {
             if (price.unit_price > 0) {
-              servicePricesText += `- ${price.service_name}: $${price.unit_price.toFixed(2)}/sq ft\n`;
+              servicePricesText += `${price.service_name}: $${price.unit_price.toFixed(2)}/sq ft\n`;
             }
           });
           servicePricesText += "\nUse these prices when calculating cost estimates. If a service is not listed or has a $0 price, use industry standard estimates.";
@@ -108,8 +114,22 @@ serve(async (req) => {
         } else {
           console.log("No service prices found for user, using default estimates");
         }
+
+        // Fetch business info from profiles
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("business_name, business_phone, business_address")
+          .eq("user_id", userId)
+          .single();
+
+        if (!profileError && profile) {
+          businessName = profile.business_name || businessName;
+          businessPhone = profile.business_phone || "";
+          businessAddress = profile.business_address || "";
+          console.log("Loaded business info for user:", userId, businessName);
+        }
       } catch (priceError) {
-        console.error("Error fetching service prices:", priceError);
+        console.error("Error fetching user data:", priceError);
       }
     }
 
@@ -151,7 +171,7 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
         messages: [
           {
             role: "system",
-            content: SYSTEM_PROMPT,
+            content: getSystemPrompt(businessName, businessPhone, businessAddress),
           },
           {
             role: "user",
