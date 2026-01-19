@@ -81,7 +81,7 @@ const EmailRequestSchema = z.object({
     rugType: z.string().min(1).max(100).transform(sanitizeString),
     dimensions: z.string().max(100).transform(sanitizeString)
   })).max(50),
-  pdfBase64: z.string().max(10000000).refine(isValidBase64, { message: "Invalid PDF data" }).optional(),
+  pdfBase64: z.string().max(25000000).refine(isValidBase64, { message: "Invalid PDF data" }).optional(),
   subject: z.string().max(200).transform(sanitizeString).optional(),
   customMessage: z.string().max(5000).transform(sanitizeString).optional(),
   businessName: z.string().max(200).transform(sanitizeString).optional(),
