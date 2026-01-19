@@ -375,18 +375,8 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
         <CardContent 
           className="pt-8 pb-10 px-8 md:px-12 relative"
           style={{
-            background: `
-              linear-gradient(180deg, hsl(40 30% 97%) 0%, hsl(35 25% 95%) 100%),
-              repeating-linear-gradient(
-                0deg,
-                transparent,
-                transparent 2px,
-                hsl(30 20% 90% / 0.3) 2px,
-                hsl(30 20% 90% / 0.3) 4px
-              )
-            `,
-            backgroundBlendMode: 'multiply',
-            boxShadow: 'inset 0 0 60px hsl(30 20% 85% / 0.4)',
+            background: `linear-gradient(180deg, hsl(40 20% 99%) 0%, hsl(35 15% 97%) 100%)`,
+            boxShadow: 'inset 0 0 80px hsl(30 15% 92% / 0.5)',
           }}
         >
           {/* Subtle corner flourishes */}
