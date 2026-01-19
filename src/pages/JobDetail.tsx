@@ -43,6 +43,7 @@ interface Rug {
   notes: string | null;
   photo_urls: string[] | null;
   analysis_report: string | null;
+  image_annotations: unknown;
   created_at: string;
 }
 
@@ -344,14 +345,16 @@ const JobDetail = () => {
       if (data.error) throw new Error(data.error);
 
       // Store image annotations if provided
-      if (data.imageAnnotations) {
-        setImageAnnotations(data.imageAnnotations);
-      }
+      const annotations = data.imageAnnotations || [];
+      setImageAnnotations(annotations);
 
-      // Update the rug with analysis
+      // Update the rug with analysis and annotations
       const { error: updateError } = await supabase
         .from('inspections')
-        .update({ analysis_report: data.report })
+        .update({ 
+          analysis_report: data.report,
+          image_annotations: annotations
+        })
         .eq('id', rug.id);
 
       if (updateError) throw updateError;
@@ -399,20 +402,26 @@ const JobDetail = () => {
       if (data.error) throw new Error(data.error);
 
       // Store image annotations if provided
-      if (data.imageAnnotations) {
-        setImageAnnotations(data.imageAnnotations);
-      }
+      const annotations = data.imageAnnotations || [];
+      setImageAnnotations(annotations);
 
-      // Update the rug with new analysis
+      // Update the rug with new analysis and annotations
       const { error: updateError } = await supabase
         .from('inspections')
-        .update({ analysis_report: data.report })
+        .update({ 
+          analysis_report: data.report,
+          image_annotations: annotations
+        })
         .eq('id', rug.id);
 
       if (updateError) throw updateError;
 
-      // Update local state to reflect the new report
-      setSelectedRug(prev => prev ? { ...prev, analysis_report: data.report } : null);
+      // Update local state to reflect the new report and annotations
+      setSelectedRug(prev => prev ? { 
+        ...prev, 
+        analysis_report: data.report,
+        image_annotations: annotations
+      } : null);
 
       toast.success(`${rug.rug_number} re-analyzed!`);
       fetchJobDetails();
@@ -729,7 +738,11 @@ const JobDetail = () => {
                 dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
               }}
               photoUrls={selectedRug.photo_urls || []}
-              imageAnnotations={imageAnnotations}
+              imageAnnotations={
+                imageAnnotations.length > 0 
+                  ? imageAnnotations 
+                  : (Array.isArray(selectedRug.image_annotations) ? selectedRug.image_annotations : [])
+              }
               onNewInspection={() => setShowReport(false)}
               onReviewEstimate={() => {
                 setShowReport(false);
