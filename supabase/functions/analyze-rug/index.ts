@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
@@ -8,6 +9,20 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schema
+const RequestSchema = z.object({
+  photos: z.array(z.string().url()).min(1).max(20),
+  rugInfo: z.object({
+    clientName: z.string().min(1).max(200),
+    rugNumber: z.string().min(1).max(100),
+    rugType: z.string().min(1).max(100),
+    length: z.union([z.string().max(20), z.number()]).optional(),
+    width: z.union([z.string().max(20), z.number()]).optional(),
+    notes: z.string().max(5000).optional().nullable()
+  }),
+  userId: z.string().uuid().optional()
+});
 
 // Dynamic system prompt that includes business name
 const getSystemPrompt = (businessName: string, businessPhone: string, businessAddress: string) => `You are an expert rug restoration specialist at ${businessName}. Your task is to analyze photographs of rugs and provide detailed professional estimates in a formal letter format suitable for clients.
@@ -116,7 +131,66 @@ serve(async (req) => {
   }
 
   try {
-    const { photos, rugInfo, userId } = await req.json();
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error("Auth error:", claimsError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid token' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const authenticatedUserId = claimsData.claims.sub;
+    console.log("Authenticated user:", authenticatedUserId);
+
+    // Parse and validate request body
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validationResult = RequestSchema.safeParse(body);
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.issues);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request data', 
+          details: validationResult.error.issues.map(i => ({ path: i.path.join('.'), message: i.message }))
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { photos, rugInfo, userId } = validationResult.data;
+
+    // Ensure the userId matches the authenticated user (if provided)
+    const effectiveUserId = userId || authenticatedUserId;
+    if (userId && userId !== authenticatedUserId) {
+      console.warn("UserId mismatch - using authenticated user:", authenticatedUserId);
+    }
 
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -124,58 +198,55 @@ serve(async (req) => {
 
     console.log(`Analyzing rug inspection for ${rugInfo.rugNumber} with ${photos.length} photos using Gemini`);
 
-    // Fetch user's service prices and business info if userId is provided
+    // Fetch user's service prices and business info using service role key
     let servicePricesText = "";
     let businessName = "Rug Restoration Services";
     let businessPhone = "";
     let businessAddress = "";
     
-    if (userId) {
-      try {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    try {
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        // Fetch service prices
-        const { data: prices, error } = await supabase
-          .from("service_prices")
-          .select("service_name, unit_price")
-          .eq("user_id", userId);
+      // Fetch service prices
+      const { data: prices, error } = await supabase
+        .from("service_prices")
+        .select("service_name, unit_price")
+        .eq("user_id", effectiveUserId);
 
-        if (!error && prices && prices.length > 0) {
-          servicePricesText = "\n\nSERVICE PRICING (per square foot):\n";
-          prices.forEach((price: { service_name: string; unit_price: number }) => {
-            if (price.unit_price > 0) {
-              servicePricesText += `${price.service_name}: $${price.unit_price.toFixed(2)}/sq ft\n`;
-            }
-          });
-          servicePricesText += "\nUse these prices when calculating cost estimates. If a service is not listed or has a $0 price, use industry standard estimates.";
-          console.log("Loaded service prices for user:", userId);
-        } else {
-          console.log("No service prices found for user, using default estimates");
-        }
-
-        // Fetch business info from profiles
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("business_name, business_phone, business_address")
-          .eq("user_id", userId)
-          .single();
-
-        if (!profileError && profile) {
-          businessName = profile.business_name || businessName;
-          businessPhone = profile.business_phone || "";
-          businessAddress = profile.business_address || "";
-          console.log("Loaded business info for user:", userId, businessName);
-        }
-      } catch (priceError) {
-        console.error("Error fetching user data:", priceError);
+      if (!error && prices && prices.length > 0) {
+        servicePricesText = "\n\nSERVICE PRICING (per square foot):\n";
+        prices.forEach((price: { service_name: string; unit_price: number }) => {
+          if (price.unit_price > 0) {
+            servicePricesText += `${price.service_name}: $${price.unit_price.toFixed(2)}/sq ft\n`;
+          }
+        });
+        servicePricesText += "\nUse these prices when calculating cost estimates. If a service is not listed or has a $0 price, use industry standard estimates.";
+        console.log("Loaded service prices for user:", effectiveUserId);
+      } else {
+        console.log("No service prices found for user, using default estimates");
       }
+
+      // Fetch business info from profiles
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("business_name, business_phone, business_address")
+        .eq("user_id", effectiveUserId)
+        .single();
+
+      if (!profileError && profile) {
+        businessName = profile.business_name || businessName;
+        businessPhone = profile.business_phone || "";
+        businessAddress = profile.business_address || "";
+        console.log("Loaded business info for user:", effectiveUserId, businessName);
+      }
+    } catch (priceError) {
+      console.error("Error fetching user data:", priceError);
     }
 
     // Calculate square footage
-    const length = rugInfo.length || 0;
-    const width = rugInfo.width || 0;
+    const length = typeof rugInfo.length === 'string' ? parseFloat(rugInfo.length) || 0 : rugInfo.length || 0;
+    const width = typeof rugInfo.width === 'string' ? parseFloat(rugInfo.width) || 0 : rugInfo.width || 0;
     const squareFootage = length * width;
 
     // Build the image content array for Gemini vision
@@ -187,14 +258,19 @@ serve(async (req) => {
       },
     }));
 
+    // Sanitize notes to prevent prompt injection
+    const sanitizedNotes = rugInfo.notes 
+      ? rugInfo.notes.replace(/[<>{}]/g, '').substring(0, 2000)
+      : "None provided";
+
     // Build the user message with rug details and images
     const userMessage = `RUG DETAILS:
-Client Name: ${rugInfo.clientName}
-Rug Number: ${rugInfo.rugNumber}
-Rug Type: ${rugInfo.rugType}
+Client Name: ${rugInfo.clientName.substring(0, 200)}
+Rug Number: ${rugInfo.rugNumber.substring(0, 100)}
+Rug Type: ${rugInfo.rugType.substring(0, 100)}
 Dimensions: ${length || "Unknown"}' x ${width || "Unknown"}' (${squareFootage > 0 ? squareFootage + " square feet" : "Unknown"})
 
-Inspector Notes: ${rugInfo.notes || "None provided"}
+Inspector Notes: ${sanitizedNotes}
 ${servicePricesText}
 
 Please examine the attached ${photos.length} photograph(s) and write a professional estimate letter following the format specified. Address it to the client by name. Calculate all costs based on the rug's square footage (${squareFootage} sq ft) and perimeter for linear services.`;

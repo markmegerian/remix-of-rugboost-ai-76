@@ -136,18 +136,21 @@ const AccountSettings = () => {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
+      // Use signed URL instead of public URL for private bucket
+      const { data: signedUrlData, error: urlError } = await supabase.storage
         .from("rug-photos")
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 604800); // 7 days expiry
+
+      if (urlError) throw urlError;
 
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ logo_url: urlData.publicUrl })
+        .update({ logo_url: signedUrlData.signedUrl })
         .eq("user_id", user!.id);
 
       if (updateError) throw updateError;
 
-      setProfile((prev) => prev ? { ...prev, logo_url: urlData.publicUrl } : null);
+      setProfile((prev) => prev ? { ...prev, logo_url: signedUrlData.signedUrl } : null);
       toast.success("Logo uploaded successfully");
     } catch (error) {
       console.error("Error uploading logo:", error);

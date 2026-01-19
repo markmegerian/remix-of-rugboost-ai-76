@@ -185,11 +185,17 @@ const JobDetail = () => {
         throw new Error(`Failed to upload ${photo.name}`);
       }
       
-      const { data: urlData } = supabase.storage
+      // Use signed URL instead of public URL for private bucket
+      const { data: signedUrlData, error: urlError } = await supabase.storage
         .from('rug-photos')
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 604800); // 7 days expiry
       
-      uploadedUrls.push(urlData.publicUrl);
+      if (urlError) {
+        console.error('Signed URL error:', urlError);
+        throw new Error(`Failed to get URL for ${photo.name}`);
+      }
+      
+      uploadedUrls.push(signedUrlData.signedUrl);
     }
     
     return uploadedUrls;

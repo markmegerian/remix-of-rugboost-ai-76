@@ -1,22 +1,29 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface EmailRequest {
-  to: string;
-  clientName: string;
-  jobNumber: string;
-  rugDetails: { rugNumber: string; rugType: string; dimensions: string }[];
-  pdfBase64?: string;
-  subject?: string;
-  customMessage?: string;
-  businessName?: string;
-  businessEmail?: string;
-  businessPhone?: string;
-}
+// Input validation schema
+const EmailRequestSchema = z.object({
+  to: z.string().email().max(255),
+  clientName: z.string().min(1).max(200),
+  jobNumber: z.string().min(1).max(100),
+  rugDetails: z.array(z.object({
+    rugNumber: z.string().min(1).max(100),
+    rugType: z.string().min(1).max(100),
+    dimensions: z.string().max(100)
+  })).max(50),
+  pdfBase64: z.string().max(10000000).optional(), // ~7.5MB max PDF
+  subject: z.string().max(200).optional(),
+  customMessage: z.string().max(5000).optional(),
+  businessName: z.string().max(200).optional(),
+  businessEmail: z.string().email().max(255).optional().or(z.literal("")),
+  businessPhone: z.string().max(50).optional(),
+});
 
 // SMTP client that handles STARTTLS on port 587
 async function sendSMTPEmail(options: {
@@ -149,7 +156,59 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { to, clientName, jobNumber, rugDetails, pdfBase64, subject, customMessage, businessName, businessEmail, businessPhone }: EmailRequest = await req.json();
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error("Auth error:", claimsError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid token' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Authenticated user:", claimsData.claims.sub);
+
+    // Parse and validate request body
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validationResult = EmailRequestSchema.safeParse(body);
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.issues);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid request data', 
+          details: validationResult.error.issues.map(i => ({ path: i.path.join('.'), message: i.message }))
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { to, clientName, jobNumber, rugDetails, pdfBase64, subject, customMessage, businessName, businessEmail, businessPhone } = validationResult.data;
 
     console.log("Sending email to:", to, "Job:", jobNumber, "Attachment:", !!pdfBase64);
 
@@ -164,16 +223,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     const fromName = businessName || "Rug Inspection Service";
     const rugSummaryHtml = rugDetails.map(r => 
-      `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${r.rugNumber}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${r.rugType}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${r.dimensions}</td></tr>`
+      `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${escapeHtml(r.rugNumber)}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${escapeHtml(r.rugType)}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${escapeHtml(r.dimensions)}</td></tr>`
     ).join("");
     
     const messageHtml = customMessage 
-      ? customMessage.split('\n').map(l => `<p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 15px">${l || '&nbsp;'}</p>`).join('')
-      : `<p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px">Dear <strong>${clientName}</strong>,</p><p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 30px">Thank you for choosing our services. Please find attached the detailed inspection report for Job #<strong>${jobNumber}</strong>.</p>`;
+      ? customMessage.split('\n').map(l => `<p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 15px">${escapeHtml(l) || '&nbsp;'}</p>`).join('')
+      : `<p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 20px">Dear <strong>${escapeHtml(clientName)}</strong>,</p><p style="color:#374151;font-size:16px;line-height:1.6;margin:0 0 30px">Thank you for choosing our services. Please find attached the detailed inspection report for Job #<strong>${escapeHtml(jobNumber)}</strong>.</p>`;
 
-    const emailHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;font-family:'Segoe UI',sans-serif;background:#f3f4f6"><div style="max-width:600px;margin:0 auto;padding:40px 20px"><div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px 16px 0 0;padding:40px 30px;text-align:center"><h1 style="color:white;margin:0;font-size:28px">${fromName}</h1><p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:16px">Rug Inspection Report</p></div><div style="background:white;padding:40px 30px;border-radius:0 0 16px 16px">${messageHtml}<div style="margin:30px 0"><h2 style="color:#1f2937;font-size:18px;margin:0 0 15px;border-bottom:2px solid #3b82f6;padding-bottom:10px">Rug Summary</h2><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:#f9fafb"><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Rug #</th><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Type</th><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Dimensions</th></tr></thead><tbody>${rugSummaryHtml}</tbody></table></div>${pdfBase64 ? '<div style="background:#eff6ff;border-radius:12px;padding:20px;margin:30px 0;text-align:center"><p style="color:#1e40af;margin:0">📎 <strong>Detailed PDF report attached</strong></p></div>' : ''}<p style="color:#374151;font-size:16px;margin:30px 0 0">If you have questions, please contact us.</p><p style="color:#374151;font-size:16px;margin:20px 0 0">Best regards,<br><strong>${fromName}</strong></p></div><div style="text-align:center;padding:30px 20px"><p style="color:#6b7280;font-size:14px;margin:0">${businessPhone || ''}${businessPhone && businessEmail ? ' • ' : ''}${businessEmail || ''}</p></div></div></body></html>`;
+    const emailHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;font-family:'Segoe UI',sans-serif;background:#f3f4f6"><div style="max-width:600px;margin:0 auto;padding:40px 20px"><div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px 16px 0 0;padding:40px 30px;text-align:center"><h1 style="color:white;margin:0;font-size:28px">${escapeHtml(fromName)}</h1><p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:16px">Rug Inspection Report</p></div><div style="background:white;padding:40px 30px;border-radius:0 0 16px 16px">${messageHtml}<div style="margin:30px 0"><h2 style="color:#1f2937;font-size:18px;margin:0 0 15px;border-bottom:2px solid #3b82f6;padding-bottom:10px">Rug Summary</h2><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:#f9fafb"><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Rug #</th><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Type</th><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Dimensions</th></tr></thead><tbody>${rugSummaryHtml}</tbody></table></div>${pdfBase64 ? '<div style="background:#eff6ff;border-radius:12px;padding:20px;margin:30px 0;text-align:center"><p style="color:#1e40af;margin:0">📎 <strong>Detailed PDF report attached</strong></p></div>' : ''}<p style="color:#374151;font-size:16px;margin:30px 0 0">If you have questions, please contact us.</p><p style="color:#374151;font-size:16px;margin:20px 0 0">Best regards,<br><strong>${escapeHtml(fromName)}</strong></p></div><div style="text-align:center;padding:30px 20px"><p style="color:#6b7280;font-size:14px;margin:0">${escapeHtml(businessPhone || '')}${businessPhone && businessEmail ? ' • ' : ''}${escapeHtml(businessEmail || '')}</p></div></div></body></html>`;
 
-    const attachments = pdfBase64 ? [{ filename: `Inspection_Report_Job_${jobNumber}.pdf`, content: pdfBase64 }] : [];
+    const attachments = pdfBase64 ? [{ filename: `Inspection_Report_Job_${jobNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`, content: pdfBase64 }] : [];
 
     await sendSMTPEmail({
       host: smtpHost,
@@ -194,5 +253,15 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
   }
 };
+
+// Helper function to escape HTML to prevent XSS
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 serve(handler);
