@@ -470,7 +470,20 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
-    const data = await response.json();
+    // Parse response with better error handling for truncated/empty responses
+    let data;
+    try {
+      const responseText = await response.text();
+      if (!responseText || responseText.trim() === '') {
+        console.error("Empty response from AI Gateway");
+        throw new Error("Empty response from AI - please try again");
+      }
+      data = JSON.parse(responseText);
+    } catch (jsonError) {
+      console.error("Failed to parse AI Gateway response:", jsonError);
+      throw new Error("Invalid response from AI - please try again");
+    }
+    
     console.log("Gemini response received successfully");
 
     // Extract the text content from the response
@@ -481,7 +494,7 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
       throw new Error("No analysis content in response");
     }
 
-    console.log("Analysis completed successfully using Gemini");
+    console.log(`Analysis completed successfully using ${model}`);
 
     // Try to parse as JSON (new structured format)
     let analysisReport: string;
