@@ -5,21 +5,9 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-// Allowed origins for CORS - restricts to known application domains
-const ALLOWED_ORIGINS = [
-  "https://rug-scan-report.lovable.app",
-  "https://id-preview--fef72b1b-d121-4ff6-bcc3-c957ca919cde.lovable.app",
-  "https://fef72b1b-d121-4ff6-bcc3-c957ca919cde.lovableproject.com",
-  Deno.env.get("APP_ORIGIN") || ""
-].filter(Boolean);
-
-const getCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 // Input validation schema
@@ -137,8 +125,6 @@ IMAGE ANNOTATIONS (for the "imageAnnotations" field):
 Use the provided service pricing to calculate costs. Calculate costs based on square footage where applicable (multiply price per sq ft by total square feet). For linear foot services (overcasting, binding), estimate based on rug perimeter. If prices are not provided, use reasonable industry standard estimates but ALWAYS provide actual numbers.`;
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -373,7 +359,7 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
     console.error("Error in analyze-rug function:", errorMessage);
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
-      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

@@ -2,18 +2,6 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
-interface ImageAnnotation {
-  label: string;
-  location: string;
-  x: number;
-  y: number;
-}
-
-interface PhotoAnnotations {
-  photoIndex: number;
-  annotations: ImageAnnotation[];
-}
-
 interface Inspection {
   id: string;
   client_name: string;
@@ -26,7 +14,6 @@ interface Inspection {
   notes: string | null;
   photo_urls: string[] | null;
   analysis_report: string | null;
-  image_annotations?: PhotoAnnotations[] | unknown;
   created_at: string;
 }
 
@@ -409,7 +396,7 @@ const addFormattedAnalysis = (
   return yPos;
 };
 
-// Helper to add photos with markers to PDF
+// Helper to add photos to PDF
 const addPhotosToPDF = async (
   doc: jsPDF,
   photoUrls: string[],
@@ -418,8 +405,7 @@ const addPhotosToPDF = async (
   pageWidth: number,
   pageHeight: number,
   branding?: BusinessBranding | null,
-  cachedLogoBase64?: string | null,
-  imageAnnotations?: PhotoAnnotations[]
+  cachedLogoBase64?: string | null
 ): Promise<number> => {
   let yPos = startY;
   
@@ -434,10 +420,8 @@ const addPhotosToPDF = async (
   let currentX = margin;
   let photosInRow = 0;
   
-  for (let photoIndex = 0; photoIndex < photoUrls.length; photoIndex++) {
-    const url = photoUrls[photoIndex];
-    
-    if (yPos + photoHeight + 25 > pageHeight - 30) {
+  for (const url of photoUrls) {
+    if (yPos + photoHeight > pageHeight - 30) {
       doc.addPage();
       yPos = addProfessionalHeaderSync(doc, pageWidth, branding, cachedLogoBase64);
       currentX = margin;
@@ -454,61 +438,9 @@ const addPhotosToPDF = async (
         
         doc.addImage(base64, 'JPEG', currentX, yPos, photoWidth, photoHeight);
         
-        // Draw markers on photo if annotations exist
-        const photoAnnotation = imageAnnotations?.find(a => a.photoIndex === photoIndex);
-        if (photoAnnotation && photoAnnotation.annotations.length > 0) {
-          photoAnnotation.annotations.forEach((annotation, annIndex) => {
-            // Calculate marker position on the PDF photo
-            const markerX = currentX + (annotation.x / 100) * photoWidth;
-            const markerY = yPos + (annotation.y / 100) * photoHeight;
-            
-            // Draw marker circle
-            doc.setFillColor(239, 68, 68); // Red color for markers
-            doc.circle(markerX, markerY, 3, 'F');
-            
-            // Draw marker number
-            doc.setFontSize(6);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(255, 255, 255);
-            doc.text((annIndex + 1).toString(), markerX, markerY + 1, { align: 'center' });
-          });
-        }
-        
-        // Add annotation legend below photo if there are annotations
-        let legendHeight = 0;
-        if (photoAnnotation && photoAnnotation.annotations.length > 0) {
-          legendHeight = Math.min(photoAnnotation.annotations.length * 4 + 2, 20);
-          let legendY = yPos + photoHeight + 3;
-          
-          doc.setFontSize(6);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(...COLORS.text);
-          
-          photoAnnotation.annotations.slice(0, 4).forEach((annotation, annIndex) => {
-            // Marker number
-            doc.setFillColor(239, 68, 68);
-            doc.circle(currentX + 2, legendY - 1, 2, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(5);
-            doc.text((annIndex + 1).toString(), currentX + 2, legendY, { align: 'center' });
-            
-            // Label text
-            doc.setTextColor(...COLORS.text);
-            doc.setFontSize(6);
-            const labelText = annotation.label.length > 35 ? annotation.label.substring(0, 35) + '...' : annotation.label;
-            doc.text(labelText, currentX + 6, legendY);
-            legendY += 4;
-          });
-          
-          if (photoAnnotation.annotations.length > 4) {
-            doc.setTextColor(...COLORS.textMuted);
-            doc.text(`+${photoAnnotation.annotations.length - 4} more issues`, currentX + 6, legendY);
-          }
-        }
-        
         photosInRow++;
         if (photosInRow >= photosPerRow) {
-          yPos += photoHeight + legendHeight + spacing;
+          yPos += photoHeight + spacing;
           currentX = margin;
           photosInRow = 0;
         } else {
@@ -525,144 +457,6 @@ const addPhotosToPDF = async (
   }
   
   return yPos;
-};
-
-// Add dedicated annotation pages with large photos and full marker details
-const addAnnotationPages = async (
-  doc: jsPDF,
-  photoUrls: string[],
-  imageAnnotations: PhotoAnnotations[],
-  pageWidth: number,
-  pageHeight: number,
-  margin: number,
-  branding?: BusinessBranding | null,
-  cachedLogoBase64?: string | null,
-  rugNumber?: string
-): Promise<void> => {
-  // Only add annotation pages if there are photos with annotations
-  const photosWithAnnotations = photoUrls.map((url, index) => ({
-    url,
-    photoIndex: index,
-    annotations: imageAnnotations.find(a => a.photoIndex === index)?.annotations || []
-  })).filter(p => p.annotations.length > 0);
-
-  if (photosWithAnnotations.length === 0) return;
-
-  for (const photo of photosWithAnnotations) {
-    doc.addPage();
-    let yPos = addProfessionalHeaderSync(doc, pageWidth, branding, cachedLogoBase64);
-    
-    // Page title
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.text);
-    const titleText = rugNumber 
-      ? `Photo Analysis: ${rugNumber} - Photo ${photo.photoIndex + 1}`
-      : `Photo Analysis: Photo ${photo.photoIndex + 1}`;
-    doc.text(titleText, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 12;
-    
-    // Issues count badge
-    doc.setFillColor(...COLORS.primary);
-    const badgeText = `${photo.annotations.length} Issue${photo.annotations.length > 1 ? 's' : ''} Identified`;
-    const badgeWidth = doc.getTextWidth(badgeText) + 16;
-    drawRoundedRect(doc, (pageWidth - badgeWidth) / 2, yPos - 5, badgeWidth, 10, 2);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...COLORS.white);
-    doc.text(badgeText, pageWidth / 2, yPos + 1, { align: 'center' });
-    yPos += 15;
-    
-    // Large photo with markers
-    const photoMaxWidth = pageWidth - margin * 2;
-    const photoMaxHeight = 120; // Larger photo
-    
-    try {
-      const base64 = await loadImageAsBase64(photo.url);
-      if (base64) {
-        // Photo container with shadow effect
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin - 2, yPos - 2, photoMaxWidth + 4, photoMaxHeight + 4, 'F');
-        
-        doc.setDrawColor(...COLORS.border);
-        doc.setLineWidth(1);
-        doc.rect(margin, yPos, photoMaxWidth, photoMaxHeight);
-        
-        doc.addImage(base64, 'JPEG', margin, yPos, photoMaxWidth, photoMaxHeight);
-        
-        // Draw larger markers on the photo
-        photo.annotations.forEach((annotation, annIndex) => {
-          const markerX = margin + (annotation.x / 100) * photoMaxWidth;
-          const markerY = yPos + (annotation.y / 100) * photoMaxHeight;
-          
-          // Outer ring for visibility
-          doc.setDrawColor(255, 255, 255);
-          doc.setLineWidth(1.5);
-          doc.circle(markerX, markerY, 5, 'S');
-          
-          // Filled circle
-          doc.setFillColor(239, 68, 68);
-          doc.circle(markerX, markerY, 4, 'F');
-          
-          // Number
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(255, 255, 255);
-          doc.text((annIndex + 1).toString(), markerX, markerY + 2, { align: 'center' });
-        });
-        
-        yPos += photoMaxHeight + 10;
-      }
-    } catch (error) {
-      console.error('Error adding annotation page image:', error);
-      yPos += 10;
-    }
-    
-    // Detailed annotations list
-    yPos = addSectionHeader(doc, 'Issue Details', yPos, margin);
-    yPos += 5;
-    
-    // Create a card for each annotation
-    for (let i = 0; i < photo.annotations.length; i++) {
-      const annotation = photo.annotations[i];
-      
-      // Check if we need a new page
-      if (yPos > pageHeight - 40) {
-        doc.addPage();
-        yPos = addProfessionalHeaderSync(doc, pageWidth, branding, cachedLogoBase64);
-        yPos = addSectionHeader(doc, 'Issue Details (continued)', yPos, margin);
-        yPos += 5;
-      }
-      
-      // Annotation card
-      const cardHeight = 22;
-      doc.setFillColor(...COLORS.background);
-      drawRoundedRect(doc, margin, yPos, pageWidth - margin * 2, cardHeight, 3);
-      
-      // Number badge
-      doc.setFillColor(239, 68, 68);
-      doc.circle(margin + 12, yPos + cardHeight / 2, 6, 'F');
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text((i + 1).toString(), margin + 12, yPos + cardHeight / 2 + 2.5, { align: 'center' });
-      
-      // Issue label
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...COLORS.text);
-      doc.text(annotation.label, margin + 24, yPos + 9);
-      
-      // Location info
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...COLORS.textMuted);
-      const locationText = `Location: ${annotation.location || 'On rug'} (${Math.round(annotation.x)}%, ${Math.round(annotation.y)}%)`;
-      doc.text(locationText, margin + 24, yPos + 17);
-      
-      yPos += cardHeight + 5;
-    }
-  }
 };
 
 export const generatePDF = async (
@@ -741,12 +535,9 @@ export const generatePDF = async (
     yPos += noteHeight + 10;
   }
   
-  // Photos with markers
+  // Photos
   if (inspection.photo_urls && inspection.photo_urls.length > 0) {
-    const annotations = Array.isArray(inspection.image_annotations) 
-      ? inspection.image_annotations as PhotoAnnotations[]
-      : [];
-    yPos = await addPhotosToPDF(doc, inspection.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64, annotations);
+    yPos = await addPhotosToPDF(doc, inspection.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64);
   }
   
   // AI Analysis
@@ -768,24 +559,6 @@ export const generatePDF = async (
       pageHeight,
       branding,
       cachedLogoBase64
-    );
-  }
-  
-  // Add dedicated annotation pages with large photos
-  if (inspection.photo_urls && inspection.photo_urls.length > 0) {
-    const annotations = Array.isArray(inspection.image_annotations) 
-      ? inspection.image_annotations as PhotoAnnotations[]
-      : [];
-    await addAnnotationPages(
-      doc, 
-      inspection.photo_urls, 
-      annotations, 
-      pageWidth, 
-      pageHeight, 
-      margin, 
-      branding, 
-      cachedLogoBase64,
-      inspection.rug_number
     );
   }
   
@@ -926,12 +699,9 @@ export const generateJobPDF = async (
     
     yPos += 5;
     
-    // Photos with markers
+    // Photos
     if (rug.photo_urls && rug.photo_urls.length > 0) {
-      const annotations = Array.isArray(rug.image_annotations) 
-        ? rug.image_annotations as PhotoAnnotations[]
-        : [];
-      yPos = await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64, annotations);
+      yPos = await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64);
     }
     
     // Analysis
@@ -953,24 +723,6 @@ export const generateJobPDF = async (
         pageHeight,
         branding,
         cachedLogoBase64
-      );
-    }
-    
-    // Add dedicated annotation pages for this rug
-    if (rug.photo_urls && rug.photo_urls.length > 0) {
-      const annotations = Array.isArray(rug.image_annotations) 
-        ? rug.image_annotations as PhotoAnnotations[]
-        : [];
-      await addAnnotationPages(
-        doc, 
-        rug.photo_urls, 
-        annotations, 
-        pageWidth, 
-        pageHeight, 
-        margin, 
-        branding, 
-        cachedLogoBase64,
-        rug.rug_number
       );
     }
   }
@@ -1097,10 +849,7 @@ export const generateJobPDFBase64 = async (
     yPos += 5;
     
     if (rug.photo_urls && rug.photo_urls.length > 0) {
-      const annotations = Array.isArray(rug.image_annotations) 
-        ? rug.image_annotations as PhotoAnnotations[]
-        : [];
-      yPos = await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64, annotations);
+      yPos = await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64);
     }
     
     if (rug.analysis_report) {
@@ -1113,24 +862,6 @@ export const generateJobPDFBase64 = async (
       yPos += 5;
       
       yPos = addFormattedAnalysis(doc, rug.analysis_report, yPos, margin, pageWidth, pageHeight, branding, cachedLogoBase64);
-    }
-    
-    // Add dedicated annotation pages for this rug
-    if (rug.photo_urls && rug.photo_urls.length > 0) {
-      const annotations = Array.isArray(rug.image_annotations) 
-        ? rug.image_annotations as PhotoAnnotations[]
-        : [];
-      await addAnnotationPages(
-        doc, 
-        rug.photo_urls, 
-        annotations, 
-        pageWidth, 
-        pageHeight, 
-        margin, 
-        branding, 
-        cachedLogoBase64,
-        rug.rug_number
-      );
     }
   }
   

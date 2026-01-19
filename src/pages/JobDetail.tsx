@@ -77,7 +77,6 @@ const JobDetail = () => {
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [servicePrices, setServicePrices] = useState<{ name: string; unitPrice: number }[]>([]);
   const [imageAnnotations, setImageAnnotations] = useState<any[]>([]);
-  const [savingAnnotations, setSavingAnnotations] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -172,8 +171,7 @@ const JobDetail = () => {
     const uploadedUrls: string[] = [];
     
     for (const photo of photos) {
-      // Include user ID in path for user-scoped storage policies
-      const fileName = `${user!.id}/${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
       
       const { data, error } = await supabase.storage
         .from('rug-photos')
@@ -500,39 +498,7 @@ const JobDetail = () => {
 
   const handleViewReport = (rug: Rug) => {
     setSelectedRug(rug);
-    // Load annotations from the rug data
-    setImageAnnotations(Array.isArray(rug.image_annotations) ? rug.image_annotations : []);
     setShowReport(true);
-  };
-
-  const handleSaveAnnotations = async (annotations: any[]) => {
-    if (!selectedRug) return;
-    
-    setSavingAnnotations(true);
-    try {
-      const { error } = await supabase
-        .from('inspections')
-        .update({ image_annotations: annotations })
-        .eq('id', selectedRug.id);
-
-      if (error) throw error;
-
-      // Update local state
-      setImageAnnotations(annotations);
-      setSelectedRug(prev => prev ? { ...prev, image_annotations: annotations } : null);
-      
-      // Update the rug in the rugs list
-      setRugs(prev => prev.map(r => 
-        r.id === selectedRug.id ? { ...r, image_annotations: annotations } : r
-      ));
-
-      toast.success('Markers saved successfully!');
-    } catch (error) {
-      console.error('Failed to save annotations:', error);
-      toast.error('Failed to save marker changes');
-    } finally {
-      setSavingAnnotations(false);
-    }
   };
 
   const handleDownloadPDF = async (rug: Rug) => {
@@ -778,7 +744,11 @@ const JobDetail = () => {
                 dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
               }}
               photoUrls={selectedRug.photo_urls || []}
-              imageAnnotations={imageAnnotations}
+              imageAnnotations={
+                imageAnnotations.length > 0 
+                  ? imageAnnotations 
+                  : (Array.isArray(selectedRug.image_annotations) ? selectedRug.image_annotations : [])
+              }
               onNewInspection={() => setShowReport(false)}
               onReviewEstimate={() => {
                 setShowReport(false);
@@ -786,8 +756,6 @@ const JobDetail = () => {
               }}
               onReanalyze={() => handleReanalyzeRug(selectedRug)}
               isReanalyzing={reanalyzingRugId === selectedRug.id}
-              onAnnotationsChange={handleSaveAnnotations}
-              isSavingAnnotations={savingAnnotations}
             />
           </div>
         </main>

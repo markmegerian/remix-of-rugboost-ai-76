@@ -128,8 +128,7 @@ const AccountSettings = () => {
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user!.id}-logo-${Date.now()}.${fileExt}`;
-      // Include user ID in path for user-scoped storage policies
-      const filePath = `${user!.id}/logos/${fileName}`;
+      const filePath = `logos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("rug-photos")
@@ -192,8 +191,8 @@ const AccountSettings = () => {
       return;
     }
 
-    if (passwordData.newPassword.length < 12) {
-      toast.error("Password must be at least 12 characters");
+    if (passwordData.newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
       return;
     }
 
