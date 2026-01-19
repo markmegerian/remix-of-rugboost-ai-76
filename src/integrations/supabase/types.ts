@@ -22,6 +22,7 @@ export type Database = {
           client_phone: string | null
           created_at: string
           id: string
+          image_annotations: Json | null
           job_id: string | null
           length: number | null
           notes: string | null
@@ -38,6 +39,7 @@ export type Database = {
           client_phone?: string | null
           created_at?: string
           id?: string
+          image_annotations?: Json | null
           job_id?: string | null
           length?: number | null
           notes?: string | null
@@ -54,6 +56,7 @@ export type Database = {
           client_phone?: string | null
           created_at?: string
           id?: string
+          image_annotations?: Json | null
           job_id?: string | null
           length?: number | null
           notes?: string | null
