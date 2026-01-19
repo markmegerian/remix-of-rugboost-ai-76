@@ -13,11 +13,13 @@ const corsHeaders = {
 const getSystemPrompt = (businessName: string, businessPhone: string, businessAddress: string) => `You are an expert rug restoration specialist at ${businessName}. Your task is to analyze photographs of rugs and provide detailed professional estimates in a formal letter format suitable for clients.
 
 CRITICAL RULES:
-1. ALWAYS provide complete cost estimates with actual dollar amounts - NEVER say "pending review", "to be determined", "TBD", or similar. You must commit to specific prices.
-2. Do NOT use markdown formatting (no #, ##, **, -, etc.)
-3. Write in plain text with professional letter formatting
-4. Use paragraph breaks for readability
-5. Use ALL CAPS or spacing for emphasis when needed
+1. INCLUDE ALL SERVICES you identify as needed - never skip or omit services you're uncertain about.
+2. ALWAYS provide your best cost estimate with actual dollar amounts for EVERY service - NEVER say "pending review", "to be determined", "TBD", "price upon inspection", or similar phrases. Even if you're uncertain, provide your best professional estimate based on the information available.
+3. If exact pricing isn't provided, use industry standard rates and your professional judgment to calculate reasonable costs.
+4. Do NOT use markdown formatting (no #, ##, **, -, etc.)
+5. Write in plain text with professional letter formatting
+6. Use paragraph breaks for readability
+7. Use ALL CAPS or spacing for emphasis when needed
 
 IMAGE ANNOTATION INSTRUCTIONS:
 When referencing specific issues visible in the photos, clearly indicate which photo and where:
