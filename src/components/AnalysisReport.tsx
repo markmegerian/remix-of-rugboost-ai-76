@@ -1,7 +1,8 @@
-import React from 'react';
-import { FileText, DollarSign, Wrench, ArrowLeft, Download, ClipboardList, RefreshCw, ImageIcon } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { FileText, DollarSign, Wrench, ArrowLeft, Download, ClipboardList, RefreshCw, ImageIcon, Plus, X, Edit2, Check, MousePointer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { generatePDF } from '@/lib/pdfGenerator';
 
@@ -31,6 +32,7 @@ interface AnalysisReportProps {
   onReviewEstimate?: () => void;
   onReanalyze?: () => void;
   isReanalyzing?: boolean;
+  onAnnotationsChange?: (annotations: PhotoAnnotations[]) => void;
 }
 
 
@@ -43,7 +45,113 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
   onReviewEstimate,
   onReanalyze,
   isReanalyzing = false,
+  onAnnotationsChange,
 }) => {
+  const [editMode, setEditMode] = useState(false);
+  const [localAnnotations, setLocalAnnotations] = useState<PhotoAnnotations[]>(imageAnnotations);
+  const [editingMarker, setEditingMarker] = useState<{ photoIndex: number; annIndex: number } | null>(null);
+  const [editLabel, setEditLabel] = useState('');
+  const imageRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Sync local state when props change
+  React.useEffect(() => {
+    setLocalAnnotations(imageAnnotations);
+  }, [imageAnnotations]);
+
+  const handleImageClick = (e: React.MouseEvent<HTMLDivElement>, photoIndex: number) => {
+    if (!editMode) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const newAnnotation: ImageAnnotation = {
+      label: 'New marker - click to edit',
+      location: `Photo ${photoIndex + 1}`,
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10,
+    };
+
+    const updatedAnnotations = [...localAnnotations];
+    const existingPhotoAnnotation = updatedAnnotations.find(a => a.photoIndex === photoIndex);
+    
+    if (existingPhotoAnnotation) {
+      existingPhotoAnnotation.annotations.push(newAnnotation);
+    } else {
+      updatedAnnotations.push({
+        photoIndex,
+        annotations: [newAnnotation],
+      });
+    }
+
+    setLocalAnnotations(updatedAnnotations);
+    
+    // Start editing the new marker
+    const annIndex = existingPhotoAnnotation 
+      ? existingPhotoAnnotation.annotations.length - 1 
+      : 0;
+    setEditingMarker({ photoIndex, annIndex });
+    setEditLabel(newAnnotation.label);
+  };
+
+  const handleDeleteMarker = (photoIndex: number, annIndex: number) => {
+    const updatedAnnotations = localAnnotations.map(pa => {
+      if (pa.photoIndex === photoIndex) {
+        return {
+          ...pa,
+          annotations: pa.annotations.filter((_, idx) => idx !== annIndex),
+        };
+      }
+      return pa;
+    }).filter(pa => pa.annotations.length > 0);
+
+    setLocalAnnotations(updatedAnnotations);
+  };
+
+  const handleEditMarker = (photoIndex: number, annIndex: number) => {
+    const photoAnnotation = localAnnotations.find(a => a.photoIndex === photoIndex);
+    if (photoAnnotation) {
+      setEditingMarker({ photoIndex, annIndex });
+      setEditLabel(photoAnnotation.annotations[annIndex].label);
+    }
+  };
+
+  const handleSaveMarkerLabel = () => {
+    if (!editingMarker) return;
+
+    const updatedAnnotations = localAnnotations.map(pa => {
+      if (pa.photoIndex === editingMarker.photoIndex) {
+        return {
+          ...pa,
+          annotations: pa.annotations.map((ann, idx) => 
+            idx === editingMarker.annIndex 
+              ? { ...ann, label: editLabel }
+              : ann
+          ),
+        };
+      }
+      return pa;
+    });
+
+    setLocalAnnotations(updatedAnnotations);
+    setEditingMarker(null);
+    setEditLabel('');
+  };
+
+  const handleSaveAnnotations = () => {
+    if (onAnnotationsChange) {
+      onAnnotationsChange(localAnnotations);
+      toast.success('Markers saved successfully!');
+    }
+    setEditMode(false);
+  };
+
+  const handleCancelEdit = () => {
+    setLocalAnnotations(imageAnnotations);
+    setEditMode(false);
+    setEditingMarker(null);
+  };
+
   const handleDownloadPDF = async () => {
     try {
       // Parse dimensions
@@ -222,6 +330,8 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
     return elements;
   };
 
+  const displayAnnotations = editMode ? localAnnotations : imageAnnotations;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -283,15 +393,59 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
       {photoUrls.length > 0 && (
         <Card className="shadow-medium">
           <CardHeader className="border-b border-border">
-            <CardTitle className="flex items-center gap-2 font-display">
-              <ImageIcon className="h-5 w-5 text-primary" />
-              Photo Analysis
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 font-display">
+                <ImageIcon className="h-5 w-5 text-primary" />
+                Photo Analysis
+              </CardTitle>
+              {onAnnotationsChange && (
+                <div className="flex items-center gap-2">
+                  {editMode ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCancelEdit}
+                        className="gap-1"
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleSaveAnnotations}
+                        className="gap-1"
+                      >
+                        <Check className="h-4 w-4" />
+                        Save Markers
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditMode(true)}
+                      className="gap-1"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      Edit Markers
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+            {editMode && (
+              <div className="mt-3 p-3 bg-primary/10 rounded-lg flex items-center gap-2 text-sm text-primary">
+                <MousePointer className="h-4 w-4" />
+                <span>Click anywhere on a photo to add a new marker. Click a marker to edit or delete it.</span>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {photoUrls.map((url, photoIndex) => {
-                const photoAnnotation = imageAnnotations.find(
+                const photoAnnotation = displayAnnotations.find(
                   (a) => a.photoIndex === photoIndex
                 );
                 const annotations = photoAnnotation?.annotations || [];
@@ -301,7 +455,11 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
                     <p className="text-sm font-medium text-muted-foreground">
                       Photo {photoIndex + 1}
                     </p>
-                    <div className="relative rounded-lg overflow-hidden border border-border">
+                    <div 
+                      ref={el => imageRefs.current[photoIndex] = el}
+                      className={`relative rounded-lg overflow-hidden border border-border ${editMode ? 'cursor-crosshair' : ''}`}
+                      onClick={(e) => handleImageClick(e, photoIndex)}
+                    >
                       <img
                         src={url}
                         alt={`Rug photo ${photoIndex + 1}`}
@@ -317,18 +475,53 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
                             top: `${annotation.y}%`,
                             transform: 'translate(-50%, -50%)',
                           }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (editMode) {
+                              handleEditMarker(photoIndex, annIndex);
+                            }
+                          }}
                         >
                           {/* Marker dot */}
                           <div className="relative group cursor-pointer">
-                            <div className="w-6 h-6 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold shadow-lg border-2 border-white animate-pulse">
+                            <div className={`w-6 h-6 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold shadow-lg border-2 border-white ${editMode ? '' : 'animate-pulse'}`}>
                               {annIndex + 1}
                             </div>
                             {/* Tooltip */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                              <div className="bg-popover text-popover-foreground px-3 py-2 rounded-md shadow-lg text-sm whitespace-nowrap border border-border">
-                                {annotation.label}
+                            {!editMode && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                                <div className="bg-popover text-popover-foreground px-3 py-2 rounded-md shadow-lg text-sm whitespace-nowrap border border-border">
+                                  {annotation.label}
+                                </div>
                               </div>
-                            </div>
+                            )}
+                            {/* Edit mode tooltip with delete */}
+                            {editMode && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex z-10 gap-1">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditMarker(photoIndex, annIndex);
+                                  }}
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMarker(photoIndex, annIndex);
+                                  }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -336,24 +529,67 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
                     {/* Annotation legend */}
                     {annotations.length > 0 && (
                       <div className="space-y-1 mt-2">
-                        {annotations.map((annotation, annIndex) => (
-                          <div
-                            key={annIndex}
-                            className="flex items-start gap-2 text-sm"
-                          >
-                            <span className="w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold flex-shrink-0">
-                              {annIndex + 1}
-                            </span>
-                            <span className="text-foreground/80">
-                              {annotation.label}
-                            </span>
-                          </div>
-                        ))}
+                        {annotations.map((annotation, annIndex) => {
+                          const isEditing = editingMarker?.photoIndex === photoIndex && editingMarker?.annIndex === annIndex;
+                          
+                          return (
+                            <div
+                              key={annIndex}
+                              className="flex items-start gap-2 text-sm"
+                            >
+                              <span className="w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold flex-shrink-0">
+                                {annIndex + 1}
+                              </span>
+                              {isEditing ? (
+                                <div className="flex-1 flex items-center gap-2">
+                                  <Input
+                                    value={editLabel}
+                                    onChange={(e) => setEditLabel(e.target.value)}
+                                    className="h-7 text-sm"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveMarkerLabel();
+                                      } else if (e.key === 'Escape') {
+                                        setEditingMarker(null);
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2"
+                                    onClick={handleSaveMarkerLabel}
+                                  >
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span 
+                                  className={`text-foreground/80 ${editMode ? 'cursor-pointer hover:text-foreground' : ''}`}
+                                  onClick={() => editMode && handleEditMarker(photoIndex, annIndex)}
+                                >
+                                  {annotation.label}
+                                </span>
+                              )}
+                              {editMode && !isEditing && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0 ml-auto"
+                                  onClick={() => handleDeleteMarker(photoIndex, annIndex)}
+                                >
+                                  <X className="h-3 w-3 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                     {annotations.length === 0 && (
                       <p className="text-xs text-muted-foreground italic">
-                        No specific issues identified in this photo
+                        {editMode ? 'Click on the photo to add markers' : 'No specific issues identified in this photo'}
                       </p>
                     )}
                   </div>

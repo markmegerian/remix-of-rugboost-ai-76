@@ -8,6 +8,7 @@ import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import type { Json } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -757,6 +758,27 @@ const JobDetail = () => {
               }}
               onReanalyze={() => handleReanalyzeRug(selectedRug)}
               isReanalyzing={reanalyzingRugId === selectedRug.id}
+              onAnnotationsChange={async (newAnnotations) => {
+                try {
+                  const { error } = await supabase
+                    .from('inspections')
+                    .update({ image_annotations: newAnnotations as unknown as Json })
+                    .eq('id', selectedRug.id);
+                  
+                  if (error) throw error;
+                  
+                  setImageAnnotations(newAnnotations);
+                  // Update the rug in local state
+                  setRugs(prev => prev.map(r => 
+                    r.id === selectedRug.id 
+                      ? { ...r, image_annotations: newAnnotations as unknown as Json }
+                      : r
+                  ));
+                } catch (error) {
+                  console.error('Failed to save annotations:', error);
+                  toast.error('Failed to save markers');
+                }
+              }}
             />
           </div>
         </main>
