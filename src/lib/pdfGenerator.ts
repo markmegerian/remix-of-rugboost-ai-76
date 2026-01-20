@@ -701,9 +701,11 @@ interface CostLine {
 const extractCostLines = (analysis: string): CostLine[] => {
   const lines = analysis.split('\n');
   const costLines: CostLine[] = [];
+  let foundTotal = false;
   
   for (const line of lines) {
     const trimmed = line.trim();
+    const lowerTrimmed = trimmed.toLowerCase();
     const costMatch = trimmed.match(/\$[\d,]+(?:\.\d{2})?/);
     
     if (costMatch) {
@@ -711,6 +713,13 @@ const extractCostLines = (analysis: string): CostLine[] => {
         text: trimmed,
         cost: costMatch[0],
       });
+      
+      // Stop after finding the TOTAL line to avoid including additional/optional services below it
+      if (lowerTrimmed.includes('total estimate') || 
+          (lowerTrimmed.includes('total') && !lowerTrimmed.includes('subtotal'))) {
+        foundTotal = true;
+        break;
+      }
     }
   }
   
