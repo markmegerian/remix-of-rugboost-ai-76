@@ -159,9 +159,38 @@ serve(async (req) => {
           }
         }
 
-        // Send confirmation email to client
+        // Generate invoice PDF and send confirmation email to client
         if (job?.client_email) {
           try {
+            // Generate invoice PDF
+            let pdfBase64: string | undefined;
+            try {
+              const { data: pdfData, error: pdfError } = await supabaseAdmin.functions.invoke("generate-invoice-pdf", {
+                body: {
+                  jobNumber: job.job_number,
+                  clientName: job.client_name,
+                  clientEmail: job.client_email,
+                  amount: session.amount_total,
+                  rugs: rugs,
+                  businessName: profile?.business_name,
+                  businessEmail: profile?.business_email,
+                  businessPhone: profile?.business_phone,
+                  businessAddress: null, // Could fetch from profile if available
+                  paidAt: new Date().toISOString(),
+                },
+              });
+              
+              if (pdfError) {
+                console.log("Invoice PDF generation error:", pdfError);
+              } else if (pdfData?.pdfBase64) {
+                pdfBase64 = pdfData.pdfBase64;
+                console.log("Invoice PDF generated successfully");
+              }
+            } catch (pdfGenError) {
+              console.log("Invoice PDF generation failed:", pdfGenError);
+            }
+
+            // Send confirmation email with PDF attachment
             await supabaseAdmin.functions.invoke("send-client-confirmation", {
               body: {
                 clientEmail: job.client_email,
@@ -173,6 +202,7 @@ serve(async (req) => {
                 businessName: profile?.business_name,
                 businessEmail: profile?.business_email,
                 businessPhone: profile?.business_phone,
+                pdfBase64: pdfBase64,
               },
             });
             console.log("Client confirmation sent");
