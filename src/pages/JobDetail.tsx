@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
-  Edit2, FileText, CheckCircle, Clock, PlayCircle, Sparkles, FolderOpen, Mail, FlaskConical
+  Edit2, FileText, CheckCircle, Clock, PlayCircle, Sparkles, FolderOpen, Mail, FlaskConical,
+  Link, Copy, ExternalLink
 } from 'lucide-react';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { toast } from 'sonner';
@@ -48,6 +49,14 @@ interface Rug {
   analysis_report: string | null;
   image_annotations: unknown;
   created_at: string;
+  estimate_approved?: boolean;
+}
+
+interface ApprovedEstimate {
+  id: string;
+  inspection_id: string;
+  services: any[];
+  total_amount: number;
 }
 
 const STATUS_OPTIONS = [
@@ -87,6 +96,9 @@ const JobDetail = () => {
   const [analysisTotal, setAnalysisTotal] = useState<number>(0);
   const [compareRug, setCompareRug] = useState<Rug | null>(null);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
+  const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
+  const [clientPortalLink, setClientPortalLink] = useState<string | null>(null);
+  const [generatingPortalLink, setGeneratingPortalLink] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -99,6 +111,8 @@ const JobDetail = () => {
       fetchJobDetails();
       fetchBranding();
       fetchServicePrices();
+      fetchApprovedEstimates();
+      fetchClientPortalLink();
     }
   }, [user, jobId]);
 
@@ -152,6 +166,100 @@ const JobDetail = () => {
       }
     } catch (error) {
       console.error('Error fetching service prices:', error);
+    }
+  };
+
+  const fetchApprovedEstimates = async () => {
+    if (!jobId) return;
+    try {
+      const { data, error } = await supabase
+        .from('approved_estimates')
+        .select('id, inspection_id, services, total_amount')
+        .eq('job_id', jobId);
+
+      if (error) throw error;
+      // Cast the services field to any[] since it comes as Json from Supabase
+      const estimates = (data || []).map(ae => ({
+        ...ae,
+        services: Array.isArray(ae.services) ? ae.services : []
+      }));
+      setApprovedEstimates(estimates);
+    } catch (error) {
+      console.error('Error fetching approved estimates:', error);
+    }
+  };
+
+  const fetchClientPortalLink = async () => {
+    if (!jobId) return;
+    try {
+      const { data, error } = await supabase
+        .from('client_job_access')
+        .select('access_token')
+        .eq('job_id', jobId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      if (data) {
+        setClientPortalLink(`${window.location.origin}/client/${data.access_token}`);
+      }
+    } catch (error) {
+      console.error('Error fetching client portal link:', error);
+    }
+  };
+
+  const generateClientPortalLink = async () => {
+    if (!job || !jobId) return;
+
+    // Check if all analyzed rugs have approved estimates
+    const analyzedRugs = rugs.filter(r => r.analysis_report);
+    const approvedCount = approvedEstimates.length;
+
+    if (analyzedRugs.length === 0) {
+      toast.error('Please analyze at least one rug first');
+      return;
+    }
+
+    if (approvedCount < analyzedRugs.length) {
+      toast.error(`Please approve estimates for all analyzed rugs (${approvedCount}/${analyzedRugs.length} approved)`);
+      return;
+    }
+
+    setGeneratingPortalLink(true);
+    try {
+      // Generate a unique access token
+      const accessToken = crypto.randomUUID();
+
+      // Create client job access record
+      const { error } = await supabase
+        .from('client_job_access')
+        .insert({
+          job_id: jobId,
+          access_token: accessToken,
+          invited_email: job.client_email,
+        });
+
+      if (error) throw error;
+
+      // Update job to enable client portal
+      await supabase
+        .from('jobs')
+        .update({ 
+          client_portal_enabled: true,
+          all_estimates_approved: true 
+        })
+        .eq('id', jobId);
+
+      const link = `${window.location.origin}/client/${accessToken}`;
+      setClientPortalLink(link);
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(link);
+      toast.success('Client portal link generated and copied to clipboard!');
+    } catch (error) {
+      console.error('Error generating portal link:', error);
+      toast.error('Failed to generate client portal link');
+    } finally {
+      setGeneratingPortalLink(false);
     }
   };
 
@@ -755,17 +863,39 @@ const JobDetail = () => {
                 dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
                 squareFootage,
               }}
+              inspectionId={selectedRug.id}
+              jobId={jobId || ''}
               availableServices={servicePrices}
+              existingApprovedEstimate={approvedEstimates.find(ae => ae.inspection_id === selectedRug.id) || null}
               onBack={() => {
                 setShowEstimateReview(false);
                 setShowReport(true);
               }}
               onApprove={(services, totalCost) => {
-                // For now, just log and go back - can be extended to save to DB
-                console.log('Approved estimate:', { services, totalCost });
+                // Update local state with new approved estimate
+                setApprovedEstimates(prev => {
+                  const existing = prev.find(ae => ae.inspection_id === selectedRug.id);
+                  if (existing) {
+                    return prev.map(ae => 
+                      ae.inspection_id === selectedRug.id 
+                        ? { ...ae, services, total_amount: totalCost }
+                        : ae
+                    );
+                  } else {
+                    return [...prev, {
+                      id: crypto.randomUUID(),
+                      inspection_id: selectedRug.id,
+                      services,
+                      total_amount: totalCost
+                    }];
+                  }
+                });
+                // Update rug's estimate_approved flag locally
+                setRugs(prev => prev.map(r => 
+                  r.id === selectedRug.id ? { ...r, estimate_approved: true } : r
+                ));
                 setShowEstimateReview(false);
                 setShowReport(false);
-                toast.success(`Estimate approved: $${totalCost.toFixed(2)}`);
               }}
             />
           </div>
@@ -1009,6 +1139,56 @@ const JobDetail = () => {
                       </Button>
                     )}
                   </>
+                )}
+                {/* Client Portal Link Button */}
+                {rugs.length > 0 && rugs.some(r => r.analysis_report) && (
+                  clientPortalLink ? (
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(clientPortalLink);
+                          toast.success('Link copied to clipboard!');
+                        }}
+                        className="gap-1"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy Link
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.open(clientPortalLink, '_blank')}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open Portal
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="navy"
+                      className="gap-2"
+                      onClick={generateClientPortalLink}
+                      disabled={generatingPortalLink || approvedEstimates.length < rugs.filter(r => r.analysis_report).length}
+                      title={approvedEstimates.length < rugs.filter(r => r.analysis_report).length 
+                        ? `Approve all estimates first (${approvedEstimates.length}/${rugs.filter(r => r.analysis_report).length})` 
+                        : 'Generate client portal link'}
+                    >
+                      {generatingPortalLink ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Link className="h-4 w-4" />
+                          Generate Client Link
+                        </>
+                      )}
+                    </Button>
+                  )
                 )}
                 <Dialog open={isAddingRug} onOpenChange={setIsAddingRug}>
                   <DialogTrigger asChild>

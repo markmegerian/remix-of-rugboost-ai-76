@@ -14,6 +14,177 @@ export type Database = {
   }
   public: {
     Tables: {
+      approved_estimates: {
+        Row: {
+          approved_by_staff_at: string | null
+          approved_by_staff_user_id: string | null
+          created_at: string | null
+          id: string
+          inspection_id: string
+          job_id: string
+          services: Json
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          approved_by_staff_at?: string | null
+          approved_by_staff_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          inspection_id: string
+          job_id: string
+          services?: Json
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Update: {
+          approved_by_staff_at?: string | null
+          approved_by_staff_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          inspection_id?: string
+          job_id?: string
+          services?: Json
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approved_estimates_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: true
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approved_estimates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_accounts: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      client_job_access: {
+        Row: {
+          access_token: string
+          client_id: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          invited_email: string | null
+          job_id: string
+        }
+        Insert: {
+          access_token: string
+          client_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          invited_email?: string | null
+          job_id: string
+        }
+        Update: {
+          access_token?: string
+          client_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          invited_email?: string | null
+          job_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_job_access_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_job_access_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_service_selections: {
+        Row: {
+          approved_estimate_id: string
+          client_job_access_id: string
+          created_at: string | null
+          id: string
+          selected_services: Json
+          total_selected: number
+          updated_at: string | null
+        }
+        Insert: {
+          approved_estimate_id: string
+          client_job_access_id: string
+          created_at?: string | null
+          id?: string
+          selected_services?: Json
+          total_selected?: number
+          updated_at?: string | null
+        }
+        Update: {
+          approved_estimate_id?: string
+          client_job_access_id?: string
+          created_at?: string | null
+          id?: string
+          selected_services?: Json
+          total_selected?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_service_selections_approved_estimate_id_fkey"
+            columns: ["approved_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "approved_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_selections_client_job_access_id_fkey"
+            columns: ["client_job_access_id"]
+            isOneToOne: false
+            referencedRelation: "client_job_access"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspections: {
         Row: {
           analysis_report: string | null
@@ -21,6 +192,7 @@ export type Database = {
           client_name: string | null
           client_phone: string | null
           created_at: string
+          estimate_approved: boolean | null
           id: string
           image_annotations: Json | null
           job_id: string | null
@@ -38,6 +210,7 @@ export type Database = {
           client_name?: string | null
           client_phone?: string | null
           created_at?: string
+          estimate_approved?: boolean | null
           id?: string
           image_annotations?: Json | null
           job_id?: string | null
@@ -55,6 +228,7 @@ export type Database = {
           client_name?: string | null
           client_phone?: string | null
           created_at?: string
+          estimate_approved?: boolean | null
           id?: string
           image_annotations?: Json | null
           job_id?: string | null
@@ -78,42 +252,114 @@ export type Database = {
       }
       jobs: {
         Row: {
+          all_estimates_approved: boolean | null
+          client_approved_at: string | null
           client_email: string | null
           client_name: string
           client_phone: string | null
+          client_portal_enabled: boolean | null
           created_at: string
           id: string
           job_number: string
           notes: string | null
+          payment_status: string | null
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          all_estimates_approved?: boolean | null
+          client_approved_at?: string | null
           client_email?: string | null
           client_name: string
           client_phone?: string | null
+          client_portal_enabled?: boolean | null
           created_at?: string
           id?: string
           job_number: string
           notes?: string | null
+          payment_status?: string | null
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          all_estimates_approved?: boolean | null
+          client_approved_at?: string | null
           client_email?: string | null
           client_name?: string
           client_phone?: string | null
+          client_portal_enabled?: boolean | null
           created_at?: string
           id?: string
           job_number?: string
           notes?: string | null
+          payment_status?: string | null
           status?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          client_id: string | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          job_id: string
+          metadata: Json | null
+          paid_at: string | null
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          client_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          job_id: string
+          metadata?: Json | null
+          paid_at?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          client_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          job_id?: string
+          metadata?: Json | null
+          paid_at?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -184,15 +430,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "staff" | "client"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -319,6 +592,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["staff", "client"],
+    },
   },
 } as const

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Select,
   SelectContent,
@@ -15,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface ServiceItem {
+export interface ServiceItem {
   id: string;
   name: string;
   description?: string;
@@ -32,9 +34,16 @@ interface EstimateReviewProps {
     dimensions: string;
     squareFootage: number | null;
   };
+  inspectionId: string;
+  jobId: string;
   onBack: () => void;
   onApprove: (services: ServiceItem[], totalCost: number) => void;
   availableServices?: { name: string; unitPrice: number }[];
+  existingApprovedEstimate?: {
+    id: string;
+    services: ServiceItem[];
+    total_amount: number;
+  } | null;
 }
 
 const PRIORITY_COLORS = {
@@ -46,18 +55,29 @@ const PRIORITY_COLORS = {
 const EstimateReview: React.FC<EstimateReviewProps> = ({
   report,
   rugInfo,
+  inspectionId,
+  jobId,
   onBack,
   onApprove,
   availableServices = [],
+  existingApprovedEstimate,
 }) => {
+  const { user } = useAuth();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Parse the AI report to extract services and costs
+  // Load existing approved estimate or parse from report
   useEffect(() => {
-    const extractedServices = parseReportForServices(report);
-    setServices(extractedServices);
-  }, [report]);
+    if (existingApprovedEstimate && existingApprovedEstimate.services.length > 0) {
+      // Use existing approved services
+      setServices(existingApprovedEstimate.services);
+    } else {
+      // Parse from AI report
+      const extractedServices = parseReportForServices(report);
+      setServices(extractedServices);
+    }
+  }, [report, existingApprovedEstimate]);
 
   // Determine priority based on service type
   const getServicePriority = (serviceName: string): 'high' | 'medium' | 'low' => {
@@ -249,14 +269,75 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
     return services.reduce((sum, s) => sum + (s.quantity * s.unitPrice), 0);
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (services.length === 0) {
       toast.error('Please add at least one service');
       return;
     }
+    
+    if (!user) {
+      toast.error('You must be logged in to approve estimates');
+      return;
+    }
+
+    setIsSaving(true);
     const total = calculateTotal();
-    onApprove(services, total);
-    toast.success('Estimate approved!');
+    
+    try {
+      // Check if there's an existing approved estimate for this inspection
+      const { data: existing, error: fetchError } = await supabase
+        .from('approved_estimates')
+        .select('id')
+        .eq('inspection_id', inspectionId)
+        .maybeSingle();
+      
+      if (fetchError) throw fetchError;
+      
+      if (existing) {
+        // Update existing estimate
+        const { error: updateError } = await supabase
+          .from('approved_estimates')
+          .update({
+            services: services as any,
+            total_amount: total,
+            approved_by_staff_at: new Date().toISOString(),
+            approved_by_staff_user_id: user.id,
+          })
+          .eq('id', existing.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        // Create new approved estimate
+        const { error: insertError } = await supabase
+          .from('approved_estimates')
+          .insert({
+            inspection_id: inspectionId,
+            job_id: jobId,
+            services: services as any,
+            total_amount: total,
+            approved_by_staff_at: new Date().toISOString(),
+            approved_by_staff_user_id: user.id,
+          });
+        
+        if (insertError) throw insertError;
+      }
+      
+      // Mark the inspection as estimate_approved
+      const { error: updateInspectionError } = await supabase
+        .from('inspections')
+        .update({ estimate_approved: true })
+        .eq('id', inspectionId);
+      
+      if (updateInspectionError) throw updateInspectionError;
+      
+      toast.success('Estimate approved and saved!');
+      onApprove(services, total);
+    } catch (error) {
+      console.error('Failed to save approved estimate:', error);
+      toast.error('Failed to save estimate. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -464,9 +545,19 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
           size="lg" 
           className="flex-1 gap-2"
           onClick={handleApprove}
+          disabled={isSaving}
         >
-          <Save className="h-4 w-4" />
-          Approve Estimate
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              {existingApprovedEstimate ? 'Update Estimate' : 'Approve Estimate'}
+            </>
+          )}
         </Button>
       </div>
     </div>
