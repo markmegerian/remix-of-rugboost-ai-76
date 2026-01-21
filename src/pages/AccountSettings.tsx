@@ -14,6 +14,7 @@ import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff, M
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ServicePricing from "@/components/ServicePricing";
 import EmailTemplatesSettings from "@/components/EmailTemplatesSettings";
+import PaymentInfoSettings from "@/components/PaymentInfoSettings";
 
 interface Profile {
   id: string;
@@ -468,6 +469,9 @@ const AccountSettings = () => {
 
           {/* Service Pricing */}
           {user && <ServicePricing userId={user.id} />}
+
+          {/* Payment Information */}
+          <PaymentInfoSettings />
 
           {/* Business Branding */}
           <Card>
