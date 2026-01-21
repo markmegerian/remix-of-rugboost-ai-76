@@ -224,12 +224,17 @@ const JobDetail = () => {
       return;
     }
 
+    if (!job.client_email) {
+      toast.error('Client email is required to generate portal link');
+      return;
+    }
+
     setGeneratingPortalLink(true);
     try {
       // Generate a unique access token
       const accessToken = crypto.randomUUID();
 
-      // Create client job access record
+      // Create client job access record first
       const { error } = await supabase
         .from('client_job_access')
         .insert({
@@ -239,6 +244,21 @@ const JobDetail = () => {
         });
 
       if (error) throw error;
+
+      // Invite the client (creates user account and links to job)
+      const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-client', {
+        body: {
+          email: job.client_email,
+          fullName: job.client_name,
+          jobId: jobId,
+          accessToken: accessToken,
+        },
+      });
+
+      if (inviteError) {
+        console.error('Invite error:', inviteError);
+        // Continue even if invite fails - the link will still work for login
+      }
 
       // Update job to enable client portal
       await supabase
@@ -254,7 +274,12 @@ const JobDetail = () => {
       
       // Copy to clipboard
       await navigator.clipboard.writeText(link);
-      toast.success('Client portal link generated and copied to clipboard!');
+      
+      if (inviteData?.isNewUser) {
+        toast.success('Client portal link generated! Client will be prompted to set their password on first visit.');
+      } else {
+        toast.success('Client portal link generated and copied to clipboard!');
+      }
     } catch (error) {
       console.error('Error generating portal link:', error);
       toast.error('Failed to generate client portal link');

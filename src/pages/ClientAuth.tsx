@@ -23,12 +23,59 @@ const ClientAuth = () => {
   const { user, loading: authLoading } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
+  const [autoLoginLoading, setAutoLoginLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupName, setSignupName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState<string>('Rug Cleaning');
+
+  // Check for invited email from access token
+  useEffect(() => {
+    const checkInvitation = async () => {
+      if (!accessToken) {
+        setAutoLoginLoading(false);
+        return;
+      }
+
+      try {
+        // Check if there's an invitation for this token
+        const { data: accessData } = await supabase
+          .from('client_job_access')
+          .select('invited_email, jobs (user_id)')
+          .eq('access_token', accessToken)
+          .single();
+
+        if (accessData?.invited_email) {
+          setInvitedEmail(accessData.invited_email);
+          setLoginEmail(accessData.invited_email);
+          setSignupEmail(accessData.invited_email);
+        }
+
+        // Get business name for display
+        if (accessData?.jobs) {
+          const { data: brandingData } = await supabase
+            .from('profiles')
+            .select('business_name')
+            .eq('user_id', (accessData.jobs as any).user_id)
+            .single();
+          
+          if (brandingData?.business_name) {
+            setBusinessName(brandingData.business_name);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking invitation:', error);
+      } finally {
+        setAutoLoginLoading(false);
+      }
+    };
+
+    checkInvitation();
+  }, [accessToken]);
 
   // If user is already logged in, redirect to client portal
   useEffect(() => {
@@ -184,7 +231,7 @@ const ClientAuth = () => {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || autoLoginLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -196,8 +243,8 @@ const ClientAuth = () => {
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img src={rugboostLogo} alt="RugBoost" className="h-16 w-16 mb-4" />
-          <h1 className="font-display text-2xl font-bold text-foreground">Client Portal</h1>
+          <img src={rugboostLogo} alt="Logo" className="h-16 w-16 mb-4" />
+          <h1 className="font-display text-2xl font-bold text-foreground">{businessName}</h1>
           <p className="text-muted-foreground text-center mt-2">
             Sign in to view your rug inspection report and approve services
           </p>

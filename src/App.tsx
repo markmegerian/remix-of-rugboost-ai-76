@@ -20,6 +20,7 @@ const History = lazy(() => import("./pages/History"));
 const ClientAuth = lazy(() => import("./pages/ClientAuth"));
 const ClientPortal = lazy(() => import("./pages/ClientPortal"));
 const ClientHistory = lazy(() => import("./pages/ClientHistory"));
+const ClientSetPassword = lazy(() => import("./pages/ClientSetPassword"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
               {/* Client Portal Routes */}
               <Route path="/client/auth" element={<ClientAuth />} />
               <Route path="/client/history" element={<ClientHistory />} />
+              <Route path="/client/set-password" element={<ClientSetPassword />} />
               <Route path="/client/payment-success" element={<PaymentSuccess />} />
               <Route path="/client/:accessToken" element={<ClientPortal />} />
               

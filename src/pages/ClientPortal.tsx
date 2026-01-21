@@ -75,10 +75,47 @@ const ClientPortal = () => {
         // Redirect to client auth with the token
         navigate(`/client/auth?token=${accessToken}`);
       } else {
-        checkAccessAndLoadData();
+        // Check if user needs to set up their password
+        if (user.user_metadata?.needs_password_setup) {
+          // Fetch branding first for the password setup page
+          fetchBrandingForPasswordSetup();
+        } else {
+          checkAccessAndLoadData();
+        }
       }
     }
   }, [user, authLoading, accessToken]);
+
+  const fetchBrandingForPasswordSetup = async () => {
+    try {
+      // Get access data to find the staff user
+      const { data: accessData } = await supabase
+        .from('client_job_access')
+        .select('jobs (user_id)')
+        .eq('access_token', accessToken)
+        .single();
+
+      let businessName = 'Rug Cleaning';
+      
+      if (accessData?.jobs) {
+        const { data: brandingData } = await supabase
+          .from('profiles')
+          .select('business_name')
+          .eq('user_id', (accessData.jobs as any).user_id)
+          .single();
+        
+        if (brandingData?.business_name) {
+          businessName = brandingData.business_name;
+        }
+      }
+      
+      // Redirect to password setup
+      navigate(`/client/set-password?token=${accessToken}&business=${encodeURIComponent(businessName)}`);
+    } catch (error) {
+      console.error('Error fetching branding:', error);
+      navigate(`/client/set-password?token=${accessToken}`);
+    }
+  };
 
   const checkAccessAndLoadData = async () => {
     if (!accessToken || !user) return;
