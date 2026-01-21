@@ -15,6 +15,11 @@ const JobDetail = lazy(() => import("./pages/JobDetail"));
 const AccountSettings = lazy(() => import("./pages/AccountSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+// Client Portal Pages
+const ClientAuth = lazy(() => import("./pages/ClientAuth"));
+const ClientPortal = lazy(() => import("./pages/ClientPortal"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+
 const queryClient = new QueryClient();
 
 // Loading fallback component
@@ -39,6 +44,12 @@ const App = () => (
               <Route path="/jobs/new" element={<NewJob />} />
               <Route path="/jobs/:jobId" element={<JobDetail />} />
               <Route path="/settings" element={<AccountSettings />} />
+              
+              {/* Client Portal Routes */}
+              <Route path="/client/auth" element={<ClientAuth />} />
+              <Route path="/client/payment-success" element={<PaymentSuccess />} />
+              <Route path="/client/:accessToken" element={<ClientPortal />} />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
