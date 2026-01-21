@@ -301,8 +301,11 @@ export type Database = {
           client_phone: string | null
           client_portal_enabled: boolean | null
           created_at: string
+          follow_up_notes: string | null
           id: string
           job_number: string
+          last_activity_at: string | null
+          next_follow_up_at: string | null
           notes: string | null
           payment_status: string | null
           status: string
@@ -317,8 +320,11 @@ export type Database = {
           client_phone?: string | null
           client_portal_enabled?: boolean | null
           created_at?: string
+          follow_up_notes?: string | null
           id?: string
           job_number: string
+          last_activity_at?: string | null
+          next_follow_up_at?: string | null
           notes?: string | null
           payment_status?: string | null
           status?: string
@@ -333,8 +339,11 @@ export type Database = {
           client_phone?: string | null
           client_portal_enabled?: boolean | null
           created_at?: string
+          follow_up_notes?: string | null
           id?: string
           job_number?: string
+          last_activity_at?: string | null
+          next_follow_up_at?: string | null
           notes?: string | null
           payment_status?: string | null
           status?: string
@@ -474,6 +483,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      service_completions: {
+        Row: {
+          approved_estimate_id: string
+          completed_at: string
+          completed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          service_id: string
+        }
+        Insert: {
+          approved_estimate_id: string
+          completed_at?: string
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          service_id: string
+        }
+        Update: {
+          approved_estimate_id?: string
+          completed_at?: string
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_completions_approved_estimate_id_fkey"
+            columns: ["approved_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "approved_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_prices: {
         Row: {

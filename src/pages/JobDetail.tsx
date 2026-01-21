@@ -27,7 +27,7 @@ import EstimateReview from '@/components/EstimateReview';
 import AnalysisProgress, { AnalysisStage } from '@/components/AnalysisProgress';
 import { ModelComparisonDialog } from '@/components/ModelComparisonDialog';
 import ClientPortalStatus from '@/components/ClientPortalStatus';
-import WorkOrderCard from '@/components/WorkOrderCard';
+import ServiceCompletionCard from '@/components/ServiceCompletionCard';
 import PaymentTracking from '@/components/PaymentTracking';
 
 interface ClientPortalStatusData {
@@ -130,6 +130,7 @@ const JobDetail = () => {
   const [generatingPortalLink, setGeneratingPortalLink] = useState(false);
   const [resendingInvite, setResendingInvite] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [serviceCompletions, setServiceCompletions] = useState<{ service_id: string; completed_at: string }[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -145,6 +146,7 @@ const JobDetail = () => {
       fetchApprovedEstimates();
       fetchClientPortalLink();
       fetchPayments();
+      fetchServiceCompletions();
     }
   }, [user, jobId]);
 
@@ -234,6 +236,34 @@ const JobDetail = () => {
       setPayments(data || []);
     } catch (error) {
       console.error('Error fetching payments:', error);
+    }
+  };
+
+  const fetchServiceCompletions = async () => {
+    if (!jobId) return;
+    try {
+      // Get all approved estimates for this job
+      const { data: estimates } = await supabase
+        .from('approved_estimates')
+        .select('id')
+        .eq('job_id', jobId);
+
+      if (!estimates || estimates.length === 0) {
+        setServiceCompletions([]);
+        return;
+      }
+
+      const estimateIds = estimates.map(e => e.id);
+      
+      const { data, error } = await supabase
+        .from('service_completions')
+        .select('service_id, completed_at')
+        .in('approved_estimate_id', estimateIds);
+
+      if (error) throw error;
+      setServiceCompletions(data || []);
+    } catch (error) {
+      console.error('Error fetching service completions:', error);
     }
   };
 
@@ -1248,25 +1278,26 @@ const JobDetail = () => {
         {/* Work Order & Payment Tracking - Show when there are approved estimates */}
         {approvedEstimates.length > 0 && (
           <div className="grid lg:grid-cols-2 gap-6">
-            {/* Work Order Card */}
-            <WorkOrderCard
+            {/* Service Completion Card */}
+            <ServiceCompletionCard
               rugs={approvedEstimates.map(ae => {
                 const rug = rugs.find(r => r.id === ae.inspection_id);
                 return {
+                  rugId: ae.inspection_id,
                   rugNumber: rug?.rug_number || 'Unknown',
                   rugType: rug?.rug_type || 'Unknown',
                   dimensions: rug?.length && rug?.width 
                     ? `${rug.length}' × ${rug.width}'` 
                     : 'N/A',
+                  estimateId: ae.id,
                   services: ae.services,
                   total: ae.total_amount,
                 };
               })}
-              payment={(() => {
-                const p = payments.find(p => p.status === 'completed');
-                return p ? { id: p.id, status: p.status, amount: p.amount, paidAt: p.paid_at } : null;
-              })()}
+              completions={serviceCompletions}
               clientApprovedAt={job.client_approved_at || null}
+              isPaid={payments.some(p => p.status === 'completed')}
+              onCompletionChange={fetchServiceCompletions}
             />
 
             {/* Payment Tracking */}

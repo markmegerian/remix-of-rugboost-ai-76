@@ -131,7 +131,7 @@ const PaymentTracking: React.FC<PaymentTrackingProps> = ({
               <span className="text-sm font-medium text-green-800 dark:text-green-300">Collected</span>
             </div>
             <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-              ${(totalPaid / 100).toFixed(2)}
+              ${totalPaid.toFixed(2)}
             </div>
           </div>
           
@@ -141,7 +141,7 @@ const PaymentTracking: React.FC<PaymentTrackingProps> = ({
               <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Outstanding</span>
             </div>
             <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
-              ${(totalPending / 100).toFixed(2)}
+              ${totalPending.toFixed(2)}
             </div>
           </div>
         </div>
@@ -176,7 +176,7 @@ const PaymentTracking: React.FC<PaymentTrackingProps> = ({
                     </TableCell>
                     <TableCell>
                       <span className="font-semibold">
-                        ${(payment.amount / 100).toFixed(2)}
+                        ${payment.amount.toFixed(2)}
                       </span>
                       <span className="text-muted-foreground text-xs ml-1">
                         {payment.currency?.toUpperCase() || 'USD'}
