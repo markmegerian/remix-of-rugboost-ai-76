@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Loader2, CheckCircle, Image, FileText, DollarSign, 
-  ChevronDown, ChevronUp, Check, X, CreditCard, LogOut, History
+  ChevronDown, ChevronUp, Check, X, CreditCard, LogOut, History, Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Collapsible,
   CollapsibleContent,
@@ -19,6 +20,14 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
+
+// Helper to check if a service is a mandatory cleaning service
+const isCleaningService = (serviceName: string): boolean => {
+  const lowerName = serviceName.toLowerCase();
+  return lowerName.includes('cleaning') || 
+         lowerName.includes('wash') || 
+         lowerName.includes('clean');
+};
 
 interface ServiceItem {
   id: string;
@@ -273,6 +282,15 @@ const ClientPortal = () => {
   };
 
   const toggleService = (rugId: string, serviceId: string) => {
+    // Find the service to check if it's mandatory
+    const rug = rugs.find(r => r.id === rugId);
+    const service = rug?.services.find(s => s.id === serviceId);
+    
+    // Prevent toggling off cleaning services (mandatory)
+    if (service && isCleaningService(service.name)) {
+      return; // Don't allow toggling cleaning services
+    }
+
     setSelectedServices(prev => {
       const newMap = new Map(prev);
       const rugServices = new Set(newMap.get(rugId) || []);
@@ -297,7 +315,11 @@ const ClientPortal = () => {
       if (selectAll) {
         newMap.set(rugId, new Set(rug.services.map(s => s.id)));
       } else {
-        newMap.set(rugId, new Set());
+        // When clearing all, keep mandatory cleaning services selected
+        const mandatoryServiceIds = rug.services
+          .filter(s => isCleaningService(s.name))
+          .map(s => s.id);
+        newMap.set(rugId, new Set(mandatoryServiceIds));
       }
       return newMap;
     });
@@ -386,11 +408,95 @@ const ClientPortal = () => {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your estimate...</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        {/* Skeleton Header */}
+        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div>
+                <Skeleton className="h-5 w-32 mb-1" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8">
+          {/* Welcome Card Skeleton */}
+          <Card className="mb-6">
+            <CardHeader>
+              <Skeleton className="h-6 w-64 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-4 w-full max-w-md" />
+            </CardContent>
+          </Card>
+
+          {/* Main Content Skeleton */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              {[1, 2].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Skeleton className="h-5 w-24 mb-2" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                      <div className="text-right">
+                        <Skeleton className="h-4 w-20 mb-1" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((j) => (
+                        <div key={j} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-5 w-5" />
+                            <div>
+                              <Skeleton className="h-4 w-32 mb-1" />
+                              <Skeleton className="h-3 w-20" />
+                            </div>
+                          </div>
+                          <Skeleton className="h-5 w-16" />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Order Summary Skeleton */}
+            <div className="lg:col-span-1">
+              <Card className="sticky top-24">
+                <CardHeader>
+                  <Skeleton className="h-5 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <Skeleton className="h-5 w-12" />
+                    <Skeleton className="h-6 w-20" />
+                  </div>
+                  <Skeleton className="h-12 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -476,7 +582,9 @@ const ClientPortal = () => {
             {rugs.map((rug) => {
               const rugSelectedServices = selectedServices.get(rug.id) || new Set();
               const allSelected = rugSelectedServices.size === rug.services.length;
-              const noneSelected = rugSelectedServices.size === 0;
+              const mandatoryServiceIds = rug.services.filter(s => isCleaningService(s.name)).map(s => s.id);
+              const onlyMandatorySelected = rugSelectedServices.size === mandatoryServiceIds.length && 
+                mandatoryServiceIds.every(id => rugSelectedServices.has(id));
               const isExpanded = expandedRugs.has(rug.id);
 
               const rugTotal = rug.services
@@ -563,9 +671,9 @@ const ClientPortal = () => {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => toggleAllServices(rug.id, false)}
-                                  disabled={noneSelected}
+                                  disabled={onlyMandatorySelected}
                                 >
-                                  Clear All
+                                  Clear Optional
                                 </Button>
                               </div>
                             </div>
@@ -573,6 +681,7 @@ const ClientPortal = () => {
                             {rug.services.map((service) => {
                               const isSelected = rugSelectedServices.has(service.id);
                               const serviceTotal = service.quantity * service.unitPrice;
+                              const isMandatory = isCleaningService(service.name);
 
                               return (
                                 <div
@@ -581,18 +690,29 @@ const ClientPortal = () => {
                                     isSelected 
                                       ? 'border-primary bg-primary/5' 
                                       : 'border-border bg-muted/30'
-                                  }`}
+                                  } ${isMandatory ? 'bg-primary/10' : ''}`}
                                 >
                                   <div className="flex items-center gap-3">
-                                    <Checkbox
-                                      checked={isSelected}
-                                      onCheckedChange={() => toggleService(rug.id, service.id)}
-                                    />
+                                    {isMandatory ? (
+                                      <div className="flex items-center justify-center h-5 w-5">
+                                        <Lock className="h-4 w-4 text-primary" />
+                                      </div>
+                                    ) : (
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => toggleService(rug.id, service.id)}
+                                      />
+                                    )}
                                     <div>
                                       <div className="flex items-center gap-2">
                                         <span className={`font-medium ${!isSelected ? 'text-muted-foreground' : ''}`}>
                                           {service.name}
                                         </span>
+                                        {isMandatory && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            Required
+                                          </Badge>
+                                        )}
                                         <Badge 
                                           variant="outline" 
                                           className={
