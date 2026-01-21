@@ -245,13 +245,18 @@ const JobDetail = () => {
 
       if (error) throw error;
 
-      // Invite the client (creates user account and links to job)
+      // Generate the portal URL
+      const portalUrl = `${window.location.origin}/client/${accessToken}`;
+
+      // Invite the client (creates user account, links to job, and sends email)
       const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-client', {
         body: {
           email: job.client_email,
           fullName: job.client_name,
           jobId: jobId,
           accessToken: accessToken,
+          jobNumber: job.job_number,
+          portalUrl: portalUrl,
         },
       });
 

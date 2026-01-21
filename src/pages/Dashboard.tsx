@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
+import NotificationBell from '@/components/NotificationBell';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -157,21 +158,21 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">Job Dashboard</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button onClick={() => navigate('/jobs/new')} size="sm" className="gap-2">
               <Plus className="h-4 w-4" />
               New Job
             </Button>
-            <Button onClick={() => navigate('/history')} variant="outline" size="sm" className="gap-2">
+            <Button onClick={() => navigate('/history')} variant="outline" size="sm" className="gap-2 hidden sm:flex">
               <History className="h-4 w-4" />
               History
             </Button>
-            <Button onClick={() => navigate('/settings')} variant="ghost" size="sm" className="gap-2">
+            <NotificationBell />
+            <Button onClick={() => navigate('/settings')} variant="ghost" size="icon">
               <Settings className="h-4 w-4" />
             </Button>
-            <Button onClick={handleSignOut} variant="outline" size="sm" className="gap-2">
+            <Button onClick={handleSignOut} variant="ghost" size="icon">
               <LogOut className="h-4 w-4" />
-              Sign Out
             </Button>
           </div>
         </div>

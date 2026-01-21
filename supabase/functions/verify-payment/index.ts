@@ -117,7 +117,31 @@ serve(async (req) => {
           total: est.total_amount || 0,
         }));
 
-        // Send notification to business owner
+        // Create in-app notification for staff
+        if (job?.user_id) {
+          try {
+            const formattedAmount = ((session.amount_total || 0) / 100).toFixed(2);
+            await supabaseAdmin
+              .from('notifications')
+              .insert({
+                user_id: job.user_id,
+                type: 'payment_received',
+                title: `Payment Received - $${formattedAmount}`,
+                message: `${job.client_name} has paid for Job #${job.job_number}. The job is now in progress.`,
+                metadata: {
+                  jobId: jobId,
+                  jobNumber: job.job_number,
+                  clientName: job.client_name,
+                  amount: session.amount_total,
+                },
+              });
+            console.log("In-app notification created");
+          } catch (notifError) {
+            console.log("In-app notification error:", notifError);
+          }
+        }
+
+        // Send email notification to business owner
         if (job && profile?.business_email) {
           try {
             await supabaseAdmin.functions.invoke("notify-payment-received", {
@@ -129,9 +153,9 @@ serve(async (req) => {
                 amount: session.amount_total,
               },
             });
-            console.log("Staff notification sent");
+            console.log("Staff email notification sent");
           } catch (notifyError) {
-            console.log("Staff notification error:", notifyError);
+            console.log("Staff email notification error:", notifyError);
           }
         }
 

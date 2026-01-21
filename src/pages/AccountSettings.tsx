@@ -10,9 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff, Mail } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ServicePricing from "@/components/ServicePricing";
+import EmailTemplatesSettings from "@/components/EmailTemplatesSettings";
 
 interface Profile {
   id: string;
@@ -579,6 +580,9 @@ const AccountSettings = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Email Templates */}
+          <EmailTemplatesSettings />
 
           {/* Save Button */}
           <div className="flex justify-end">
