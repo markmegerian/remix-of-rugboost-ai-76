@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminMetricCard } from '@/components/admin/AdminMetricCard';
+import PlatformRevenueChart from '@/components/admin/PlatformRevenueChart';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -248,6 +249,9 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Platform Revenue Chart */}
+          <PlatformRevenueChart />
 
           {/* Recent Payments */}
           <Card className="shadow-medium">

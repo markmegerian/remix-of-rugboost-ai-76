@@ -531,6 +531,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bank_account_number: string | null
+          bank_name: string | null
+          bank_routing_number: string | null
           business_address: string | null
           business_email: string | null
           business_name: string | null
@@ -539,10 +542,18 @@ export type Database = {
           full_name: string | null
           id: string
           logo_url: string | null
+          payment_method: string | null
+          payment_notes: string | null
+          paypal_email: string | null
           updated_at: string
           user_id: string
+          venmo_handle: string | null
+          zelle_email: string | null
         }
         Insert: {
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_routing_number?: string | null
           business_address?: string | null
           business_email?: string | null
           business_name?: string | null
@@ -551,10 +562,18 @@ export type Database = {
           full_name?: string | null
           id?: string
           logo_url?: string | null
+          payment_method?: string | null
+          payment_notes?: string | null
+          paypal_email?: string | null
           updated_at?: string
           user_id: string
+          venmo_handle?: string | null
+          zelle_email?: string | null
         }
         Update: {
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_routing_number?: string | null
           business_address?: string | null
           business_email?: string | null
           business_name?: string | null
@@ -563,8 +582,13 @@ export type Database = {
           full_name?: string | null
           id?: string
           logo_url?: string | null
+          payment_method?: string | null
+          payment_notes?: string | null
+          paypal_email?: string | null
           updated_at?: string
           user_id?: string
+          venmo_handle?: string | null
+          zelle_email?: string | null
         }
         Relationships: []
       }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, Building2, Mail, Phone, MapPin, Briefcase, DollarSign, Loader2, Plus, CheckCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Building2, Mail, Phone, MapPin, Briefcase, DollarSign, Loader2, Plus, CheckCircle, Clock, CreditCard, Wallet, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,14 @@ interface Profile {
   business_phone: string | null;
   business_address: string | null;
   created_at: string;
+  payment_method: string | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
+  bank_routing_number: string | null;
+  paypal_email: string | null;
+  venmo_handle: string | null;
+  zelle_email: string | null;
+  payment_notes: string | null;
 }
 
 interface Job {
@@ -212,6 +220,71 @@ const AdminUserDetail = () => {
                   <p>Member since: {format(new Date(profile.created_at), 'MMMM d, yyyy')}</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Information */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="font-display text-lg flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Payment Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {profile.payment_method ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    {profile.payment_method === 'bank_transfer' && <Building className="h-4 w-4 text-muted-foreground" />}
+                    {['paypal', 'venmo', 'zelle'].includes(profile.payment_method) && <Wallet className="h-4 w-4 text-muted-foreground" />}
+                    {profile.payment_method === 'check' && <CreditCard className="h-4 w-4 text-muted-foreground" />}
+                    <Badge variant="outline" className="capitalize">{profile.payment_method.replace('_', ' ')}</Badge>
+                  </div>
+                  
+                  {profile.payment_method === 'bank_transfer' && (
+                    <div className="p-4 rounded-lg bg-muted/50 space-y-2 text-sm">
+                      {profile.bank_name && <p><span className="text-muted-foreground">Bank:</span> {profile.bank_name}</p>}
+                      {profile.bank_routing_number && <p><span className="text-muted-foreground">Routing:</span> {profile.bank_routing_number}</p>}
+                      {profile.bank_account_number && <p><span className="text-muted-foreground">Account:</span> ****{profile.bank_account_number.slice(-4)}</p>}
+                    </div>
+                  )}
+                  
+                  {profile.payment_method === 'paypal' && profile.paypal_email && (
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
+                      <p><span className="text-muted-foreground">PayPal:</span> {profile.paypal_email}</p>
+                    </div>
+                  )}
+                  
+                  {profile.payment_method === 'venmo' && profile.venmo_handle && (
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
+                      <p><span className="text-muted-foreground">Venmo:</span> {profile.venmo_handle}</p>
+                    </div>
+                  )}
+                  
+                  {profile.payment_method === 'zelle' && profile.zelle_email && (
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm">
+                      <p><span className="text-muted-foreground">Zelle:</span> {profile.zelle_email}</p>
+                    </div>
+                  )}
+                  
+                  {profile.payment_method === 'check' && (
+                    <div className="p-4 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                      Mail check to business address
+                    </div>
+                  )}
+                  
+                  {profile.payment_notes && (
+                    <div className="text-sm">
+                      <p className="text-muted-foreground">Notes:</p>
+                      <p>{profile.payment_notes}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No payment information provided. Business should update their settings.
+                </p>
+              )}
             </CardContent>
           </Card>
 
