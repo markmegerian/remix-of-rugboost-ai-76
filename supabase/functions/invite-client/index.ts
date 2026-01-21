@@ -39,44 +39,65 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Inviting client: ${email} for job ${jobId}`);
-
-    // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`Inviting client: ${normalizedEmail} for job ${jobId}`);
 
     let userId: string;
     let isNewUser = false;
     let tempPassword: string | null = null;
 
-    if (existingUser) {
-      console.log('User already exists:', existingUser.id);
-      userId = existingUser.id;
-    } else {
-      // Generate a temporary password (client will be required to change it)
-      tempPassword = crypto.randomUUID().slice(0, 16);
-      
-      // Create the user with admin API
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true, // Auto-confirm the email
-        user_metadata: {
-          full_name: fullName,
-          needs_password_setup: true, // Flag to show password setup screen
-        },
-      });
+    // Try to create the user first - if they exist, we'll handle that error
+    tempPassword = crypto.randomUUID().slice(0, 16);
+    
+    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: normalizedEmail,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        needs_password_setup: true,
+      },
+    });
 
-      if (createError) {
+    if (createError) {
+      // Check if it's an "email exists" error
+      if (createError.code === 'email_exists' || createError.message?.includes('already been registered')) {
+        console.log('User already exists, fetching existing user...');
+        
+        // Fetch user by email using the admin API
+        const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+          page: 1,
+          perPage: 1000,
+        });
+
+        if (listError) {
+          console.error('Error listing users:', listError);
+          throw listError;
+        }
+
+        const existingUser = usersData?.users?.find(
+          u => u.email?.toLowerCase() === normalizedEmail
+        );
+
+        if (!existingUser) {
+          // Try getUserByEmail as fallback (if available in newer SDK versions)
+          throw new Error('User exists but could not be retrieved');
+        }
+
+        userId = existingUser.id;
+        isNewUser = false;
+        tempPassword = null;
+        console.log('Found existing user:', userId);
+      } else {
         console.error('Error creating user:', createError);
         throw createError;
       }
-
+    } else {
       userId = newUser.user.id;
       isNewUser = true;
       console.log('Created new user:', userId);
 
-      // Add client role
+      // Add client role for new users
       const { error: roleError } = await supabaseAdmin
         .from('user_roles')
         .insert({ user_id: userId, role: 'client' });
@@ -97,13 +118,14 @@ Deno.serve(async (req) => {
 
     if (existingClient) {
       clientId = existingClient.id;
+      console.log('Using existing client account:', clientId);
     } else {
       // Create client account
       const { data: newClient, error: clientError } = await supabaseAdmin
         .from('client_accounts')
         .insert({
           user_id: userId,
-          email,
+          email: normalizedEmail,
           full_name: fullName,
         })
         .select('id')
@@ -114,6 +136,7 @@ Deno.serve(async (req) => {
         throw clientError;
       }
       clientId = newClient.id;
+      console.log('Created new client account:', clientId);
     }
 
     // Link client to job access
@@ -124,6 +147,8 @@ Deno.serve(async (req) => {
 
     if (linkError) {
       console.error('Error linking client to job:', linkError);
+    } else {
+      console.log('Linked client to job access');
     }
 
     return new Response(
