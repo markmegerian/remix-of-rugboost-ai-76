@@ -65,21 +65,31 @@ serve(async (req) => {
 
   try {
     const { sessionId } = await req.json();
+    
+    // Generate request ID for logging
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
 
     if (!sessionId) {
+      console.warn(`[${requestId}] Missing session ID from IP: ${clientIp.substring(0, 10)}***`);
       throw new Error("Session ID is required");
     }
 
     // Validate sessionId format to prevent injection
     if (typeof sessionId !== 'string' || !sessionId.startsWith('cs_')) {
+      console.warn(`[${requestId}] Invalid session ID format from IP: ${clientIp.substring(0, 10)}***`);
       throw new Error("Invalid session ID format");
     }
+    
+    console.log(`[${requestId}] Verify payment request from IP: ${clientIp.substring(0, 10)}*** Session: ${sessionId.substring(0, 15)}***`);
 
     // RATE LIMITING: Check if client has exceeded verification attempts
     const clientIdentifier = getClientIdentifier(req, sessionId);
     const rateLimitResult = checkRateLimit(clientIdentifier);
     if (!rateLimitResult.allowed) {
-      console.warn(`Rate limit exceeded for client ${clientIdentifier}`);
+      console.warn(`[${requestId}] Rate limit exceeded for client ${clientIdentifier.substring(0, 15)}***`);
       return new Response(
         JSON.stringify({ 
           error: "Too many verification attempts. Please try again later.",

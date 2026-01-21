@@ -118,7 +118,10 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    console.log(`Completing registration for: ${normalizedEmail}`);
+    const requestId = crypto.randomUUID().slice(0, 8);
+    
+    console.log(`[${requestId}] Registration request from IP: ${clientIp.substring(0, 10)}*** for: ${normalizedEmail.substring(0, 3)}***`);
+    console.log(`[${requestId}] Rate limit status - Remaining: ${rateCheck.remaining}, Reset in: ${Math.ceil(rateCheck.resetIn / 1000)}s`);
 
     // Validate the access token and verify email matches
     const { data: tokenData, error: tokenError } = await supabaseAdmin
@@ -160,7 +163,7 @@ Deno.serve(async (req) => {
 
     if (!existingUser) {
       // User doesn't exist yet - create them with the provided password
-      console.log('Creating new user with provided password');
+      console.log(`[${requestId}] Creating new user account`);
       
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: normalizedEmail,
@@ -172,10 +175,11 @@ Deno.serve(async (req) => {
       });
 
       if (createError) {
-        console.error('Error creating user:', createError);
+        console.error(`[${requestId}] Error creating user:`, createError.message);
         throw createError;
       }
 
+      console.log(`[${requestId}] User created successfully: ${newUser.user.id.substring(0, 8)}***`);
       const userId = newUser.user.id;
 
       // Add client role
@@ -184,7 +188,9 @@ Deno.serve(async (req) => {
         .insert({ user_id: userId, role: 'client' });
 
       if (roleError && roleError.code !== '23505') {
-        console.error('Error adding role:', roleError);
+        console.error(`[${requestId}] Error adding client role:`, roleError.message);
+      } else {
+        console.log(`[${requestId}] Client role added`);
       }
 
       // Create client account
@@ -199,7 +205,9 @@ Deno.serve(async (req) => {
         .single();
 
       if (clientError && clientError.code !== '23505') {
-        console.error('Error creating client account:', clientError);
+        console.error(`[${requestId}] Error creating client account:`, clientError.message);
+      } else if (clientAccount) {
+        console.log(`[${requestId}] Client account created: ${clientAccount.id.substring(0, 8)}***`);
       }
 
       // Link to job access
@@ -208,8 +216,10 @@ Deno.serve(async (req) => {
           .from('client_job_access')
           .update({ client_id: clientAccount.id })
           .eq('access_token', accessToken);
+        console.log(`[${requestId}] Linked client to job access`);
       }
 
+      console.log(`[${requestId}] Registration completed successfully (new user)`);
       return new Response(
         JSON.stringify({ success: true, userId, isNewUser: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -217,7 +227,7 @@ Deno.serve(async (req) => {
     }
 
     // User exists - update their password
-    console.log('Updating password for existing user:', existingUser.id);
+    console.log(`[${requestId}] Updating password for existing user: ${existingUser.id.substring(0, 8)}***`);
     
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       existingUser.id,
@@ -231,9 +241,10 @@ Deno.serve(async (req) => {
     );
 
     if (updateError) {
-      console.error('Error updating user password:', updateError);
+      console.error(`[${requestId}] Error updating user password:`, updateError.message);
       throw updateError;
     }
+    console.log(`[${requestId}] Password updated successfully`);
 
     // Ensure client account exists and is linked
     const { data: existingClient } = await supabaseAdmin
@@ -275,15 +286,16 @@ Deno.serve(async (req) => {
       .insert({ user_id: existingUser.id, role: 'client' });
 
     if (roleError && roleError.code !== '23505') {
-      console.error('Error adding role:', roleError);
+      console.error(`[${requestId}] Error adding role:`, roleError.message);
     }
 
+    console.log(`[${requestId}] Registration completed successfully (existing user)`);
     return new Response(
       JSON.stringify({ success: true, userId: existingUser.id, isNewUser: false }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    console.error('Complete registration error:', error);
+    console.error('Registration error:', error instanceof Error ? error.message : 'Unknown error');
     const errorMessage = error instanceof Error ? error.message : 'Failed to complete registration';
     return new Response(
       JSON.stringify({ error: errorMessage }),

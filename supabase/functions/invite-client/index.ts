@@ -62,7 +62,13 @@ Deno.serve(async (req) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    console.log(`Inviting client: ${normalizedEmail} for job ${jobId}`);
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    console.log(`[${requestId}] Invite client request from IP: ${clientIp.substring(0, 10)}***`);
+    console.log(`[${requestId}] Inviting: ${normalizedEmail.substring(0, 3)}*** for job ${jobId.substring(0, 8)}***`);
 
     let userId: string | null = null;
     let isNewUser = false;
@@ -76,7 +82,7 @@ Deno.serve(async (req) => {
     });
 
     if (listError) {
-      console.error('Error listing users:', listError);
+      console.error(`[${requestId}] Error listing users:`, listError.message);
       throw listError;
     }
 
@@ -87,11 +93,11 @@ Deno.serve(async (req) => {
     if (existingUser) {
       userId = existingUser.id;
       isNewUser = false;
-      console.log('Found existing user:', userId);
+      console.log(`[${requestId}] Found existing user: ${userId.substring(0, 8)}***`);
     } else {
       // User doesn't exist yet - they will be created when they set their password
       isNewUser = true;
-      console.log('User does not exist yet, will be created on portal access');
+      console.log(`[${requestId}] New user - will be created on portal access`);
     }
 
     // Only set up client account if user already exists
@@ -105,7 +111,7 @@ Deno.serve(async (req) => {
 
       if (existingClient) {
         clientId = existingClient.id;
-        console.log('Using existing client account:', clientId);
+        console.log(`[${requestId}] Using existing client account: ${existingClient.id.substring(0, 8)}***`);
       } else {
         // Create client account
         const { data: newClient, error: clientError } = await supabaseAdmin
@@ -119,11 +125,11 @@ Deno.serve(async (req) => {
           .single();
 
         if (clientError) {
-          console.error('Error creating client account:', clientError);
+          console.error(`[${requestId}] Error creating client account:`, clientError.message);
           throw clientError;
         }
         clientId = newClient.id;
-        console.log('Created new client account:', clientId);
+        console.log(`[${requestId}] Created new client account: ${newClient.id.substring(0, 8)}***`);
       }
 
       // Link client to job access
@@ -133,9 +139,9 @@ Deno.serve(async (req) => {
         .eq('access_token', accessToken);
 
       if (linkError) {
-        console.error('Error linking client to job:', linkError);
+        console.error(`[${requestId}] Error linking client to job:`, linkError.message);
       } else {
-        console.log('Linked client to job access');
+        console.log(`[${requestId}] Linked client to job access`);
       }
     }
 
@@ -269,18 +275,18 @@ ${businessName}`;
         });
 
         if (emailError) {
-          console.error('Error sending invite email:', emailError);
+          console.error(`[${requestId}] Error sending invite email:`, emailError);
           emailErrorMessage = typeof emailError === 'object' ? JSON.stringify(emailError) : String(emailError);
         } else {
-          console.log('Invite email sent successfully');
+          console.log(`[${requestId}] Invite email sent successfully`);
           emailSentSuccessfully = true;
         }
       } catch (emailErr) {
-        console.error('Failed to send invite email:', emailErr);
+        console.error(`[${requestId}] Failed to send invite email:`, emailErr);
         emailErrorMessage = emailErr instanceof Error ? emailErr.message : String(emailErr);
       }
     } else {
-      console.log('Skipping email - no RESEND_API_KEY or portalUrl');
+      console.log(`[${requestId}] Skipping email - no RESEND_API_KEY or portalUrl`);
       emailErrorMessage = 'Email not configured (missing RESEND_API_KEY or portalUrl)';
     }
 
@@ -294,9 +300,10 @@ ${businessName}`;
       .eq('access_token', accessToken);
 
     if (updateError) {
-      console.error('Error updating email status:', updateError);
+      console.error(`[${requestId}] Error updating email status:`, updateError.message);
     }
 
+    console.log(`[${requestId}] Invite completed - Email sent: ${emailSentSuccessfully}, New user: ${isNewUser}`);
     return new Response(
       JSON.stringify({
         success: true,
@@ -307,7 +314,7 @@ ${businessName}`;
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    console.error('Invite client error:', error);
+    console.error('Invite client error:', error instanceof Error ? error.message : 'Unknown error');
     const errorMessage = error instanceof Error ? error.message : 'Failed to invite client';
     return new Response(
       JSON.stringify({ error: errorMessage }),

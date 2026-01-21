@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Mail, Lock, User, KeyRound } from 'lucide-react';
+import { Loader2, Mail, Lock, User, KeyRound, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { z } from 'zod';
+import { 
+  checkLoginAllowed, 
+  recordFailedAttempt, 
+  clearAttempts, 
+  formatRemainingTime 
+} from '@/lib/authRateLimiter';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 // Enforce strong password requirements
@@ -37,6 +44,10 @@ const ClientAuth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Brute-force protection state
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Check for invited email from access token and determine flow
   useEffect(() => {
@@ -184,8 +195,47 @@ const ClientAuth = () => {
     }
   };
 
+  // Check lockout status on mount and when email changes
+  useEffect(() => {
+    if (loginEmail) {
+      const status = checkLoginAllowed(loginEmail);
+      if (!status.allowed) {
+        setLockoutRemaining(status.remainingSeconds);
+        startLockoutTimer();
+      }
+    }
+    return () => {
+      if (lockoutTimer) clearInterval(lockoutTimer);
+    };
+  }, [loginEmail]);
+
+  const startLockoutTimer = () => {
+    if (lockoutTimer) clearInterval(lockoutTimer);
+    
+    const timer = setInterval(() => {
+      setLockoutRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    setLockoutTimer(timer);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check brute-force lockout
+    const lockoutStatus = checkLoginAllowed(loginEmail);
+    if (!lockoutStatus.allowed) {
+      setLockoutRemaining(lockoutStatus.remainingSeconds);
+      startLockoutTimer();
+      toast.error(`Too many failed attempts. Please wait ${formatRemainingTime(lockoutStatus.remainingSeconds)}.`);
+      return;
+    }
     
     const emailValid = validateField('loginEmail', loginEmail);
     const passwordValid = validateField('loginPassword', loginPassword);
@@ -199,8 +249,24 @@ const ClientAuth = () => {
         password: loginPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Record failed attempt and apply exponential backoff
+        const { lockoutSeconds, failedAttempts } = recordFailedAttempt(loginEmail);
+        
+        console.log(`[Security] Failed login attempt #${failedAttempts} for: ${loginEmail.substring(0, 3)}***`);
+        
+        if (lockoutSeconds > 0) {
+          setLockoutRemaining(lockoutSeconds);
+          startLockoutTimer();
+          toast.error(`Incorrect credentials. Please wait ${formatRemainingTime(lockoutSeconds)} before trying again.`);
+        } else {
+          toast.error(error.message || 'Failed to log in');
+        }
+        return;
+      }
 
+      // Clear lockout on successful login
+      clearAttempts(loginEmail);
       toast.success('Logged in successfully!');
       
       if (accessToken) {
@@ -434,6 +500,15 @@ const ClientAuth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {lockoutRemaining > 0 && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Too many failed attempts. Please wait {formatRemainingTime(lockoutRemaining)} before trying again.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="login-email">Email</Label>
@@ -475,12 +550,18 @@ const ClientAuth = () => {
                 )}
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading || lockoutRemaining > 0}
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...
                   </>
+                ) : lockoutRemaining > 0 ? (
+                  `Wait ${formatRemainingTime(lockoutRemaining)}`
                 ) : (
                   'Sign In'
                 )}

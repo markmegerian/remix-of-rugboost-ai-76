@@ -120,8 +120,18 @@ serve(async (req) => {
     const body: CheckoutRequest = await req.json();
     const { jobId, clientJobAccessId, selectedServices, totalAmount, customerEmail, successUrl, cancelUrl } = body;
 
+    // Generate request ID for logging
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    console.log(`[${requestId}] Checkout request from IP: ${clientIp.substring(0, 10)}*** User: ${userId.substring(0, 8)}***`);
+    console.log(`[${requestId}] Job: ${jobId?.substring(0, 8)}*** Amount: $${totalAmount} Services: ${selectedServices?.length || 0} rugs`);
+
     // Validate required fields
     if (!jobId || !clientJobAccessId || !selectedServices || selectedServices.length === 0 || !totalAmount) {
+      console.warn(`[${requestId}] Missing required fields`);
       throw new Error("Missing required fields: jobId, clientJobAccessId, selectedServices, totalAmount");
     }
 
