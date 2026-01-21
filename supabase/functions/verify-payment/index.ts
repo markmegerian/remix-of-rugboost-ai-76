@@ -74,34 +74,86 @@ serve(async (req) => {
         // Get job details for response
         const { data: job } = await supabaseAdmin
           .from("jobs")
-          .select("job_number, client_name, user_id")
+          .select("job_number, client_name, client_email, user_id")
           .eq("id", jobId)
           .single();
 
-        // Send notification to business owner
+        // Get business profile
+        let profile = null;
         if (job?.user_id) {
-          // Get business email
-          const { data: profile } = await supabaseAdmin
+          const { data: profileData } = await supabaseAdmin
             .from("profiles")
-            .select("business_email, business_name")
+            .select("business_email, business_name, business_phone")
             .eq("user_id", job.user_id)
             .single();
+          profile = profileData;
+        }
 
-          if (profile?.business_email) {
-            // Invoke notification function (if exists)
-            try {
-              await supabaseAdmin.functions.invoke("notify-payment-received", {
-                body: {
-                  to: profile.business_email,
-                  businessName: profile.business_name,
-                  jobNumber: job.job_number,
-                  clientName: job.client_name,
-                  amount: session.amount_total,
-                },
-              });
-            } catch (notifyError) {
-              console.log("Notification function not available:", notifyError);
-            }
+        // Get approved estimates with services for this job
+        const { data: estimates } = await supabaseAdmin
+          .from("approved_estimates")
+          .select(`
+            id,
+            services,
+            total_amount,
+            inspection_id,
+            inspections (
+              rug_number,
+              rug_type,
+              length,
+              width
+            )
+          `)
+          .eq("job_id", jobId);
+
+        // Format rug details for the email
+        const rugs = (estimates || []).map((est: any) => ({
+          rugNumber: est.inspections?.rug_number || "Unknown",
+          rugType: est.inspections?.rug_type || "Unknown",
+          dimensions: est.inspections?.length && est.inspections?.width 
+            ? `${est.inspections.length}' × ${est.inspections.width}'` 
+            : "N/A",
+          services: Array.isArray(est.services) ? est.services : [],
+          total: est.total_amount || 0,
+        }));
+
+        // Send notification to business owner
+        if (job && profile?.business_email) {
+          try {
+            await supabaseAdmin.functions.invoke("notify-payment-received", {
+              body: {
+                to: profile.business_email,
+                businessName: profile.business_name,
+                jobNumber: job.job_number,
+                clientName: job.client_name,
+                amount: session.amount_total,
+              },
+            });
+            console.log("Staff notification sent");
+          } catch (notifyError) {
+            console.log("Staff notification error:", notifyError);
+          }
+        }
+
+        // Send confirmation email to client
+        if (job?.client_email) {
+          try {
+            await supabaseAdmin.functions.invoke("send-client-confirmation", {
+              body: {
+                clientEmail: job.client_email,
+                clientName: job.client_name,
+                jobId: jobId,
+                jobNumber: job.job_number,
+                amount: session.amount_total,
+                rugs: rugs,
+                businessName: profile?.business_name,
+                businessEmail: profile?.business_email,
+                businessPhone: profile?.business_phone,
+              },
+            });
+            console.log("Client confirmation sent");
+          } catch (clientError) {
+            console.log("Client confirmation error:", clientError);
           }
         }
 

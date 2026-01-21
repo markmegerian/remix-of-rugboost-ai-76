@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.invite-client]
 verify_jwt = false
+
+[functions.send-client-confirmation]
+verify_jwt = false
