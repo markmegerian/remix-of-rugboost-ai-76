@@ -64,112 +64,79 @@ Deno.serve(async (req) => {
     const normalizedEmail = email.toLowerCase().trim();
     console.log(`Inviting client: ${normalizedEmail} for job ${jobId}`);
 
-    let userId: string;
+    let userId: string | null = null;
     let isNewUser = false;
-    let tempPassword: string | null = null;
+    let clientId: string | null = null;
 
-    // Try to create the user first - if they exist, we'll handle that error
-    tempPassword = crypto.randomUUID().slice(0, 16);
-    
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: normalizedEmail,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-        needs_password_setup: true,
-      },
+    // Check if user already exists - don't create the user yet
+    // The user will set their own password when they access the portal
+    const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
     });
 
-    if (createError) {
-      // Check if it's an "email exists" error
-      if (createError.code === 'email_exists' || createError.message?.includes('already been registered')) {
-        console.log('User already exists, fetching existing user...');
-        
-        // Fetch user by email using the admin API
-        const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        });
+    if (listError) {
+      console.error('Error listing users:', listError);
+      throw listError;
+    }
 
-        if (listError) {
-          console.error('Error listing users:', listError);
-          throw listError;
-        }
+    const existingUser = usersData?.users?.find(
+      u => u.email?.toLowerCase() === normalizedEmail
+    );
 
-        const existingUser = usersData?.users?.find(
-          u => u.email?.toLowerCase() === normalizedEmail
-        );
-
-        if (!existingUser) {
-          throw new Error('User exists but could not be retrieved');
-        }
-
-        userId = existingUser.id;
-        isNewUser = false;
-        tempPassword = null;
-        console.log('Found existing user:', userId);
-      } else {
-        console.error('Error creating user:', createError);
-        throw createError;
-      }
+    if (existingUser) {
+      userId = existingUser.id;
+      isNewUser = false;
+      console.log('Found existing user:', userId);
     } else {
-      userId = newUser.user.id;
+      // User doesn't exist yet - they will be created when they set their password
       isNewUser = true;
-      console.log('Created new user:', userId);
-
-      // Add client role for new users
-      const { error: roleError } = await supabaseAdmin
-        .from('user_roles')
-        .insert({ user_id: userId, role: 'client' });
-
-      if (roleError && roleError.code !== '23505') {
-        console.error('Error adding role:', roleError);
-      }
+      console.log('User does not exist yet, will be created on portal access');
     }
 
-    // Check if client account exists
-    const { data: existingClient } = await supabaseAdmin
-      .from('client_accounts')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    let clientId: string;
-
-    if (existingClient) {
-      clientId = existingClient.id;
-      console.log('Using existing client account:', clientId);
-    } else {
-      // Create client account
-      const { data: newClient, error: clientError } = await supabaseAdmin
+    // Only set up client account if user already exists
+    if (userId) {
+      // Check if client account exists
+      const { data: existingClient } = await supabaseAdmin
         .from('client_accounts')
-        .insert({
-          user_id: userId,
-          email: normalizedEmail,
-          full_name: fullName,
-        })
         .select('id')
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
 
-      if (clientError) {
-        console.error('Error creating client account:', clientError);
-        throw clientError;
+      if (existingClient) {
+        clientId = existingClient.id;
+        console.log('Using existing client account:', clientId);
+      } else {
+        // Create client account
+        const { data: newClient, error: clientError } = await supabaseAdmin
+          .from('client_accounts')
+          .insert({
+            user_id: userId,
+            email: normalizedEmail,
+            full_name: fullName,
+          })
+          .select('id')
+          .single();
+
+        if (clientError) {
+          console.error('Error creating client account:', clientError);
+          throw clientError;
+        }
+        clientId = newClient.id;
+        console.log('Created new client account:', clientId);
       }
-      clientId = newClient.id;
-      console.log('Created new client account:', clientId);
-    }
 
-    // Link client to job access
-    const { error: linkError } = await supabaseAdmin
-      .from('client_job_access')
-      .update({ client_id: clientId })
-      .eq('access_token', accessToken);
+      // Link client to job access
+      const { error: linkError } = await supabaseAdmin
+        .from('client_job_access')
+        .update({ client_id: clientId })
+        .eq('access_token', accessToken);
 
-    if (linkError) {
-      console.error('Error linking client to job:', linkError);
-    } else {
-      console.log('Linked client to job access');
+      if (linkError) {
+        console.error('Error linking client to job:', linkError);
+      } else {
+        console.log('Linked client to job access');
+      }
     }
 
     // Variable to track email status
@@ -336,7 +303,6 @@ ${businessName}`;
         userId,
         clientId,
         isNewUser,
-        tempPassword: isNewUser ? tempPassword : null,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
