@@ -1,0 +1,240 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface RegistrationRequest {
+  accessToken: string;
+  email: string;
+  password: string;
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    // Create admin client
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const { accessToken, email, password } = await req.json() as RegistrationRequest;
+
+    if (!accessToken || !email || !password) {
+      return new Response(
+        JSON.stringify({ error: 'Access token, email, and password are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate password strength
+    if (password.length < 10) {
+      return new Response(
+        JSON.stringify({ error: 'Password must be at least 10 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!/[A-Z]/.test(password)) {
+      return new Response(
+        JSON.stringify({ error: 'Password must contain an uppercase letter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!/[a-z]/.test(password)) {
+      return new Response(
+        JSON.stringify({ error: 'Password must contain a lowercase letter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!/[0-9]/.test(password)) {
+      return new Response(
+        JSON.stringify({ error: 'Password must contain a number' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    console.log(`Completing registration for: ${normalizedEmail}`);
+
+    // Validate the access token and verify email matches
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
+      .rpc('validate_access_token', { _token: accessToken });
+
+    if (tokenError || !tokenData || tokenData.length === 0) {
+      console.error('Token validation error:', tokenError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired access link' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const accessInfo = tokenData[0];
+    
+    // SECURITY: Verify the email matches the invited email
+    const invitedEmail = accessInfo.invited_email?.toLowerCase().trim();
+    if (invitedEmail && invitedEmail !== normalizedEmail) {
+      return new Response(
+        JSON.stringify({ error: 'Email does not match the invitation' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Find the user by email
+    const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (listError) {
+      console.error('Error listing users:', listError);
+      throw listError;
+    }
+
+    const existingUser = usersData?.users?.find(
+      u => u.email?.toLowerCase() === normalizedEmail
+    );
+
+    if (!existingUser) {
+      // User doesn't exist yet - create them with the provided password
+      console.log('Creating new user with provided password');
+      
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: normalizedEmail,
+        password: password,
+        email_confirm: true,
+        user_metadata: {
+          needs_password_setup: false,
+        },
+      });
+
+      if (createError) {
+        console.error('Error creating user:', createError);
+        throw createError;
+      }
+
+      const userId = newUser.user.id;
+
+      // Add client role
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({ user_id: userId, role: 'client' });
+
+      if (roleError && roleError.code !== '23505') {
+        console.error('Error adding role:', roleError);
+      }
+
+      // Create client account
+      const { data: clientAccount, error: clientError } = await supabaseAdmin
+        .from('client_accounts')
+        .insert({
+          user_id: userId,
+          email: normalizedEmail,
+          full_name: accessInfo.client_name || '',
+        })
+        .select('id')
+        .single();
+
+      if (clientError && clientError.code !== '23505') {
+        console.error('Error creating client account:', clientError);
+      }
+
+      // Link to job access
+      if (clientAccount) {
+        await supabaseAdmin
+          .from('client_job_access')
+          .update({ client_id: clientAccount.id })
+          .eq('access_token', accessToken);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, userId, isNewUser: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // User exists - update their password
+    console.log('Updating password for existing user:', existingUser.id);
+    
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      existingUser.id,
+      {
+        password: password,
+        user_metadata: {
+          ...existingUser.user_metadata,
+          needs_password_setup: false,
+        },
+      }
+    );
+
+    if (updateError) {
+      console.error('Error updating user password:', updateError);
+      throw updateError;
+    }
+
+    // Ensure client account exists and is linked
+    const { data: existingClient } = await supabaseAdmin
+      .from('client_accounts')
+      .select('id')
+      .eq('user_id', existingUser.id)
+      .maybeSingle();
+
+    let clientId = existingClient?.id;
+
+    if (!clientId) {
+      const { data: newClient, error: clientError } = await supabaseAdmin
+        .from('client_accounts')
+        .insert({
+          user_id: existingUser.id,
+          email: normalizedEmail,
+          full_name: accessInfo.client_name || existingUser.user_metadata?.full_name || '',
+        })
+        .select('id')
+        .single();
+
+      if (!clientError) {
+        clientId = newClient.id;
+      }
+    }
+
+    // Link to job access if not already linked
+    if (clientId) {
+      await supabaseAdmin
+        .from('client_job_access')
+        .update({ client_id: clientId })
+        .eq('access_token', accessToken)
+        .is('client_id', null);
+    }
+
+    // Ensure client role exists
+    const { error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .insert({ user_id: existingUser.id, role: 'client' });
+
+    if (roleError && roleError.code !== '23505') {
+      console.error('Error adding role:', roleError);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, userId: existingUser.id, isNewUser: false }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error: unknown) {
+    console.error('Complete registration error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to complete registration';
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
