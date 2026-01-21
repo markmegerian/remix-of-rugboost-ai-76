@@ -48,6 +48,12 @@ export interface BusinessBranding {
   logo_url: string | null;
 }
 
+export interface UpsellService {
+  name: string;
+  unitPrice: number;
+  description?: string;
+}
+
 // Refined color palette - soft elegance with professional tones
 const COLORS = {
   // Primary - Soft navy for elevated feel
@@ -688,7 +694,8 @@ const extractAdditionalServices = (rugs: Inspection[]): AdditionalService[] => {
 export const generateJobPDF = async (
   job: Job,
   rugs: Inspection[],
-  branding?: BusinessBranding | null
+  branding?: BusinessBranding | null,
+  upsellServices?: UpsellService[]
 ): Promise<void> => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -944,7 +951,73 @@ export const generateJobPDF = async (
   doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 6, yPos + 8, { align: 'right' });
   yPos += 24;
   
-  // Additional services section removed - to be implemented in the future
+  // ============ ADDITIONAL RECOMMENDED SERVICES (from user settings) ============
+  
+  if (upsellServices && upsellServices.length > 0) {
+    if (yPos > pageHeight - 60) {
+      doc.addPage();
+      yPos = addSimplePageHeader(doc, pageWidth, branding);
+    }
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.primary);
+    doc.text('STRONGLY RECOMMENDED ADDITIONAL PROTECTION', margin, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COLORS.text);
+    const additionalIntro = 'To further protect your investment, we recommend the following additional services:';
+    const introLinesAdditional = doc.splitTextToSize(additionalIntro, pageWidth - margin * 2);
+    introLinesAdditional.forEach((line: string) => {
+      doc.text(line, margin, yPos);
+      yPos += 5;
+    });
+    yPos += 6;
+    
+    // Calculate total rug area for price estimation
+    const totalArea = rugs.reduce((sum, rug) => {
+      const area = (rug.length || 0) * (rug.width || 0);
+      return sum + area;
+    }, 0);
+    
+    for (const service of upsellServices) {
+      if (yPos > pageHeight - 40) {
+        doc.addPage();
+        yPos = addSimplePageHeader(doc, pageWidth, branding);
+      }
+      
+      // Calculate estimated cost based on total area
+      const estimatedCost = totalArea > 0 
+        ? `$${(service.unitPrice * totalArea).toFixed(2)}` 
+        : `$${service.unitPrice.toFixed(2)}/sq ft`;
+      
+      // Service title with cost
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.primary);
+      doc.text(`${service.name} (${estimatedCost})`, margin, yPos);
+      yPos += 7;
+      
+      // Description if provided
+      if (service.description) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.text);
+        const descLines = doc.splitTextToSize(service.description, pageWidth - margin * 2);
+        descLines.forEach((line: string) => {
+          if (yPos > pageHeight - 25) {
+            doc.addPage();
+            yPos = addSimplePageHeader(doc, pageWidth, branding);
+          }
+          doc.text(line, margin, yPos);
+          yPos += 4.5;
+        });
+      }
+      yPos += 6;
+    }
+  }
   
   // ============ NEXT STEPS / CLOSING ============
   
@@ -1073,7 +1146,8 @@ Please contact us${branding?.business_phone ? ` at ${branding.business_phone}` :
 export const generateJobPDFBase64 = async (
   job: Job,
   rugs: Inspection[],
-  branding?: BusinessBranding | null
+  branding?: BusinessBranding | null,
+  upsellServices?: UpsellService[]
 ): Promise<string> => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -1308,49 +1382,60 @@ export const generateJobPDFBase64 = async (
   doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 6, yPos + 8, { align: 'right' });
   yPos += 24;
   
-  // Additional services
-  if (yPos > pageHeight - 60) {
-    doc.addPage();
-    yPos = addSimplePageHeader(doc, pageWidth, branding);
-  }
+  // ============ ADDITIONAL RECOMMENDED SERVICES (from user settings) ============
   
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.primary);
-  doc.text('ADDITIONAL RECOMMENDED SERVICES', margin, yPos);
-  yPos += 8;
-  
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.text);
-  const additionalIntro = 'Based on our professional assessment, we recommend additional services to enhance protection and longevity:';
-  const introLinesAdditional = doc.splitTextToSize(additionalIntro, pageWidth - margin * 2);
-  introLinesAdditional.forEach((line: string) => { doc.text(line, margin, yPos); yPos += 5; });
-  yPos += 6;
-  
-  const defaultAdditional = [
-    { name: 'Moth Proofing Treatment', estimatedCost: `~$${Math.round(grandTotal * 0.1)}`, description: 'Creates an invisible barrier protecting against moth larvae damage.' },
-    { name: 'Fiber Protection Treatment', estimatedCost: `~$${Math.round(grandTotal * 0.15)}`, description: 'Creates an invisible shield repelling liquid spills and dry soil.' }
-  ];
-  
-  for (const service of defaultAdditional) {
-    if (yPos > pageHeight - 40) {
+  if (upsellServices && upsellServices.length > 0) {
+    if (yPos > pageHeight - 60) {
       doc.addPage();
       yPos = addSimplePageHeader(doc, pageWidth, branding);
     }
     
-    doc.setFontSize(11);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...COLORS.primary);
-    doc.text(`${service.name} (${service.estimatedCost})`, margin, yPos);
-    yPos += 7;
+    doc.text('STRONGLY RECOMMENDED ADDITIONAL PROTECTION', margin, yPos);
+    yPos += 8;
     
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...COLORS.text);
-    const descLines = doc.splitTextToSize(service.description, pageWidth - margin * 2);
-    descLines.forEach((line: string) => { doc.text(line, margin, yPos); yPos += 4.5; });
+    const additionalIntro = 'To further protect your investment, we recommend the following additional services:';
+    const introLinesAdditional = doc.splitTextToSize(additionalIntro, pageWidth - margin * 2);
+    introLinesAdditional.forEach((line: string) => { doc.text(line, margin, yPos); yPos += 5; });
     yPos += 6;
+    
+    // Calculate total rug area for price estimation
+    const totalArea = rugs.reduce((sum, rug) => {
+      const area = (rug.length || 0) * (rug.width || 0);
+      return sum + area;
+    }, 0);
+    
+    for (const service of upsellServices) {
+      if (yPos > pageHeight - 40) {
+        doc.addPage();
+        yPos = addSimplePageHeader(doc, pageWidth, branding);
+      }
+      
+      // Calculate estimated cost based on total area
+      const estimatedCost = totalArea > 0 
+        ? `$${(service.unitPrice * totalArea).toFixed(2)}` 
+        : `$${service.unitPrice.toFixed(2)}/sq ft`;
+      
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.primary);
+      doc.text(`${service.name} (${estimatedCost})`, margin, yPos);
+      yPos += 7;
+      
+      if (service.description) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.text);
+        const descLines = doc.splitTextToSize(service.description, pageWidth - margin * 2);
+        descLines.forEach((line: string) => { doc.text(line, margin, yPos); yPos += 4.5; });
+      }
+      yPos += 6;
+    }
   }
   
   // Closing

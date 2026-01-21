@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { generatePDF, generateJobPDF, generateJobPDFBase64, BusinessBranding } from '@/lib/pdfGenerator';
+import { generatePDF, generateJobPDF, generateJobPDFBase64, BusinessBranding, UpsellService } from '@/lib/pdfGenerator';
 import RugForm from '@/components/RugForm';
 import JobForm from '@/components/JobForm';
 import EditRugDialog from '@/components/EditRugDialog';
@@ -79,6 +79,7 @@ const JobDetail = () => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [servicePrices, setServicePrices] = useState<{ name: string; unitPrice: number }[]>([]);
+  const [upsellServices, setUpsellServices] = useState<UpsellService[]>([]);
   const [imageAnnotations, setImageAnnotations] = useState<any[]>([]);
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle');
   const [analysisRugNumber, setAnalysisRugNumber] = useState<string>('');
@@ -126,7 +127,7 @@ const JobDetail = () => {
     try {
       const { data, error } = await supabase
         .from('service_prices')
-        .select('service_name, unit_price')
+        .select('service_name, unit_price, is_additional')
         .eq('user_id', user!.id);
 
       if (error) {
@@ -135,7 +136,19 @@ const JobDetail = () => {
       }
 
       if (data) {
-        setServicePrices(data.map(p => ({ name: p.service_name, unitPrice: p.unit_price })));
+        // Regular service prices (not additional/upsell)
+        setServicePrices(
+          data
+            .filter(p => !p.is_additional)
+            .map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
+        );
+        
+        // Upsell/additional services
+        setUpsellServices(
+          data
+            .filter(p => p.is_additional)
+            .map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
+        );
       }
     } catch (error) {
       console.error('Error fetching service prices:', error);
@@ -578,7 +591,7 @@ const JobDetail = () => {
         client_phone: job.client_phone,
       }));
 
-      await generateJobPDF(job, rugsWithClient, branding);
+      await generateJobPDF(job, rugsWithClient, branding, upsellServices);
       toast.success('Complete job report downloaded!');
     } catch (error) {
       console.error('Job PDF generation error:', error);
@@ -622,7 +635,7 @@ const JobDetail = () => {
         client_phone: job.client_phone,
       }));
       
-      const pdfBase64 = await generateJobPDFBase64(job, rugsWithClient, branding);
+      const pdfBase64 = await generateJobPDFBase64(job, rugsWithClient, branding, upsellServices);
       
       const rugDetails = analyzedRugs.map(rug => ({
         rugNumber: rug.rug_number,
