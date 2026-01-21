@@ -13,7 +13,12 @@ import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('Please enter a valid email address');
-const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+// Enforce strong password requirements matching ClientSetPassword
+const passwordSchema = z.string()
+  .min(10, 'Password must be at least 10 characters')
+  .regex(/[A-Z]/, 'Must contain uppercase letter')
+  .regex(/[a-z]/, 'Must contain lowercase letter')
+  .regex(/[0-9]/, 'Must contain number');
 const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
 const ClientAuth = () => {
@@ -87,6 +92,29 @@ const ClientAuth = () => {
 
   const linkClientToJob = async (userId: string, token: string) => {
     try {
+      // SECURITY: Validate the token and verify email matches before linking
+      const { data: tokenData, error: tokenError } = await supabase
+        .rpc('validate_access_token', { _token: token })
+        .single();
+
+      if (tokenError || !tokenData) {
+        toast.error('Invalid or expired access link');
+        return;
+      }
+
+      // SECURITY: Verify the user's email matches the invited email
+      // This prevents attackers from claiming someone else's job access
+      if (tokenData.invited_email && user?.email) {
+        const normalizedInvitedEmail = tokenData.invited_email.toLowerCase().trim();
+        const normalizedUserEmail = user.email.toLowerCase().trim();
+        
+        if (normalizedInvitedEmail !== normalizedUserEmail) {
+          toast.error('This access link was sent to a different email address');
+          console.error('Email mismatch:', { invited: normalizedInvitedEmail, user: normalizedUserEmail });
+          return;
+        }
+      }
+
       // Check if user already has a client account
       const { data: existingClient, error: clientError } = await supabase
         .from('client_accounts')

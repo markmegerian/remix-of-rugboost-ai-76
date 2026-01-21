@@ -20,12 +20,21 @@ serve(async (req) => {
       throw new Error("Session ID is required");
     }
 
+    // Validate sessionId format to prevent injection
+    if (typeof sessionId !== 'string' || !sessionId.startsWith('cs_')) {
+      throw new Error("Invalid session ID format");
+    }
+
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Retrieve the checkout session
+    // Retrieve the checkout session from Stripe
+    // This is secure because:
+    // 1. Only valid Stripe session IDs will return data
+    // 2. Stripe validates the session belongs to our account
+    // 3. We only process if the payment_status is "paid"
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["payment_intent"],
     });
@@ -37,6 +46,31 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // SECURITY: Verify this session exists in our payments table
+    // This ensures the session was created by our system
+    const { data: existingPayment, error: paymentLookupError } = await supabaseAdmin
+      .from('payments')
+      .select('id, job_id, status')
+      .eq('stripe_checkout_session_id', sessionId)
+      .single();
+
+    if (paymentLookupError || !existingPayment) {
+      console.error("Payment record not found for session:", sessionId);
+      return new Response(
+        JSON.stringify({ error: "Payment record not found", success: false }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // If payment is already completed, return success without reprocessing
+    if (existingPayment.status === 'completed') {
+      console.log("Payment already processed:", sessionId);
+      return new Response(
+        JSON.stringify({ success: true, amount: session.amount_total, alreadyProcessed: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (session.payment_status === "paid") {
       const paymentIntent = session.payment_intent as Stripe.PaymentIntent;

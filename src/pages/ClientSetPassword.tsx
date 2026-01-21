@@ -10,7 +10,12 @@ import { supabase } from '@/integrations/supabase/client';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { z } from 'zod';
 
-const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
+// Enforce strong password requirements
+const passwordSchema = z.string()
+  .min(10, 'Password must be at least 10 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number');
 
 const ClientSetPassword = () => {
   const navigate = useNavigate();

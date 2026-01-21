@@ -37,7 +37,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    // Get authenticated user
+    // Get authenticated user - REQUIRED for authorization
     const authHeader = req.headers.get("Authorization");
     let userEmail: string | undefined;
     let userId: string | undefined;
@@ -51,12 +51,53 @@ serve(async (req) => {
       }
     }
 
+    // Require authentication
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const body: CheckoutRequest = await req.json();
     const { jobId, clientJobAccessId, selectedServices, totalAmount, customerEmail, successUrl, cancelUrl } = body;
 
     // Validate required fields
-    if (!jobId || !selectedServices || selectedServices.length === 0 || !totalAmount) {
-      throw new Error("Missing required fields: jobId, selectedServices, totalAmount");
+    if (!jobId || !clientJobAccessId || !selectedServices || selectedServices.length === 0 || !totalAmount) {
+      throw new Error("Missing required fields: jobId, clientJobAccessId, selectedServices, totalAmount");
+    }
+
+    // SECURITY: Verify the authenticated user has access to this job
+    // Get user's client account
+    const { data: clientAccount, error: clientError } = await supabaseClient
+      .from('client_accounts')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (clientError || !clientAccount) {
+      console.error("Client account not found for user:", userId);
+      return new Response(
+        JSON.stringify({ error: "Client account not found" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify the client has access to this specific job via client_job_access
+    const { data: accessRecord, error: accessError } = await supabaseClient
+      .from('client_job_access')
+      .select('id, job_id')
+      .eq('id', clientJobAccessId)
+      .eq('job_id', jobId)
+      .eq('client_id', clientAccount.id)
+      .single();
+
+    if (accessError || !accessRecord) {
+      console.error("Unauthorized job access attempt:", { userId, jobId, clientJobAccessId });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized access to job" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const email = userEmail || customerEmail;
