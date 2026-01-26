@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, Building2, Mail, Phone, MapPin, Briefcase, DollarSign, Loader2, Plus, CheckCircle, Clock, CreditCard, Wallet, Building } from 'lucide-react';
+import { ArrowLeft, Building2, Mail, Phone, MapPin, Briefcase, DollarSign, Loader2, Plus, CheckCircle, Clock, CreditCard, Wallet, Building, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,14 @@ interface Profile {
   venmo_handle: string | null;
   zelle_email: string | null;
   payment_notes: string | null;
+}
+
+interface DecryptedPaymentInfo {
+  bank_account_number?: string;
+  bank_routing_number?: string;
+  paypal_email?: string;
+  venmo_handle?: string;
+  zelle_email?: string;
 }
 
 interface Job {
@@ -67,11 +75,23 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+// Fields that are encrypted
+const ENCRYPTED_FIELDS = [
+  'bank_account_number',
+  'bank_routing_number',
+  'paypal_email',
+  'venmo_handle',
+  'zelle_email'
+];
+
 const AdminUserDetail = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { isAdmin, loading: authLoading } = useAdminAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [decryptedPayment, setDecryptedPayment] = useState<DecryptedPaymentInfo>({});
+  const [decryptionLoading, setDecryptionLoading] = useState(false);
+  const [showDecrypted, setShowDecrypted] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -89,6 +109,47 @@ const AdminUserDetail = () => {
       fetchUserData();
     }
   }, [isAdmin, userId]);
+
+  const decryptPaymentData = async () => {
+    if (!profile || !userId) return;
+    
+    setDecryptionLoading(true);
+    try {
+      const encryptedData: Record<string, string> = {};
+      
+      for (const field of ENCRYPTED_FIELDS) {
+        const value = profile[field as keyof Profile];
+        if (value && typeof value === 'string') {
+          encryptedData[field] = value;
+        }
+      }
+
+      if (Object.keys(encryptedData).length === 0) {
+        setShowDecrypted(true);
+        return;
+      }
+
+      const response = await supabase.functions.invoke('financial-data', {
+        body: { 
+          action: 'decrypt', 
+          data: encryptedData,
+          targetUserId: userId 
+        }
+      });
+
+      if (response.error) {
+        console.error('Decryption error:', response.error);
+        return;
+      }
+
+      setDecryptedPayment(response.data?.data || {});
+      setShowDecrypted(true);
+    } catch (error) {
+      console.error('Failed to decrypt payment data:', error);
+    } finally {
+      setDecryptionLoading(false);
+    }
+  };
 
   const fetchUserData = async () => {
     if (!userId) return;
@@ -170,6 +231,19 @@ const AdminUserDetail = () => {
   const outstandingBalance = totalRevenue - totalPaidOut;
   const businessName = profile.business_name || profile.full_name || 'Unnamed Business';
 
+  // Helper to get display value (decrypted or masked)
+  const getPaymentValue = (field: keyof DecryptedPaymentInfo, rawValue: string | null) => {
+    if (!rawValue) return null;
+    if (showDecrypted && decryptedPayment[field]) {
+      return decryptedPayment[field];
+    }
+    // Show masked value for encrypted data
+    if (field === 'bank_account_number' && rawValue.length > 20) {
+      return '••••••••' + (decryptedPayment[field]?.slice(-4) || '••••');
+    }
+    return '••••••••';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminHeader title={businessName} subtitle="Business details" />
@@ -226,10 +300,28 @@ const AdminUserDetail = () => {
           {/* Payment Information */}
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="font-display text-lg flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                Payment Information
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-display text-lg flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Payment Information
+                  <Shield className="h-4 w-4 text-green-600" />
+                </CardTitle>
+                {profile.payment_method && !showDecrypted && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={decryptPaymentData}
+                    disabled={decryptionLoading}
+                  >
+                    {decryptionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Shield className="h-4 w-4 mr-2" />
+                    )}
+                    Reveal Details
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {profile.payment_method ? (
@@ -244,26 +336,47 @@ const AdminUserDetail = () => {
                   {profile.payment_method === 'bank_transfer' && (
                     <div className="p-4 rounded-lg bg-muted/50 space-y-2 text-sm">
                       {profile.bank_name && <p><span className="text-muted-foreground">Bank:</span> {profile.bank_name}</p>}
-                      {profile.bank_routing_number && <p><span className="text-muted-foreground">Routing:</span> {profile.bank_routing_number}</p>}
-                      {profile.bank_account_number && <p><span className="text-muted-foreground">Account:</span> ****{profile.bank_account_number.slice(-4)}</p>}
+                      {profile.bank_routing_number && (
+                        <p>
+                          <span className="text-muted-foreground">Routing:</span>{' '}
+                          {showDecrypted ? (decryptedPayment.bank_routing_number || profile.bank_routing_number) : '•••••••••'}
+                        </p>
+                      )}
+                      {profile.bank_account_number && (
+                        <p>
+                          <span className="text-muted-foreground">Account:</span>{' '}
+                          {showDecrypted 
+                            ? (decryptedPayment.bank_account_number || profile.bank_account_number)
+                            : '••••' + (decryptedPayment.bank_account_number?.slice(-4) || '••••')}
+                        </p>
+                      )}
                     </div>
                   )}
                   
                   {profile.payment_method === 'paypal' && profile.paypal_email && (
                     <div className="p-4 rounded-lg bg-muted/50 text-sm">
-                      <p><span className="text-muted-foreground">PayPal:</span> {profile.paypal_email}</p>
+                      <p>
+                        <span className="text-muted-foreground">PayPal:</span>{' '}
+                        {showDecrypted ? (decryptedPayment.paypal_email || profile.paypal_email) : '••••••••@••••.•••'}
+                      </p>
                     </div>
                   )}
                   
                   {profile.payment_method === 'venmo' && profile.venmo_handle && (
                     <div className="p-4 rounded-lg bg-muted/50 text-sm">
-                      <p><span className="text-muted-foreground">Venmo:</span> {profile.venmo_handle}</p>
+                      <p>
+                        <span className="text-muted-foreground">Venmo:</span>{' '}
+                        {showDecrypted ? (decryptedPayment.venmo_handle || profile.venmo_handle) : '@••••••••'}
+                      </p>
                     </div>
                   )}
                   
                   {profile.payment_method === 'zelle' && profile.zelle_email && (
                     <div className="p-4 rounded-lg bg-muted/50 text-sm">
-                      <p><span className="text-muted-foreground">Zelle:</span> {profile.zelle_email}</p>
+                      <p>
+                        <span className="text-muted-foreground">Zelle:</span>{' '}
+                        {showDecrypted ? (decryptedPayment.zelle_email || profile.zelle_email) : '••••••••@••••.•••'}
+                      </p>
                     </div>
                   )}
                   
@@ -278,6 +391,13 @@ const AdminUserDetail = () => {
                       <p className="text-muted-foreground">Notes:</p>
                       <p>{profile.payment_notes}</p>
                     </div>
+                  )}
+
+                  {showDecrypted && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      This access has been logged for security auditing
+                    </p>
                   )}
                 </div>
               ) : (
@@ -450,9 +570,11 @@ const AdminUserDetail = () => {
                           <TableCell className="text-right font-medium">
                             {formatCurrency(payout.amount)}
                           </TableCell>
-                          <TableCell>{payout.payment_method || '—'}</TableCell>
+                          <TableCell className="capitalize">
+                            {payout.payment_method?.replace('_', ' ') || '-'}
+                          </TableCell>
                           <TableCell className="font-mono text-sm">
-                            {payout.reference_number || '—'}
+                            {payout.reference_number || '-'}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -461,7 +583,7 @@ const AdminUserDetail = () => {
                                 payout.status === 'completed'
                                   ? 'border-green-500 text-green-600'
                                   : payout.status === 'pending'
-                                  ? 'border-amber-500 text-amber-600'
+                                  ? 'border-yellow-500 text-yellow-600'
                                   : 'border-red-500 text-red-600'
                               }
                             >
@@ -481,6 +603,7 @@ const AdminUserDetail = () => {
         </div>
       </main>
 
+      {/* Payout Dialog */}
       <PayoutDialog
         open={payoutDialogOpen}
         onOpenChange={setPayoutDialogOpen}

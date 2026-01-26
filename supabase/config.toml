@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.notify-payout]
 verify_jwt = false
+
+[functions.complete-client-registration]
+verify_jwt = false
+
+[functions.financial-data]
+verify_jwt = false

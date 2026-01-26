@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CreditCard, Loader2, Save, Building, Wallet } from "lucide-react";
+import { CreditCard, Loader2, Save, Building, Wallet, Shield } from "lucide-react";
 
 interface PaymentInfo {
   payment_method: string | null;
@@ -20,6 +20,15 @@ interface PaymentInfo {
   zelle_email: string | null;
   payment_notes: string | null;
 }
+
+// Fields that should be encrypted
+const ENCRYPTED_FIELDS = [
+  'bank_account_number',
+  'bank_routing_number',
+  'paypal_email',
+  'venmo_handle',
+  'zelle_email'
+];
 
 const PaymentInfoSettings = () => {
   const { user } = useAuth();
@@ -42,6 +51,68 @@ const PaymentInfoSettings = () => {
     }
   }, [user]);
 
+  const decryptFields = async (data: Record<string, string | null>): Promise<Record<string, string>> => {
+    const encryptedData: Record<string, string> = {};
+    
+    for (const field of ENCRYPTED_FIELDS) {
+      if (data[field]) {
+        encryptedData[field] = data[field] as string;
+      }
+    }
+
+    if (Object.keys(encryptedData).length === 0) {
+      return {};
+    }
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) return {};
+
+      const response = await supabase.functions.invoke('financial-data', {
+        body: { action: 'decrypt', data: encryptedData }
+      });
+
+      if (response.error) {
+        console.error('Decryption error:', response.error);
+        return {};
+      }
+
+      return response.data?.data || {};
+    } catch (error) {
+      console.error('Failed to decrypt fields:', error);
+      return {};
+    }
+  };
+
+  const encryptFields = async (data: Record<string, string | null>): Promise<Record<string, string>> => {
+    const toEncrypt: Record<string, string> = {};
+    
+    for (const field of ENCRYPTED_FIELDS) {
+      if (data[field]) {
+        toEncrypt[field] = data[field] as string;
+      }
+    }
+
+    if (Object.keys(toEncrypt).length === 0) {
+      return {};
+    }
+
+    try {
+      const response = await supabase.functions.invoke('financial-data', {
+        body: { action: 'encrypt', data: toEncrypt }
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      return response.data?.data || {};
+    } catch (error) {
+      console.error('Failed to encrypt fields:', error);
+      throw new Error('Failed to secure payment data');
+    }
+  };
+
   const fetchPaymentInfo = async () => {
     try {
       const { data, error } = await supabase
@@ -55,14 +126,17 @@ const PaymentInfoSettings = () => {
       }
 
       if (data) {
+        // Decrypt sensitive fields
+        const decrypted = await decryptFields(data);
+        
         setPaymentInfo({
           payment_method: data.payment_method || "bank_transfer",
           bank_name: data.bank_name || "",
-          bank_account_number: data.bank_account_number || "",
-          bank_routing_number: data.bank_routing_number || "",
-          paypal_email: data.paypal_email || "",
-          venmo_handle: data.venmo_handle || "",
-          zelle_email: data.zelle_email || "",
+          bank_account_number: decrypted.bank_account_number || data.bank_account_number || "",
+          bank_routing_number: decrypted.bank_routing_number || data.bank_routing_number || "",
+          paypal_email: decrypted.paypal_email || data.paypal_email || "",
+          venmo_handle: decrypted.venmo_handle || data.venmo_handle || "",
+          zelle_email: decrypted.zelle_email || data.zelle_email || "",
           payment_notes: data.payment_notes || "",
         });
       }
@@ -86,23 +160,34 @@ const PaymentInfoSettings = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Encrypt sensitive fields before saving
+      const dataToEncrypt: Record<string, string | null> = {
+        bank_account_number: paymentInfo.bank_account_number || null,
+        bank_routing_number: paymentInfo.bank_routing_number || null,
+        paypal_email: paymentInfo.paypal_email || null,
+        venmo_handle: paymentInfo.venmo_handle || null,
+        zelle_email: paymentInfo.zelle_email || null,
+      };
+
+      const encrypted = await encryptFields(dataToEncrypt);
+
       const { error } = await supabase
         .from("profiles")
         .update({
           payment_method: paymentInfo.payment_method,
           bank_name: paymentInfo.bank_name || null,
-          bank_account_number: paymentInfo.bank_account_number || null,
-          bank_routing_number: paymentInfo.bank_routing_number || null,
-          paypal_email: paymentInfo.paypal_email || null,
-          venmo_handle: paymentInfo.venmo_handle || null,
-          zelle_email: paymentInfo.zelle_email || null,
+          bank_account_number: encrypted.bank_account_number || paymentInfo.bank_account_number || null,
+          bank_routing_number: encrypted.bank_routing_number || paymentInfo.bank_routing_number || null,
+          paypal_email: encrypted.paypal_email || paymentInfo.paypal_email || null,
+          venmo_handle: encrypted.venmo_handle || paymentInfo.venmo_handle || null,
+          zelle_email: encrypted.zelle_email || paymentInfo.zelle_email || null,
           payment_notes: paymentInfo.payment_notes || null,
         })
         .eq("user_id", user!.id);
 
       if (error) throw error;
 
-      toast.success("Payment information saved successfully");
+      toast.success("Payment information saved securely");
     } catch (error) {
       console.error("Error saving payment info:", error);
       toast.error("Failed to save payment information");
@@ -128,8 +213,9 @@ const PaymentInfoSettings = () => {
           <CreditCard className="h-5 w-5" />
           Payment Information
         </CardTitle>
-        <CardDescription>
-          How you'd like to receive payouts from the platform
+        <CardDescription className="flex items-center gap-1">
+          <Shield className="h-3 w-3" />
+          Your payment data is encrypted for security
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -184,6 +270,7 @@ const PaymentInfoSettings = () => {
             <h4 className="font-medium flex items-center gap-2">
               <Building className="h-4 w-4" />
               Bank Account Details
+              <Shield className="h-3 w-3 text-green-600" />
             </h4>
             <div className="space-y-2">
               <Label htmlFor="bank_name">Bank Name</Label>
@@ -224,7 +311,10 @@ const PaymentInfoSettings = () => {
         {/* PayPal Fields */}
         {paymentInfo.payment_method === "paypal" && (
           <div className="space-y-4 p-4 rounded-lg bg-muted/50 border">
-            <h4 className="font-medium">PayPal Details</h4>
+            <h4 className="font-medium flex items-center gap-2">
+              PayPal Details
+              <Shield className="h-3 w-3 text-green-600" />
+            </h4>
             <div className="space-y-2">
               <Label htmlFor="paypal_email">PayPal Email</Label>
               <Input
@@ -242,7 +332,10 @@ const PaymentInfoSettings = () => {
         {/* Venmo Fields */}
         {paymentInfo.payment_method === "venmo" && (
           <div className="space-y-4 p-4 rounded-lg bg-muted/50 border">
-            <h4 className="font-medium">Venmo Details</h4>
+            <h4 className="font-medium flex items-center gap-2">
+              Venmo Details
+              <Shield className="h-3 w-3 text-green-600" />
+            </h4>
             <div className="space-y-2">
               <Label htmlFor="venmo_handle">Venmo Handle</Label>
               <Input
@@ -259,7 +352,10 @@ const PaymentInfoSettings = () => {
         {/* Zelle Fields */}
         {paymentInfo.payment_method === "zelle" && (
           <div className="space-y-4 p-4 rounded-lg bg-muted/50 border">
-            <h4 className="font-medium">Zelle Details</h4>
+            <h4 className="font-medium flex items-center gap-2">
+              Zelle Details
+              <Shield className="h-3 w-3 text-green-600" />
+            </h4>
             <div className="space-y-2">
               <Label htmlFor="zelle_email">Zelle Email or Phone</Label>
               <Input
