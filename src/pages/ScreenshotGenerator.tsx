@@ -156,13 +156,25 @@ const ScreenshotGenerator: React.FC = () => {
                 <SelectItem value="iphone-15-pro">
                   <div className="flex items-center gap-2">
                     <Smartphone className="h-4 w-4" />
-                    iPhone 15 Pro (6.1")
+                    iPhone 6.1" (1179×2556)
                   </div>
                 </SelectItem>
                 <SelectItem value="iphone-15-pro-max">
                   <div className="flex items-center gap-2">
                     <Smartphone className="h-4 w-4" />
-                    iPhone 15 Pro Max (6.7")
+                    iPhone 6.7" (1290×2796)
+                  </div>
+                </SelectItem>
+                <SelectItem value="iphone-6.5-inch">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4" />
+                    iPhone 6.5" (1242×2688)
+                  </div>
+                </SelectItem>
+                <SelectItem value="iphone-6.5-inch-alt">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4" />
+                    iPhone 6.5" (1284×2778)
                   </div>
                 </SelectItem>
                 <SelectItem value="ipad-pro-12.9">

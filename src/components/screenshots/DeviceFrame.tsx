@@ -1,7 +1,12 @@
 import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
-export type DeviceType = 'iphone-15-pro' | 'iphone-15-pro-max' | 'ipad-pro-12.9';
+export type DeviceType = 
+  | 'iphone-15-pro' 
+  | 'iphone-15-pro-max' 
+  | 'iphone-6.5-inch' 
+  | 'iphone-6.5-inch-alt'
+  | 'ipad-pro-12.9';
 
 interface DeviceFrameProps {
   children: React.ReactNode;
@@ -21,6 +26,7 @@ export const DEVICE_SPECS = {
     cornerRadius: 55,
     notchWidth: 126,
     dynamicIsland: true,
+    hasNotch: false,
   },
   'iphone-15-pro-max': {
     name: 'iPhone 15 Pro Max (6.7")',
@@ -31,6 +37,29 @@ export const DEVICE_SPECS = {
     cornerRadius: 60,
     notchWidth: 126,
     dynamicIsland: true,
+    hasNotch: false,
+  },
+  'iphone-6.5-inch': {
+    name: 'iPhone 6.5" (1242×2688)',
+    width: 1242,
+    height: 2688,
+    displayWidth: 414,
+    displayHeight: 896,
+    cornerRadius: 50,
+    notchWidth: 160,
+    dynamicIsland: false,
+    hasNotch: true,
+  },
+  'iphone-6.5-inch-alt': {
+    name: 'iPhone 6.5" (1284×2778)',
+    width: 1284,
+    height: 2778,
+    displayWidth: 428,
+    displayHeight: 926,
+    cornerRadius: 53,
+    notchWidth: 126,
+    dynamicIsland: false,
+    hasNotch: true,
   },
   'ipad-pro-12.9': {
     name: 'iPad Pro 12.9"',
@@ -41,6 +70,7 @@ export const DEVICE_SPECS = {
     cornerRadius: 18,
     notchWidth: 0,
     dynamicIsland: false,
+    hasNotch: false,
   },
 };
 
@@ -84,7 +114,7 @@ const DeviceFrame = forwardRef<HTMLDivElement, DeviceFrameProps>(({
             backgroundColor: '#000',
           }}
         >
-          {/* Dynamic Island (iPhone only) */}
+          {/* Dynamic Island (iPhone 14 Pro+) */}
           {specs.dynamicIsland && (
             <div 
               className="absolute left-1/2 -translate-x-1/2 bg-black z-30"
@@ -97,8 +127,22 @@ const DeviceFrame = forwardRef<HTMLDivElement, DeviceFrameProps>(({
             />
           )}
           
+          {/* Classic Notch (iPhone X - 13) */}
+          {specs.hasNotch && (
+            <div 
+              className="absolute left-1/2 -translate-x-1/2 bg-black z-30"
+              style={{
+                top: 0,
+                width: specs.notchWidth * scale,
+                height: 30 * scale,
+                borderBottomLeftRadius: 20 * scale,
+                borderBottomRightRadius: 20 * scale,
+              }}
+            />
+          )}
+          
           {/* Screen content container - this scales the content */}
-          <div 
+          <div
             className="absolute inset-0 overflow-hidden"
             style={{
               backgroundColor: 'hsl(var(--background))',
