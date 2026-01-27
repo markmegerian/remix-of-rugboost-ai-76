@@ -140,7 +140,7 @@ const Dashboard = () => {
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
-            <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
+            <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10 border-0" />
             <div>
               <h1 className="text-xl font-bold text-foreground font-sans">RugBoost</h1>
               <p className="text-xs text-muted-foreground">Job Dashboard</p>
