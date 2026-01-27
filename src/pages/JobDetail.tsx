@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useJobDetail, useInvalidateJobDetail } from '@/hooks/useJobDetail';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useUpdateJobStatus } from '@/hooks/useJobs';
 import type { Json } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,6 +103,7 @@ const JobDetail = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const invalidateJobDetail = useInvalidateJobDetail();
+  const updateJobStatus = useUpdateJobStatus();
   
   // Use React Query for all data fetching (parallel fetches)
   const { data: jobData, isLoading: loading, refetch } = useJobDetail(jobId, user?.id);
@@ -323,24 +325,11 @@ const JobDetail = () => {
     reset: resetUploadProgress 
   } = usePhotoUpload({ batchSize: 4 });
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = (newStatus: string) => {
     if (!job) return;
-
-    try {
-      const { error } = await supabase
-        .from('jobs')
-        .update({ status: newStatus })
-        .eq('id', job.id);
-
-      if (error) throw error;
-      
-      // Refresh data via React Query
-      fetchJobDetails();
-      toast.success(`Job status updated to ${newStatus}`);
-    } catch (error) {
-      console.error('Status update error:', error);
-      toast.error('Failed to update status');
-    }
+    
+    // Use optimistic update - UI updates instantly, server sync in background
+    updateJobStatus.mutate({ jobId: job.id, status: newStatus });
   };
 
   const handleEditJob = async (formData: {

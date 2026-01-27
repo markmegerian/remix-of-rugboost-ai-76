@@ -2,9 +2,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.lovable.fef72b1bd1214ff6bcc3c957ca919cde',
-  appName: 'rug-scan-report',
+  appName: 'Rugboost',
   webDir: 'dist',
-  // COMMENTED OUT for local builds - uncomment for live reload development
+  // COMMENTED OUT for production/App Store builds - uncomment for live reload development
   // server: {
   //   url: 'https://fef72b1b-d121-4ff6-bcc3-c957ca919cde.lovableproject.com?forceHideBadge=true',
   //   cleartext: true
@@ -12,12 +12,17 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
-    scheme: 'Rugboost'
+    scheme: 'Rugboost',
+    // Allows proper handling of background/foreground states
+    backgroundColor: '#f7f5f3',
+    // Prevent WebView from scrolling behind nav bar
+    scrollEnabled: true,
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false
+    webContentsDebuggingEnabled: false,
+    backgroundColor: '#f7f5f3',
   },
   plugins: {
     SplashScreen: {
@@ -26,13 +31,29 @@ const config: CapacitorConfig = {
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
       splashFullScreen: true,
-      splashImmersive: true
+      splashImmersive: true,
+      // iOS specific
+      iosSpinnerStyle: 'small',
+      spinnerColor: '#2563eb',
     },
     Keyboard: {
       resize: 'body',
-      resizeOnFullScreen: true
-    }
-  }
+      resizeOnFullScreen: true,
+      // Smooth keyboard transitions
+      style: 'dark',
+    },
+    PushNotifications: {
+      // Required for iOS push notifications
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+    Camera: {
+      // Camera permissions are handled via Info.plist
+    },
+    StatusBar: {
+      // Style configured via AppInitializer
+      overlaysWebView: false,
+    },
+  },
 };
 
 export default config;

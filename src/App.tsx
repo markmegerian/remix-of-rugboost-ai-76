@@ -43,9 +43,9 @@ const AdminAuditLog = lazy(() => import("./pages/admin/AdminAuditLog"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 
-// Loading fallback component
+// Loading fallback component - iOS safe area aware
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
+  <div className="min-h-screen-safe flex items-center justify-center safe-y">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
   </div>
 );

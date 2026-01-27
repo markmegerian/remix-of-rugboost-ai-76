@@ -79,30 +79,45 @@ export const useUpdateJobStatus = () => {
     onMutate: async ({ jobId, status }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.jobs.list() });
+      await queryClient.cancelQueries({ queryKey: queryKeys.jobs.detail(jobId) });
       
-      // Snapshot previous value
+      // Snapshot previous values
       const previousJobs = queryClient.getQueryData<Job[]>(queryKeys.jobs.list());
+      const previousJobDetail = queryClient.getQueryData(queryKeys.jobs.detail(jobId));
       
-      // Optimistically update
+      // Optimistically update jobs list
       queryClient.setQueryData<Job[]>(queryKeys.jobs.list(), (old) => 
         old?.map(job => job.id === jobId ? { ...job, status } : job)
       );
       
-      return { previousJobs };
+      // Optimistically update job detail if it exists
+      queryClient.setQueryData(queryKeys.jobs.detail(jobId), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          job: old.job ? { ...old.job, status } : old.job,
+        };
+      });
+      
+      return { previousJobs, previousJobDetail, jobId };
     },
     onError: (err, variables, context) => {
       // Rollback on error
       if (context?.previousJobs) {
         queryClient.setQueryData(queryKeys.jobs.list(), context.previousJobs);
       }
+      if (context?.previousJobDetail && context?.jobId) {
+        queryClient.setQueryData(queryKeys.jobs.detail(context.jobId), context.previousJobDetail);
+      }
       toast.error('Failed to update status');
     },
     onSuccess: () => {
       toast.success('Status updated');
     },
-    onSettled: () => {
+    onSettled: (data, error, variables) => {
       // Refetch to ensure server state
       queryClient.invalidateQueries({ queryKey: queryKeys.jobs.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(variables.jobId) });
     },
   });
 };

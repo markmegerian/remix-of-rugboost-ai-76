@@ -8,30 +8,46 @@
     <link rel="dns-prefetch" href="https://tviommdnpvfceuprrwzf.supabase.co" />
     <link rel="preconnect" href="https://tviommdnpvfceuprrwzf.supabase.co" crossorigin />
     
-    <!-- Capacitor / Mobile App Meta Tags -->
+    <!-- iOS App Store / Capacitor Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Rugboost">
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
     <meta name="mobile-web-app-capable" content="yes">
     
+    <!-- iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" href="/splash-2732x2732.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+    <link rel="apple-touch-startup-image" href="/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
+    <link rel="apple-touch-startup-image" href="/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
+    
+    <!-- iOS Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png">
+    
     <!-- Theme color for mobile browsers -->
     <meta name="theme-color" content="#f7f5f3" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
     
-    <title>Rugboost</title>
-    <meta name="description" content="Your Office AI">
+    <title>Rugboost - AI-Powered Rug Inspection</title>
+    <meta name="description" content="Professional rug cleaning inspection app with AI-powered analysis, automated estimates, and client portal. Streamline your rug cleaning business workflow.">
+    <meta name="keywords" content="rug cleaning, rug inspection, AI analysis, carpet cleaning, professional cleaning">
     <meta name="author" content="RugBoost" />
     
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Rugboost">
-    <meta property="og:description" content="Your Office AI">
+    <meta property="og:site_name" content="Rugboost">
+    <meta property="og:title" content="Rugboost - AI-Powered Rug Inspection">
+    <meta property="og:description" content="Professional rug cleaning inspection app with AI-powered analysis, automated estimates, and client portal.">
+    <meta property="og:url" content="https://rug-scan-report.lovable.app">
     
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@RugBoost" />
-    <meta name="twitter:title" content="Rugboost">
-    <meta name="twitter:description" content="Your Office AI">
+    <meta name="twitter:title" content="Rugboost - AI-Powered Rug Inspection">
+    <meta name="twitter:description" content="Professional rug cleaning inspection app with AI-powered analysis.">
   
     <link rel="icon" type="image/svg+xml" href="https://storage.googleapis.com/gpt-engineer-file-uploads/UAZGezYaP5VpDciEgiyPBTBIonQ2/uploads/1768589107611-gmit-icon-transparent.svg">
   </head>
@@ -46,6 +62,12 @@
           align-items: center;
           justify-content: center;
           background: hsl(30, 25%, 97%);
+        }
+        @supports (padding: env(safe-area-inset-top)) {
+          .initial-loader {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+          }
         }
         .initial-loader-spinner {
           width: 32px;
