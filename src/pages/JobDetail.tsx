@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
@@ -9,6 +9,7 @@ import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useJobDetail, useInvalidateJobDetail } from '@/hooks/useJobDetail';
 import type { Json } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import { ModelComparisonDialog } from '@/components/ModelComparisonDialog';
 import ClientPortalStatus from '@/components/ClientPortalStatus';
 import ServiceCompletionCard from '@/components/ServiceCompletionCard';
 import PaymentTracking from '@/components/PaymentTracking';
+import { JobDetailSkeleton } from '@/components/skeletons/JobDetailSkeleton';
 
 interface ClientPortalStatusData {
   accessToken: string;
@@ -97,9 +99,12 @@ const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [job, setJob] = useState<Job | null>(null);
-  const [rugs, setRugs] = useState<Rug[]>([]);
-  const [loading, setLoading] = useState(true);
+  const invalidateJobDetail = useInvalidateJobDetail();
+  
+  // Use React Query for all data fetching (parallel fetches)
+  const { data: jobData, isLoading: loading, refetch } = useJobDetail(jobId, user?.id);
+
+  // Local state for UI interactions
   const [isAddingRug, setIsAddingRug] = useState(false);
   const [isEditingJob, setIsEditingJob] = useState(false);
   const [editingRug, setEditingRug] = useState<Rug | null>(null);
@@ -112,11 +117,8 @@ const JobDetail = () => {
   const [selectedRug, setSelectedRug] = useState<Rug | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [showEstimateReview, setShowEstimateReview] = useState(false);
-  const [branding, setBranding] = useState<BusinessBranding | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
-  const [servicePrices, setServicePrices] = useState<{ name: string; unitPrice: number }[]>([]);
-  const [upsellServices, setUpsellServices] = useState<UpsellService[]>([]);
   const [imageAnnotations, setImageAnnotations] = useState<any[]>([]);
   const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle');
   const [analysisRugNumber, setAnalysisRugNumber] = useState<string>('');
@@ -124,13 +126,32 @@ const JobDetail = () => {
   const [analysisTotal, setAnalysisTotal] = useState<number>(0);
   const [compareRug, setCompareRug] = useState<Rug | null>(null);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
-  const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
-  const [clientPortalLink, setClientPortalLink] = useState<string | null>(null);
-  const [clientPortalStatus, setClientPortalStatus] = useState<ClientPortalStatusData | null>(null);
   const [generatingPortalLink, setGeneratingPortalLink] = useState(false);
   const [resendingInvite, setResendingInvite] = useState(false);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [serviceCompletions, setServiceCompletions] = useState<{ service_id: string; completed_at: string }[]>([]);
+  
+  // Mutable state derived from query data
+  const [localApprovedEstimates, setLocalApprovedEstimates] = useState<ApprovedEstimate[]>([]);
+  const [localRugs, setLocalRugs] = useState<Rug[]>([]);
+  
+  // Sync query data to local state when it changes
+  useEffect(() => {
+    if (jobData) {
+      setLocalApprovedEstimates(jobData.approvedEstimates);
+      setLocalRugs(jobData.rugs);
+    }
+  }, [jobData]);
+
+  // Derived data from React Query (with fallbacks for local state)
+  const job = jobData?.job || null;
+  const rugs = localRugs.length > 0 ? localRugs : (jobData?.rugs || []);
+  const branding = jobData?.branding || null;
+  const servicePrices = jobData?.servicePrices || [];
+  const upsellServices = jobData?.upsellServices || [];
+  const approvedEstimates = localApprovedEstimates.length > 0 ? localApprovedEstimates : (jobData?.approvedEstimates || []);
+  const payments = jobData?.payments || [];
+  const clientPortalLink = jobData?.clientPortalLink || null;
+  const clientPortalStatus = jobData?.clientPortalStatus || null;
+  const serviceCompletions = jobData?.serviceCompletions || [];
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -138,186 +159,24 @@ const JobDetail = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user && jobId) {
-      fetchJobDetails();
-      fetchBranding();
-      fetchServicePrices();
-      fetchApprovedEstimates();
-      fetchClientPortalLink();
-      fetchPayments();
-      fetchServiceCompletions();
+  // Helper function to refresh data
+  const fetchJobDetails = useCallback(() => {
+    if (jobId) {
+      invalidateJobDetail(jobId);
+      refetch();
     }
-  }, [user, jobId]);
+  }, [jobId, invalidateJobDetail, refetch]);
+  
+  const fetchServiceCompletions = useCallback(() => {
+    fetchJobDetails();
+  }, [fetchJobDetails]);
+  
+  const fetchClientPortalLink = useCallback(() => {
+    fetchJobDetails();
+  }, [fetchJobDetails]);
 
-  const fetchBranding = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('business_name, business_address, business_phone, business_email, logo_url')
-        .eq('user_id', user!.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching branding:', error);
-        return;
-      }
-
-      if (data) {
-        setBranding(data);
-      }
-    } catch (error) {
-      console.error('Error fetching branding:', error);
-    }
-  };
-
-  const fetchServicePrices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('service_prices')
-        .select('service_name, unit_price, is_additional')
-        .eq('user_id', user!.id);
-
-      if (error) {
-        console.error('Error fetching service prices:', error);
-        return;
-      }
-
-      if (data) {
-        // Regular service prices (not additional/upsell)
-        setServicePrices(
-          data
-            .filter(p => !p.is_additional)
-            .map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
-        );
-        
-        // Upsell/additional services
-        setUpsellServices(
-          data
-            .filter(p => p.is_additional)
-            .map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
-        );
-      }
-    } catch (error) {
-      console.error('Error fetching service prices:', error);
-    }
-  };
-
-  const fetchApprovedEstimates = async () => {
-    if (!jobId) return;
-    try {
-      const { data, error } = await supabase
-        .from('approved_estimates')
-        .select('id, inspection_id, services, total_amount')
-        .eq('job_id', jobId);
-
-      if (error) throw error;
-      // Cast the services field to any[] since it comes as Json from Supabase
-      const estimates = (data || []).map(ae => ({
-        ...ae,
-        services: Array.isArray(ae.services) ? ae.services : []
-      }));
-      setApprovedEstimates(estimates);
-    } catch (error) {
-      console.error('Error fetching approved estimates:', error);
-    }
-  };
-
-  const fetchPayments = async () => {
-    if (!jobId) return;
-    try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPayments(data || []);
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-    }
-  };
-
-  const fetchServiceCompletions = async () => {
-    if (!jobId) return;
-    try {
-      // Get all approved estimates for this job
-      const { data: estimates } = await supabase
-        .from('approved_estimates')
-        .select('id')
-        .eq('job_id', jobId);
-
-      if (!estimates || estimates.length === 0) {
-        setServiceCompletions([]);
-        return;
-      }
-
-      const estimateIds = estimates.map(e => e.id);
-      
-      const { data, error } = await supabase
-        .from('service_completions')
-        .select('service_id, completed_at')
-        .in('approved_estimate_id', estimateIds);
-
-      if (error) throw error;
-      setServiceCompletions(data || []);
-    } catch (error) {
-      console.error('Error fetching service completions:', error);
-    }
-  };
-
-  const fetchClientPortalLink = async () => {
-    if (!jobId) return;
-    try {
-      const { data, error } = await supabase
-        .from('client_job_access')
-        .select(`
-          id,
-          access_token,
-          email_sent_at,
-          email_error,
-          first_accessed_at,
-          password_set_at,
-          client_id
-        `)
-        .eq('job_id', jobId)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      if (data) {
-        setClientPortalLink(`${window.location.origin}/client/${data.access_token}`);
-        
-        // Check if there are service selections for this access
-        let hasSelections = false;
-        let selectionsAt = null;
-        
-        const { data: selections } = await supabase
-          .from('client_service_selections')
-          .select('id, created_at')
-          .eq('client_job_access_id', data.id)
-          .maybeSingle();
-        
-        if (selections) {
-          hasSelections = true;
-          selectionsAt = selections.created_at;
-        }
-
-        setClientPortalStatus({
-          accessToken: data.access_token,
-          emailSentAt: data.email_sent_at,
-          emailError: data.email_error,
-          firstAccessedAt: data.first_accessed_at,
-          passwordSetAt: data.password_set_at,
-          hasClientAccount: !!data.client_id,
-          hasServiceSelections: hasSelections,
-          serviceSelectionsAt: selectionsAt,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching client portal link:', error);
-    }
-  };
+  // All data fetching is now handled by useJobDetail hook with parallel fetches
+  // Old manual fetch functions have been removed
 
   const handleResendInvite = async () => {
     if (!job || !clientPortalStatus) return;
@@ -434,13 +293,12 @@ const JobDetail = () => {
         .eq('id', jobId);
 
       const link = `${baseUrl}/client/${accessToken}`;
-      setClientPortalLink(link);
       
       // Copy to clipboard
       await navigator.clipboard.writeText(link);
       
-      // Refresh the portal status to get the new tracking data
-      await fetchClientPortalLink();
+      // Refresh data via React Query
+      fetchJobDetails();
       
       if (inviteData?.isNewUser) {
         toast.success('Client portal link generated! Client will be prompted to set their password on first visit.');
@@ -452,40 +310,6 @@ const JobDetail = () => {
       toast.error('Failed to generate client portal link');
     } finally {
       setGeneratingPortalLink(false);
-    }
-  };
-
-  const fetchJobDetails = async () => {
-    setLoading(true);
-    try {
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', jobId)
-        .maybeSingle();
-
-      if (jobError) throw jobError;
-      if (!jobData) {
-        toast.error('Job not found');
-        navigate('/dashboard');
-        return;
-      }
-
-      setJob(jobData);
-
-      const { data: rugsData, error: rugsError } = await supabase
-        .from('inspections')
-        .select('*')
-        .eq('job_id', jobId)
-        .order('created_at', { ascending: true });
-
-      if (rugsError) throw rugsError;
-      setRugs(rugsData || []);
-    } catch (error) {
-      console.error('Error fetching job details:', error);
-      toast.error('Failed to load job details');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -535,7 +359,8 @@ const JobDetail = () => {
 
       if (error) throw error;
       
-      setJob({ ...job, status: newStatus });
+      // Refresh data via React Query
+      fetchJobDetails();
       toast.success(`Job status updated to ${newStatus}`);
     } catch (error) {
       console.error('Status update error:', error);
@@ -1065,7 +890,7 @@ const JobDetail = () => {
               }}
               onApprove={(services, totalCost) => {
                 // Update local state with new approved estimate
-                setApprovedEstimates(prev => {
+                setLocalApprovedEstimates(prev => {
                   const existing = prev.find(ae => ae.inspection_id === selectedRug.id);
                   if (existing) {
                     return prev.map(ae => 
@@ -1083,7 +908,7 @@ const JobDetail = () => {
                   }
                 });
                 // Update rug's estimate_approved flag locally
-                setRugs(prev => prev.map(r => 
+                setLocalRugs(prev => prev.map(r => 
                   r.id === selectedRug.id ? { ...r, estimate_approved: true } : r
                 ));
                 setShowEstimateReview(false);
@@ -1149,7 +974,7 @@ const JobDetail = () => {
                   
                   setImageAnnotations(newAnnotations);
                   // Update the rug in local state
-                  setRugs(prev => prev.map(r => 
+                  setLocalRugs(prev => prev.map(r => 
                     r.id === selectedRug.id 
                       ? { ...r, image_annotations: newAnnotations as unknown as Json }
                       : r

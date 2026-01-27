@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Calendar, Briefcase, Eye, Plus, LogOut, Loader2, ChevronRight, PlayCircle, Clock, CheckCircle, Settings, History, BarChart3, DollarSign, Shield } from 'lucide-react';
+import { Search, Calendar, Briefcase, Eye, Plus, LogOut, ChevronRight, PlayCircle, Clock, CheckCircle, Settings, History, BarChart3, DollarSign, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useJobs, Job } from '@/hooks/useJobs';
 import { format } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import NotificationBell from '@/components/NotificationBell';
+import { JobListSkeleton } from '@/components/skeletons/JobListSkeleton';
+
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'completed':
@@ -33,80 +34,28 @@ const getStatusBadge = (status: string) => {
         </Badge>;
   }
 };
-interface Job {
-  id: string;
-  job_number: string;
-  client_name: string;
-  client_email: string | null;
-  client_phone: string | null;
-  notes: string | null;
-  status: string;
-  created_at: string;
-  rug_count?: number;
-}
+
 const Dashboard = () => {
   const navigate = useNavigate();
-  const {
-    user,
-    loading: authLoading,
-    signOut
-  } = useAuth();
-  const {
-    isAdmin
-  } = useAdminAuth();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { isAdmin } = useAdminAuth();
+  const { data: jobs = [], isLoading, isError } = useJobs();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
-  useEffect(() => {
-    if (user) {
-      fetchJobs();
-    }
-  }, [user]);
-  const fetchJobs = async () => {
-    setLoading(true);
-    try {
-      // Fetch jobs
-      const {
-        data: jobsData,
-        error: jobsError
-      } = await supabase.from('jobs').select('*').order('created_at', {
-        ascending: false
-      });
-      if (jobsError) throw jobsError;
 
-      // Fetch rug counts for each job
-      const jobsWithCounts = await Promise.all((jobsData || []).map(async job => {
-        const {
-          count
-        } = await supabase.from('inspections').select('*', {
-          count: 'exact',
-          head: true
-        }).eq('job_id', job.id);
-        return {
-          ...job,
-          rug_count: count || 0
-        };
-      }));
-      setJobs(jobsWithCounts);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      toast.error('Failed to load jobs');
-    } finally {
-      setLoading(false);
-    }
-  };
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
   };
-  const filteredJobs = jobs.filter(job => {
+
+  const filteredJobs = jobs.filter((job: Job) => {
     // Search filter
     const matchesSearch = job.client_name.toLowerCase().includes(searchQuery.toLowerCase()) || job.job_number.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -130,12 +79,30 @@ const Dashboard = () => {
     }
     return matchesSearch && matchesStatus && matchesDate;
   });
+
   if (authLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>;
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10 border-0" />
+              <div>
+                <h1 className="text-xl font-bold text-foreground font-sans">RugBoost</h1>
+                <p className="text-xs text-muted-foreground">Job Dashboard</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-8">
+          <JobListSkeleton />
+        </main>
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-background">
+
+  return (
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
@@ -223,65 +190,77 @@ const Dashboard = () => {
           </Card>
 
           {/* Jobs Table */}
-          <Card className="shadow-medium">
-            <CardHeader>
-              <CardTitle className="font-display text-lg flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                Jobs
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({filteredJobs.length} total)
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div> : filteredJobs.length === 0 ? <div className="text-center py-12 text-muted-foreground">
-                  <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No jobs found</p>
-                  {jobs.length === 0 && <Button onClick={() => navigate('/jobs/new')} className="mt-4">
-                      Create Your First Job
-                    </Button>}
-                </div> : <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Job #</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Rugs</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredJobs.map(job => <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/jobs/${job.id}`)}>
-                          <TableCell className="font-medium">
-                            {format(new Date(job.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell className="font-mono">{job.job_number}</TableCell>
-                          <TableCell>{job.client_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{job.rug_count} rugs</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(job.status)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="sm" className="gap-1">
-                              <Eye className="h-4 w-4" />
-                              View
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>)}
-                    </TableBody>
-                  </Table>
-                </div>}
-            </CardContent>
-          </Card>
+          {isLoading ? (
+            <JobListSkeleton />
+          ) : (
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle className="font-display text-lg flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-primary" />
+                  Jobs
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({filteredJobs.length} total)
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredJobs.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No jobs found</p>
+                    {jobs.length === 0 && (
+                      <Button onClick={() => navigate('/jobs/new')} className="mt-4">
+                        Create Your First Job
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Job #</TableHead>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Rugs</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredJobs.map((job: Job) => (
+                          <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/jobs/${job.id}`)}>
+                            <TableCell className="font-medium">
+                              {format(new Date(job.created_at), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell className="font-mono">{job.job_number}</TableCell>
+                            <TableCell>{job.client_name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{job.rug_count} rugs</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(job.status)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" className="gap-1">
+                                <Eye className="h-4 w-4" />
+                                View
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
-    </div>;
+    </div>
+  );
 };
+
 export default Dashboard;
