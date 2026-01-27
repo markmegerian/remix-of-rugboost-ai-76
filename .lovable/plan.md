@@ -1,391 +1,453 @@
 
 
-# Complete Platform Production Readiness & AI Enhancement Plan
+# Comprehensive UX & Performance Optimization Plan
 
-This comprehensive plan combines all requirements: legal compliance, configuration fixes, PDF font standardization, AI learning system, and estimate consistency.
+## Executive Summary
 
----
-
-## Phase 1: Legal & Compliance (Critical for Launch)
-
-### 1.1 Create Privacy Policy Page
-
-**New File:** `src/pages/PrivacyPolicy.tsx`
-
-- Professional legal page with RugBoost branding
-- Covers data collection, usage, storage, and user rights
-- Mobile-responsive layout with proper navigation back to app
-- Content sections: Information Collection, Data Usage, Data Security, Third-Party Services (Stripe, Supabase), User Rights, Contact Information
-
-### 1.2 Create Terms of Service Page
-
-**New File:** `src/pages/TermsOfService.tsx`
-
-- Complete terms covering service usage, payment terms, liability limitations
-- Account responsibilities and acceptable use policies
-- Dispute resolution and governing law sections
-- Clear language appropriate for B2B rug cleaning platform
-
-### 1.3 Add Routes for Legal Pages
-
-**File:** `src/App.tsx`
-
-- Add lazy imports for `PrivacyPolicy` and `TermsOfService`
-- Add routes: `/privacy-policy` and `/terms-of-service`
-
-### 1.4 Update Authentication Pages with Links
-
-**Files to Update:**
-- `src/pages/Auth.tsx` - Add clickable links to legal pages
-- `src/pages/ClientAuth.tsx` (lines 475-477 and 587-589) - Convert placeholder text to actual links
+After a thorough review of the RugBoost platform, I've identified significant opportunities to improve load times, application responsiveness, and the overall workflow process. The changes fall into four categories: data fetching optimization, UX flow improvements, loading state standardization, and workflow streamlining.
 
 ---
 
-## Phase 2: Configuration & Environment Fixes
+## Analysis Findings
 
-### 2.1 Replace Hardcoded URLs
+### Current Pain Points Identified
 
-**File:** `src/pages/JobDetail.tsx`
+1. **N+1 Query Pattern in Dashboard** (Dashboard.tsx:85-96)
+   - For each job, a separate query fetches rug count
+   - With 50 jobs = 51 database queries
+   - Creates noticeable delay on dashboard load
 
-Replace all instances of `https://app.rugboost.com` with environment variable:
+2. **React Query Not Utilized**
+   - `@tanstack/react-query` is installed but not used for data fetching
+   - All pages use manual `useEffect` + `useState` patterns
+   - No caching, deduplication, or background refetching
+   - Navigating Dashboard → JobDetail → Dashboard refetches everything
 
-| Line | Current | Updated |
-|------|---------|---------|
-| 327 | `https://app.rugboost.com/client/${accessToken}` | `${import.meta.env.VITE_APP_URL}/client/${accessToken}` |
-| 406 | `https://app.rugboost.com/client/${accessToken}` | `${import.meta.env.VITE_APP_URL}/client/${accessToken}` |
-| 434 | `https://app.rugboost.com/client/${accessToken}` | `${import.meta.env.VITE_APP_URL}/client/${accessToken}` |
+3. **JobDetail.tsx Waterfall Fetches** (lines 141-150)
+   - 7 sequential fetch calls on mount: job details, branding, service prices, approved estimates, portal link, payments, service completions
+   - No parallelization or caching
 
-### 2.2 Connect Invoice Generation
+4. **Inconsistent Loading States**
+   - Dashboard, History use simple spinners
+   - ClientPortal uses proper skeleton screens
+   - No unified loading component pattern
 
-**File:** `src/components/PaymentTracking.tsx`
+5. **Photo Upload is Blocking** (JobDetail.tsx:492-525)
+   - Photos uploaded one at a time sequentially
+   - User waits during entire upload process
+   - No progress indicator per photo
 
-- Replace "Invoice generation coming soon" toast with actual functionality
-- Call existing `generate-invoice-pdf` edge function
-- Download generated PDF for user
+6. **Client Search Not Debounced Properly**
+   - ClientSearch has 300ms debounce but fires on every keystroke
+   - Each search triggers full re-render
+
+7. **Redundant Auth Checks**
+   - Every protected page has its own `useEffect` for auth redirect
+   - No centralized route protection
+
+8. **Console Errors**
+   - "Function components cannot be given refs" errors on Index and Auth pages
 
 ---
 
-## Phase 3: PDF Font Standardization (Sans-Serif)
+## Phase 1: Data Fetching Optimization
 
-### 3.1 Update PDF Generator to Use Helvetica
+### 1.1 Migrate to React Query for All Data Fetching
 
-**File:** `src/lib/pdfGenerator.ts`
+**Impact: High | Effort: Medium**
 
-The PDF currently uses `'times'` (serif) font throughout. jsPDF includes `'helvetica'` as a built-in sans-serif font.
+Create reusable query hooks that leverage React Query's caching:
 
-**Changes Required:**
-
-Replace all instances of:
 ```typescript
-doc.setFont('times', 'bold')
-doc.setFont('times', 'normal')
-doc.setFont('times', 'italic')
-doc.setFont('times', 'bolditalic')
+// src/hooks/useJobs.ts
+export const useJobs = () => {
+  return useQuery({
+    queryKey: ['jobs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          inspections:inspections(count)
+        `)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 30000, // 30 seconds
+  });
+};
 ```
 
-With:
-```typescript
-doc.setFont('helvetica', 'bold')
-doc.setFont('helvetica', 'normal')
-doc.setFont('helvetica', 'oblique')  // Helvetica uses 'oblique' not 'italic'
-doc.setFont('helvetica', 'boldoblique')
-```
+**Benefits:**
+- Automatic caching between page navigations
+- Background refetching when window refocuses
+- Deduplication of identical requests
+- Built-in loading/error states
 
-**Affected Lines (approximately 50+ occurrences):**
-- Lines 204, 232, 403, 436-438, 467-469, 497, 500-501 (helper functions)
-- Lines 546, 553, 566, 596, 602, 609, 614, 628, 633, 647, 653 (cover page)
-- Lines 693, 700, 747, 753, 765, 777, 805, 835, 857, 863, 869, 911, 949, 953, 958, 971 (content pages)
-- Lines 1024-1027 (page numbers)
-- All corresponding lines in `generateJobPDFBase64` function (lines 1038-1400+)
+### 1.2 Fix N+1 Query in Dashboard
 
-**Also update:** `supabase/functions/generate-invoice-pdf/index.ts` - change all `'helvetica'` font calls to match (this file already uses helvetica, just need to verify consistency)
+**Impact: High | Effort: Low**
 
-### 3.2 Fix Text Formatting Issues
-
-While updating fonts, also fix:
-- Ensure consistent line spacing throughout
-- Verify all text aligns properly with new font metrics (Helvetica is slightly wider than Times)
-- Adjust any hardcoded width calculations if text overflows
-
----
-
-## Phase 4: AI Learning System (Teaching the AI)
-
-### 4.1 Create AI Feedback Database Table
-
-**Database Migration:**
+Replace individual rug count queries with a single aggregated query:
 
 ```sql
-CREATE TABLE ai_analysis_feedback (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  inspection_id UUID REFERENCES inspections(id) ON DELETE SET NULL,
-  feedback_type TEXT NOT NULL CHECK (feedback_type IN (
-    'service_correction',
-    'price_correction', 
-    'missed_issue',
-    'false_positive',
-    'identification_error'
-  )),
-  
-  -- Original AI output
-  original_service_name TEXT,
-  original_price NUMERIC,
-  original_rug_identification TEXT,
-  
-  -- Corrected values
-  corrected_service_name TEXT,
-  corrected_price NUMERIC,
-  corrected_identification TEXT,
-  
-  -- Context
-  notes TEXT,
-  rug_type TEXT,
-  rug_origin TEXT,
-  
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Enable RLS
-ALTER TABLE ai_analysis_feedback ENABLE ROW LEVEL SECURITY;
-
--- Staff can manage their own feedback
-CREATE POLICY "Users can manage their own feedback" 
-  ON ai_analysis_feedback 
-  FOR ALL 
-  USING (auth.uid() = user_id);
+SELECT jobs.*, COUNT(inspections.id) as rug_count
+FROM jobs
+LEFT JOIN inspections ON inspections.job_id = jobs.id
+GROUP BY jobs.id
+ORDER BY jobs.created_at DESC
 ```
 
-### 4.2 Create TeachAI Dialog Component
+Or use Supabase's nested select syntax:
+```typescript
+.select(`*, inspections:inspections(count)`)
+```
 
-**New File:** `src/components/TeachAIDialog.tsx`
+### 1.3 Parallelize JobDetail Fetches
 
-Modal component that captures staff corrections:
-- Correction type dropdown (Price was wrong, Service misidentified, AI missed issue, Not actually needed)
-- Original value display (read-only)
-- Corrected value input
-- Optional notes field for context
-- Optional rug identification correction
+**Impact: Medium | Effort: Low**
 
-### 4.3 Integrate Feedback Capture in EstimateReview
-
-**File:** `src/components/EstimateReview.tsx`
-
-- Track original AI-parsed values separately from edited values
-- Detect significant changes (price diff > 20% or different service name)
-- Show "Teach AI" prompt when significant changes detected
-- Add visual indicator showing which items were edited from AI original
-
-### 4.4 Enhance analyze-rug Edge Function
-
-**File:** `supabase/functions/analyze-rug/index.ts`
-
-Add feedback context to AI prompts:
+Use `Promise.all` to fetch all data simultaneously:
 
 ```typescript
-// Fetch recent corrections for this user
-const { data: recentFeedback } = await supabase
-  .from('ai_analysis_feedback')
-  .select('*')
-  .eq('user_id', effectiveUserId)
-  .order('created_at', { ascending: false })
-  .limit(10);
+const [jobData, branding, prices, estimates, portal, payments, completions] = 
+  await Promise.all([
+    fetchJobDetails(),
+    fetchBranding(),
+    fetchServicePrices(),
+    fetchApprovedEstimates(),
+    fetchClientPortalLink(),
+    fetchPayments(),
+    fetchServiceCompletions(),
+  ]);
+```
 
-// Build context string from feedback
-let feedbackContext = '';
-if (recentFeedback?.length > 0) {
-  feedbackContext = '\n\nLEARNED CORRECTIONS (apply these patterns):\n';
-  for (const fb of recentFeedback) {
-    if (fb.feedback_type === 'price_correction') {
-      feedbackContext += `- ${fb.original_service_name}: was $${fb.original_price}, should be $${fb.corrected_price}\n`;
-    } else if (fb.feedback_type === 'identification_error') {
-      feedbackContext += `- Rug ID: Misidentified as "${fb.original_rug_identification}", was actually "${fb.corrected_identification}"\n`;
-    }
-    // Handle other types...
+### 1.4 Optimize Photo Uploads with Parallel Processing
+
+**Impact: Medium | Effort: Low**
+
+Upload photos in parallel batches of 3-5:
+
+```typescript
+const uploadPhotos = async (photos: File[]) => {
+  const BATCH_SIZE = 4;
+  const results: string[] = [];
+  
+  for (let i = 0; i < photos.length; i += BATCH_SIZE) {
+    const batch = photos.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(uploadSinglePhoto));
+    results.push(...batchResults);
+    onProgress?.((i + batch.length) / photos.length * 100);
   }
-}
-
-// Append to system prompt
-const enhancedPrompt = baseSystemPrompt + feedbackContext;
+  
+  return results;
+};
 ```
 
 ---
 
-## Phase 5: Estimate Consistency Across All Views
+## Phase 2: Loading State Standardization
 
-### 5.1 Update AnalysisReport to Use Approved Estimates
+### 2.1 Create Unified Skeleton Components
 
-**File:** `src/components/AnalysisReport.tsx`
+**Impact: Medium | Effort: Medium**
 
-Add new prop and logic:
+Create context-aware skeleton loaders:
 
 ```typescript
-interface AnalysisReportProps {
-  // ... existing props
-  approvedEstimate?: {
-    services: ServiceItem[];
-    total_amount: number;
-  } | null;
-}
+// src/components/skeletons/JobListSkeleton.tsx
+const JobListSkeleton = () => (
+  <div className="space-y-3">
+    {[1, 2, 3, 4, 5].map((i) => (
+      <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+        <Skeleton className="h-4 w-24" /> {/* Date */}
+        <Skeleton className="h-4 w-20" /> {/* Job # */}
+        <Skeleton className="h-4 w-32" /> {/* Client */}
+        <Skeleton className="h-6 w-16" /> {/* Badge */}
+      </div>
+    ))}
+  </div>
+);
 ```
 
-When rendering the cost breakdown:
-- If `approvedEstimate` exists, display services from approved data instead of parsing raw AI text
-- Show visual indicator that these are "Verified" prices
-- Keep raw AI text for description/narrative sections, only override cost data
+### 2.2 Apply Skeletons to All Pages
 
-### 5.2 Update JobDetail to Pass Approved Estimates
+- **Dashboard**: Job table skeleton
+- **History**: Job group cards skeleton  
+- **Analytics**: Chart placeholders with correct aspect ratios
+- **AccountSettings**: Form fields skeleton
 
-**File:** `src/pages/JobDetail.tsx`
+---
 
-- Already fetches `approvedEstimates` - pass to AnalysisReport component:
+## Phase 3: Workflow Process Improvements
+
+### 3.1 Streamlined New Job Flow
+
+**Current Flow:** 
+1. Go to New Job page
+2. Fill client info
+3. Create job
+4. Redirected to JobDetail
+5. Click "Add Rug"
+6. Fill rug details + capture 6 photos
+7. Submit rug
+8. Wait for analysis
+
+**Optimized Flow:**
+- Allow adding first rug directly in the job creation form
+- Start photo upload immediately after capture (background)
+- Trigger analysis automatically after rug creation
+- Show analysis progress without blocking UI
+
+### 3.2 Quick Actions from Dashboard
+
+Add inline actions to job rows:
+- Quick "Analyze All" button for jobs with pending rugs
+- Status change dropdown without opening detail page
+- Client portal link copy with one click
+
+### 3.3 Photo Capture Improvements
+
+**Current Issues:**
+- Must capture all 6 required photos before submitting
+- If one photo fails, must recapture all
+- No preview zoom
+
+**Improvements:**
+- Allow saving draft rugs with partial photos
+- Add photo preview with pinch-zoom capability
+- Show upload progress per photo
+- Resume failed uploads
+
+### 3.4 Auto-Save Draft Estimates
+
+When staff edits services in EstimateReview:
+- Auto-save drafts every 30 seconds
+- Persist draft to localStorage as backup
+- Show "unsaved changes" indicator
+- Prevent accidental navigation away
+
+---
+
+## Phase 4: Route & Auth Optimization
+
+### 4.1 Create Protected Route Wrapper
+
+**Impact: Medium | Effort: Low**
+
+Eliminate duplicated auth checks:
 
 ```typescript
-<AnalysisReport
-  report={inspection.analysis_report}
-  approvedEstimate={approvedEstimatesMap.get(inspection.id)}
-  // ... other props
+// src/components/ProtectedRoute.tsx
+const ProtectedRoute = ({ 
+  children, 
+  requiredRoles = [] 
+}: { 
+  children: React.ReactNode;
+  requiredRoles?: AppRole[];
+}) => {
+  const { user, loading, roles } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading]);
+
+  if (loading) return <PageLoader />;
+  if (!user) return null;
+  if (requiredRoles.length && !requiredRoles.some(r => roles.includes(r))) {
+    return <Navigate to="/dashboard" />;
+  }
+
+  return children;
+};
+```
+
+### 4.2 Fix Function Component Ref Warning
+
+**Impact: Low | Effort: Low**
+
+Wrap lazy-loaded components with `forwardRef` or remove ref passing in React Router.
+
+---
+
+## Phase 5: Micro-Optimizations
+
+### 5.1 Debounce Client Search Properly
+
+Use `useDeferredValue` or proper debounce hook:
+
+```typescript
+const deferredQuery = useDeferredValue(query);
+
+useEffect(() => {
+  if (deferredQuery.length >= 2) {
+    searchClients(deferredQuery);
+  }
+}, [deferredQuery]);
+```
+
+### 5.2 Memoize Expensive Components
+
+Add `React.memo` to:
+- `AnalysisReport` (heavy rendering)
+- `PaymentTracking` table rows
+- Dashboard job table rows
+
+### 5.3 Optimize Analysis Report Formatting
+
+The `formatReport` function in AnalysisReport.tsx parses text on every render. Memoize it:
+
+```typescript
+const formattedReport = useMemo(
+  () => formatReport(report, approvedEstimate),
+  [report, approvedEstimate]
+);
+```
+
+### 5.4 Image Lazy Loading
+
+Add lazy loading to rug photo grids:
+
+```typescript
+<img 
+  src={photoUrl} 
+  loading="lazy"
+  decoding="async"
 />
 ```
 
-### 5.3 Ensure PDF Generation Uses Approved Data
+---
 
-**File:** `src/lib/pdfGenerator.ts`
+## Implementation Prioritization
 
-Update `generateJobPDF` signature:
+### Immediate Impact (Week 1)
+| Task | Impact | Effort |
+|------|--------|--------|
+| Fix N+1 query in Dashboard | High | Low |
+| Parallelize JobDetail fetches | High | Low |
+| Parallel photo uploads | Medium | Low |
+| Fix forwardRef console warnings | Low | Low |
 
-```typescript
-export const generateJobPDF = async (
-  job: Job,
-  rugs: Inspection[],
-  branding?: BusinessBranding | null,
-  upsellServices?: UpsellService[],
-  approvedEstimates?: Map<string, {services: ServiceItem[], total_amount: number}>
-): Promise<void>
-```
+### High Value (Week 2)
+| Task | Impact | Effort |
+|------|--------|--------|
+| Migrate Dashboard to React Query | High | Medium |
+| Migrate JobDetail to React Query | High | Medium |
+| Create ProtectedRoute wrapper | Medium | Low |
+| Skeleton loaders for Dashboard | Medium | Medium |
 
-In the "RUG BREAKDOWN & SERVICES" section:
-- Check if `approvedEstimates` has data for each rug
-- If yes, use approved services/prices instead of parsing from `analysis_report`
-- If no, fall back to existing `extractRugCosts()` parsing
+### Polish (Week 3)
+| Task | Impact | Effort |
+|------|--------|--------|
+| Skeleton loaders for all pages | Medium | Medium |
+| Memoize expensive components | Medium | Low |
+| Auto-save draft estimates | Medium | Medium |
+| Quick actions from Dashboard | Low | Medium |
 
 ---
 
-## Phase 6: UX Polish & Validation
+## Technical Implementation Details
 
-### 6.1 Add Zod Validation to Forms
-
-**Files:**
-- `src/components/JobForm.tsx` - Add schema validation for client info
-- `src/components/RugForm.tsx` - Add schema validation for rug details
+### React Query Setup Enhancement
 
 ```typescript
-const jobSchema = z.object({
-  clientName: z.string().min(2, 'Name is required'),
-  clientEmail: z.string().email('Invalid email').optional().or(z.literal('')),
-  clientPhone: z.string().optional(),
-  notes: z.string().optional(),
+// src/lib/queryClient.ts
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 30, // 30 seconds
+      gcTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
+  },
 });
 ```
 
-### 6.2 Standardize Loading States
+### Query Key Organization
 
-Create consistent skeleton components for:
-- Dashboard cards
-- Job list items
-- Analytics charts
-
-Replace simple spinners with content-aware skeletons in:
-- `src/pages/Dashboard.tsx`
-- `src/pages/History.tsx`
-- `src/pages/Analytics.tsx`
-
-### 6.3 Add Rate Limit Error Handling
-
-**Files:** `src/pages/ClientPortal.tsx`, payment flows
-
-- Detect 429 responses
-- Show countdown timer before retry
-- User-friendly messaging about temporary limits
-
----
-
-## Implementation Order
-
-| Step | Priority | Estimated Changes |
-|------|----------|-------------------|
-| 1. Legal pages + routes | Critical | 3 new files, 3 edits |
-| 2. Replace hardcoded URLs | Critical | 1 file, 3 line changes |
-| 3. PDF font standardization | High | 2 files, ~100 line changes |
-| 4. AI feedback table | High | 1 migration |
-| 5. TeachAI dialog | High | 1 new component |
-| 6. EstimateReview feedback integration | High | 1 file edit |
-| 7. AnalysisReport consistency | High | 1 file edit |
-| 8. PDF approved estimates integration | High | 1 file edit |
-| 9. analyze-rug enhancement | Medium | 1 edge function edit |
-| 10. Invoice generation connection | Medium | 1 file edit |
-| 11. Form validation | Medium | 2 file edits |
-| 12. Loading state polish | Low | 3 file edits |
-
----
-
-## Files Changed Summary
-
-| Category | New Files | Modified Files |
-|----------|-----------|----------------|
-| Legal | `PrivacyPolicy.tsx`, `TermsOfService.tsx` | `App.tsx`, `Auth.tsx`, `ClientAuth.tsx` |
-| Config | - | `JobDetail.tsx` |
-| PDF | - | `pdfGenerator.ts`, `generate-invoice-pdf/index.ts` |
-| AI Learning | `TeachAIDialog.tsx` | `EstimateReview.tsx`, `analyze-rug/index.ts` |
-| Consistency | - | `AnalysisReport.tsx`, `pdfGenerator.ts`, `JobDetail.tsx` |
-| Polish | - | `PaymentTracking.tsx`, `JobForm.tsx`, `RugForm.tsx`, `Dashboard.tsx`, `History.tsx` |
-| Database | 1 migration | - |
-
-**Total: 3 new files + 1 migration + ~15 file modifications**
-
----
-
-## Technical Notes
-
-### PDF Font Considerations
-- jsPDF built-in fonts: `helvetica`, `times`, `courier`
-- Helvetica uses `oblique` instead of `italic`
-- Font metrics differ - may need minor spacing adjustments
-
-### Backward Compatibility
-- Existing inspections without feedback continue working
-- Reports without approved estimates display AI-parsed values
-- All changes are additive
-
-### Data Flow After Implementation
-
-```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-│  analyze-rug    │────>│   inspections    │────>│   EstimateReview    │
-│  (AI + learned  │     │  analysis_report │     │  (Staff edits +     │
-│   patterns)     │     │                  │     │   feedback capture) │
-└─────────────────┘     └──────────────────┘     └─────────────────────┘
-         ▲                                                  │
-         │                                                  ▼
-         │                                       ┌─────────────────────┐
-         │                                       │ approved_estimates  │
-         │                                       │ (Source of truth)   │
-         │                                       └─────────────────────┘
-         │                                                  │
-         │  ┌──────────────────────┐                       │
-         └──│ ai_analysis_feedback │<──────────────────────┘
-            │ (Learning data)      │
-            └──────────────────────┘
-                      │
-                      ▼
-              ┌───────────────────────────────────┐
-              │ All displays use approved_estimates│
-              │ - AnalysisReport                   │
-              │ - PDF Generator                    │
-              │ - Client Portal                    │
-              │ - Invoices                         │
-              └───────────────────────────────────┘
+```typescript
+// src/lib/queryKeys.ts
+export const queryKeys = {
+  jobs: {
+    all: ['jobs'] as const,
+    detail: (id: string) => ['jobs', id] as const,
+    rugs: (jobId: string) => ['jobs', jobId, 'rugs'] as const,
+  },
+  user: {
+    branding: (userId: string) => ['user', userId, 'branding'] as const,
+    servicePrices: (userId: string) => ['user', userId, 'prices'] as const,
+  },
+  payments: {
+    byJob: (jobId: string) => ['payments', { jobId }] as const,
+  },
+};
 ```
 
-This comprehensive plan addresses all identified gaps and ensures the platform is production-ready with consistent data flow, teachable AI, and professional presentation.
+### Optimistic Updates for Status Changes
+
+```typescript
+const updateStatus = useMutation({
+  mutationFn: (newStatus: string) => 
+    supabase.from('jobs').update({ status: newStatus }).eq('id', jobId),
+  onMutate: async (newStatus) => {
+    await queryClient.cancelQueries(queryKeys.jobs.detail(jobId));
+    const previous = queryClient.getQueryData(queryKeys.jobs.detail(jobId));
+    queryClient.setQueryData(queryKeys.jobs.detail(jobId), (old) => ({
+      ...old,
+      status: newStatus,
+    }));
+    return { previous };
+  },
+  onError: (err, vars, context) => {
+    queryClient.setQueryData(queryKeys.jobs.detail(jobId), context?.previous);
+  },
+});
+```
+
+---
+
+## Expected Outcomes
+
+### Performance Improvements
+- **Dashboard load time**: 50-70% reduction (N+1 query fix + caching)
+- **JobDetail load time**: 40-60% reduction (parallel fetches)
+- **Photo upload time**: 60-75% reduction (parallel uploads)
+- **Page navigation**: Near-instant with React Query cache
+
+### User Experience Improvements
+- Consistent, predictable loading states
+- Reduced perceived wait times with skeletons
+- Fewer redundant data fetches
+- Smoother workflow transitions
+- Background data refresh without UI blocking
+
+---
+
+## Files to Create/Modify
+
+### New Files
+- `src/lib/queryClient.ts` - React Query configuration
+- `src/lib/queryKeys.ts` - Centralized query key management
+- `src/hooks/useJobs.ts` - Jobs data hook
+- `src/hooks/useJobDetail.ts` - Single job data hook
+- `src/components/ProtectedRoute.tsx` - Auth wrapper
+- `src/components/skeletons/JobListSkeleton.tsx`
+- `src/components/skeletons/JobDetailSkeleton.tsx`
+- `src/components/skeletons/AnalyticsSkeleton.tsx`
+
+### Modified Files
+- `src/App.tsx` - Enhanced QueryClient, ProtectedRoute usage
+- `src/pages/Dashboard.tsx` - React Query integration, skeleton loader
+- `src/pages/JobDetail.tsx` - React Query, parallel fetches, skeleton
+- `src/pages/History.tsx` - React Query, skeleton
+- `src/pages/Analytics.tsx` - Skeleton loader
+- `src/components/GuidedPhotoCapture.tsx` - Parallel upload progress
+- `src/components/EstimateReview.tsx` - Auto-save drafts
+- `src/components/AnalysisReport.tsx` - Memoization
+- `src/components/ClientSearch.tsx` - Deferred value optimization
 
