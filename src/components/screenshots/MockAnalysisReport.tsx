@@ -1,91 +1,107 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { demoRugs } from '@/data/demoData';
-import { FileText, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, Sparkles, ArrowLeft, ChevronDown } from 'lucide-react';
 
-const MockAnalysisReport: React.FC = () => {
+const MockAnalysisReport = forwardRef<HTMLDivElement>((_, ref) => {
   const rug = demoRugs[0]; // Antique Persian Tabriz
   
   return (
-    <div className="min-h-full bg-background">
+    <div ref={ref} className="w-full h-full bg-background overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md px-4 py-3">
-        <div className="flex items-center gap-2">
-          <button className="h-7 w-7 rounded-md bg-secondary flex items-center justify-center">
-            <span className="text-muted-foreground text-sm">←</span>
+      <header className="border-b border-border bg-card px-5 py-4">
+        <div className="flex items-center gap-3">
+          <button className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </button>
-          <div>
-            <h1 className="font-display text-base font-bold text-foreground">{rug.rug_number}</h1>
-            <p className="text-[10px] text-muted-foreground">{rug.rug_type}</p>
+          <div className="flex-1">
+            <h1 className="font-display text-lg font-bold text-foreground">{rug.rug_number}</h1>
+            <p className="text-xs text-muted-foreground">{rug.rug_type}</p>
           </div>
+          <button className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
       </header>
 
-      <div className="p-4 space-y-4">
+      <div className="p-5 space-y-4 pb-20 overflow-auto">
         {/* AI Analysis Badge */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg border border-primary/20">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-xs font-medium text-primary">AI-Powered Analysis</span>
+        <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 rounded-xl border border-primary/20">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">AI-Powered Analysis</p>
+            <p className="text-xs text-muted-foreground">Expert inspection completed</p>
+          </div>
         </div>
 
         {/* At-a-Glance Card */}
-        <div className="bg-card rounded-lg border border-border p-4 shadow-sm">
-          <h2 className="font-display text-sm font-bold text-foreground mb-2 flex items-center gap-2">
-            <FileText className="h-4 w-4 text-primary" />
+        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+          <h2 className="font-display text-base font-bold text-foreground mb-4 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
             At-a-Glance
           </h2>
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Type:</span>
-              <span className="font-medium text-foreground">{rug.rug_type}</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Type</p>
+              <p className="text-sm font-medium text-foreground">Persian Tabriz</p>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Dimensions:</span>
-              <span className="font-medium text-foreground">{rug.width}' × {rug.length}'</span>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Dimensions</p>
+              <p className="text-sm font-medium text-foreground">{rug.width}' × {rug.length}'</p>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Age:</span>
-              <span className="font-medium text-foreground">Circa 1920s</span>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Age</p>
+              <p className="text-sm font-medium text-foreground">Circa 1920s</p>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Origin:</span>
-              <span className="font-medium text-foreground">Tabriz, Iran</span>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Origin</p>
+              <p className="text-sm font-medium text-foreground">Tabriz, Iran</p>
             </div>
           </div>
         </div>
 
         {/* Condition Assessment */}
-        <div className="bg-card rounded-lg border border-border p-4 shadow-sm">
-          <h2 className="font-display text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            Condition: Very Good
-          </h2>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            This exquisite antique displays exceptional craftsmanship with vibrant traditional indigo, madder red, and ivory tones.
+        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-bold text-foreground">Very Good</h2>
+              <p className="text-xs text-muted-foreground">Overall Condition</p>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            This exquisite antique displays exceptional craftsmanship with vibrant traditional indigo, madder red, and ivory tones remaining beautifully preserved.
           </p>
         </div>
 
         {/* Issues Identified */}
-        <div className="bg-card rounded-lg border border-border p-4 shadow-sm">
-          <h2 className="font-display text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+        <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
+          <h2 className="font-display text-base font-bold text-foreground mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
             Issues Identified
           </h2>
-          <ul className="space-y-2">
+          <div className="space-y-3">
             {[
               'Light surface soiling in high-traffic areas',
               'Minor fringe deterioration (3 inches)',
               'Two small moth nibbles requiring reweaving',
+              'Original selvedge showing slight wear',
             ].map((issue, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                <span className="text-amber-500 mt-0.5">•</span>
-                {issue}
-              </li>
+              <div key={i} className="flex items-start gap-3 p-3 bg-amber-500/5 rounded-lg border border-amber-500/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 flex-shrink-0" />
+                <p className="text-sm text-foreground">{issue}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     </div>
   );
-};
+});
+
+MockAnalysisReport.displayName = 'MockAnalysisReport';
 
 export default MockAnalysisReport;
