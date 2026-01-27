@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, Calendar, Clock, ChevronDown, ChevronUp, ChevronRight, 
-  LogOut, Loader2, Settings, History as HistoryIcon, 
-  CheckCircle, DollarSign, Image, FileText, ArrowLeft
+  LogOut, Settings, History as HistoryIcon, 
+  CheckCircle, Image, FileText, ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,11 +15,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/lib/queryKeys';
 import { format, isThisYear, isThisMonth, isThisWeek, parseISO } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
+import { HistorySkeleton } from '@/components/skeletons/HistorySkeleton';
 
 interface HistoryRug {
   id: string;
@@ -52,8 +54,6 @@ interface TimelineGroup {
 const History = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
-  const [jobs, setJobs] = useState<HistoryJob[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
 
@@ -63,16 +63,11 @@ const History = () => {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchHistory();
-    }
-  }, [user]);
-
-  const fetchHistory = async () => {
-    setLoading(true);
-    try {
-      // Fetch completed jobs with their rugs and estimates
+  // Use React Query for data fetching with optimized query
+  const { data: jobs = [], isLoading } = useQuery({
+    queryKey: queryKeys.history.list(),
+    queryFn: async (): Promise<HistoryJob[]> => {
+      // Fetch completed jobs with their rugs in a single query
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select(`
@@ -83,48 +78,34 @@ const History = () => {
           client_phone,
           status,
           created_at,
-          payment_status
+          payment_status,
+          inspections:inspections(id, rug_number, rug_type, length, width, photo_urls, analysis_report),
+          approved_estimates:approved_estimates(total_amount)
         `)
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
       if (jobsError) throw jobsError;
 
-      // Fetch rugs and estimates for each job
-      const jobsWithDetails = await Promise.all(
-        (jobsData || []).map(async (job) => {
-          // Get rugs
-          const { data: rugsData } = await supabase
-            .from('inspections')
-            .select('id, rug_number, rug_type, length, width, photo_urls, analysis_report')
-            .eq('job_id', job.id);
-
-          // Get approved estimates total
-          const { data: estimatesData } = await supabase
-            .from('approved_estimates')
-            .select('total_amount')
-            .eq('job_id', job.id);
-
-          const totalAmount = (estimatesData || []).reduce(
-            (sum, est) => sum + (est.total_amount || 0), 0
-          );
-
-          return {
-            ...job,
-            rugs: rugsData || [],
-            total_amount: totalAmount,
-          };
-        })
-      );
-
-      setJobs(jobsWithDetails);
-    } catch (error) {
-      console.error('Error fetching history:', error);
-      toast.error('Failed to load history');
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Transform the data
+      return (jobsData || []).map((job: any) => ({
+        id: job.id,
+        job_number: job.job_number,
+        client_name: job.client_name,
+        client_email: job.client_email,
+        client_phone: job.client_phone,
+        status: job.status,
+        created_at: job.created_at,
+        payment_status: job.payment_status,
+        rugs: job.inspections || [],
+        total_amount: (job.approved_estimates || []).reduce(
+          (sum: number, est: any) => sum + (est.total_amount || 0), 0
+        ),
+      }));
+    },
+    enabled: !!user,
+    staleTime: 30000,
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -143,18 +124,18 @@ const History = () => {
     });
   };
 
-  // Filter jobs by search query
-  const filteredJobs = jobs.filter((job) => {
+  // Filter jobs by search query (memoized)
+  const filteredJobs = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return (
+    return jobs.filter((job) => 
       job.client_name.toLowerCase().includes(query) ||
       job.job_number.toLowerCase().includes(query) ||
       (job.client_email?.toLowerCase().includes(query) ?? false)
     );
-  });
+  }, [jobs, searchQuery]);
 
-  // Group jobs into timeline periods
-  const groupJobsByTime = (jobs: HistoryJob[]): TimelineGroup[] => {
+  // Group jobs into timeline periods (memoized)
+  const timelineGroups = useMemo((): TimelineGroup[] => {
     const groups: { [key: string]: HistoryJob[] } = {
       'This Week': [],
       'This Month': [],
@@ -162,7 +143,7 @@ const History = () => {
       'Older': [],
     };
 
-    jobs.forEach(job => {
+    filteredJobs.forEach(job => {
       const date = parseISO(job.created_at);
       if (isThisWeek(date)) {
         groups['This Week'].push(job);
@@ -178,14 +159,25 @@ const History = () => {
     return Object.entries(groups)
       .filter(([_, jobsList]) => jobsList.length > 0)
       .map(([label, jobsList]) => ({ label, jobs: jobsList }));
-  };
-
-  const timelineGroups = groupJobsByTime(filteredJobs);
+  }, [filteredJobs]);
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-3">
+              <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
+              <div>
+                <h1 className="font-display text-xl font-bold text-foreground">RugBoost</h1>
+                <p className="text-xs text-muted-foreground">Client History</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-8">
+          <HistorySkeleton />
+        </main>
       </div>
     );
   }
@@ -246,10 +238,8 @@ const History = () => {
           </Card>
 
           {/* Timeline */}
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
+          {isLoading ? (
+            <HistorySkeleton />
           ) : timelineGroups.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
@@ -370,6 +360,7 @@ const History = () => {
                                               src={rug.photo_urls[0]}
                                               alt={rug.rug_number}
                                               className="w-12 h-12 object-cover rounded-md border"
+                                              loading="lazy"
                                             />
                                           ) : (
                                             <div className="w-12 h-12 rounded-md border bg-muted flex items-center justify-center">

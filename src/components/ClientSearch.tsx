@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { Search, User, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,7 @@ interface ClientSearchProps {
 
 const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValue = '' }) => {
   const [query, setQuery] = useState(initialValue);
+  const deferredQuery = useDeferredValue(query);
   const [results, setResults] = useState<Client[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,9 +33,10 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Use deferred value for search to avoid blocking UI
   useEffect(() => {
     const searchClients = async () => {
-      if (query.length < 2) {
+      if (deferredQuery.length < 2) {
         setResults([]);
         return;
       }
@@ -45,7 +47,7 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
         const { data, error } = await supabase
           .from('jobs')
           .select('client_name, client_email, client_phone')
-          .ilike('client_name', `%${query}%`)
+          .ilike('client_name', `%${deferredQuery}%`)
           .order('created_at', { ascending: false })
           .limit(10);
 
@@ -69,15 +71,16 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
       }
     };
 
-    const debounce = setTimeout(searchClients, 300);
-    return () => clearTimeout(debounce);
-  }, [query]);
+    searchClients();
+  }, [deferredQuery]);
 
   const handleSelect = (client: Client) => {
     setQuery(client.client_name);
     onSelectClient(client);
     setIsOpen(false);
   };
+
+  const isStale = query !== deferredQuery;
 
   return (
     <div ref={containerRef} className="relative">
@@ -102,7 +105,7 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
       </div>
 
       {isOpen && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+        <div className={`absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden transition-opacity ${isStale ? 'opacity-70' : 'opacity-100'}`}>
           <div className="p-2 text-xs text-muted-foreground bg-muted/50">
             Existing Clients
           </div>
@@ -130,7 +133,7 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
         </div>
       )}
 
-      {loading && (
+      {(loading || isStale) && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
