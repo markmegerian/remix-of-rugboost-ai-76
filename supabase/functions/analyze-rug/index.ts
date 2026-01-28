@@ -283,7 +283,6 @@ serve(async (req) => {
     }
 
     const authenticatedUserId = claimsData.claims.sub as string;
-    console.log("Authenticated user:", authenticatedUserId);
 
     // Check rate limit
     const rateLimit = checkRateLimit(authenticatedUserId);
@@ -341,7 +340,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log(`Analyzing rug inspection for ${rugInfo.rugNumber} with ${photos.length} photos using ${model}`);
+
 
     // Fetch user's service prices and business info using service role key
     let servicePricesText = "";
@@ -370,9 +369,6 @@ serve(async (req) => {
           }
         });
         servicePricesText += "\nUse these prices when calculating cost estimates. If a service is not listed or has a $0 price, use industry standard estimates.";
-        console.log("Loaded service prices for user:", effectiveUserId);
-      } else {
-        console.log("No service prices found for user, using default estimates");
       }
 
       // Fetch business info from profiles
@@ -386,7 +382,6 @@ serve(async (req) => {
         businessName = profile.business_name || businessName;
         businessPhone = profile.business_phone || "";
         businessAddress = profile.business_address || "";
-        console.log("Loaded business info for user:", effectiveUserId, businessName);
       }
 
       // Fetch recent AI feedback corrections for this user (AI Learning System)
@@ -414,7 +409,6 @@ serve(async (req) => {
             feedbackContext += `- "${fb.original_service_name}" was incorrectly recommended - be more careful with this\n`;
           }
         }
-        console.log(`Loaded ${recentFeedback.length} AI feedback corrections for user:`, effectiveUserId);
       }
     } catch (priceError) {
       console.error("Error fetching user data:", priceError);
@@ -511,8 +505,6 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
       console.error("Failed to parse AI Gateway response:", jsonError);
       throw new Error("Invalid response from AI - please try again");
     }
-    
-    console.log("Gemini response received successfully");
 
     // Extract the text content from the response
     const rawContent = data.choices?.[0]?.message?.content;
@@ -521,8 +513,6 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
       console.error("Unexpected response structure:", JSON.stringify(data, null, 2));
       throw new Error("No analysis content in response");
     }
-
-    console.log(`Analysis completed successfully using ${model}`);
 
     // Try to parse as JSON (new structured format)
     let analysisReport: string;
@@ -539,14 +529,12 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
       const parsed = JSON.parse(cleanedContent);
       analysisReport = parsed.letter || rawContent;
       imageAnnotations = parsed.imageAnnotations || [];
-      console.log(`Parsed structured response with ${imageAnnotations.length} image annotations`);
     } catch (parseError) {
       // Check if response was truncated (ends with incomplete JSON)
       const isTruncated = rawContent.includes('"letter"') && 
         (!rawContent.includes('"imageAnnotations"') || !rawContent.trim().endsWith('}'));
       
       if (isTruncated) {
-        console.log("Response appears truncated, extracting letter content");
         // Try to extract the letter content from truncated JSON
         const letterMatch = rawContent.match(/"letter"\s*:\s*"([\s\S]*?)(?:"\s*,\s*"imageAnnotations"|"\s*}|$)/);
         if (letterMatch && letterMatch[1]) {
@@ -564,10 +552,8 @@ Please examine the attached ${photos.length} photograph(s) and write a professio
             .replace(/\\"/g, '"')
             .replace(/\\\\/g, '\\');
         }
-        console.log("Extracted letter from truncated response");
       } else {
         // If not truncated JSON, use the raw content as the report
-        console.log("Response is not JSON, using raw text");
         analysisReport = rawContent;
       }
     }

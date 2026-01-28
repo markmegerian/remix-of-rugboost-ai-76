@@ -53,7 +53,7 @@ serve(async (req) => {
       paidAt,
     }: InvoiceRequest = await req.json();
 
-    console.log(`Generating invoice PDF for job ${jobNumber}`);
+    
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -236,7 +236,7 @@ serve(async (req) => {
     // Convert to base64
     const pdfBase64 = doc.output("datauristring").split(",")[1];
 
-    console.log("Invoice PDF generated successfully");
+    
 
     return new Response(
       JSON.stringify({ 

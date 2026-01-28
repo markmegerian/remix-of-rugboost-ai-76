@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
-const Auth = () => {
+const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
   const { user, loading, signIn, signUp } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,7 +103,7 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div ref={ref} className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto flex items-center justify-center px-4 py-6">
@@ -257,6 +257,8 @@ const Auth = () => {
       </main>
     </div>
   );
-};
+});
+
+Auth.displayName = 'Auth';
 
 export default Auth;

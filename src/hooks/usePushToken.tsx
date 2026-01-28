@@ -30,8 +30,6 @@ export function usePushToken() {
 
       if (error) {
         console.error('Failed to save push token:', error);
-      } else {
-        console.log('Push token saved successfully');
       }
     } catch (error) {
       console.error('Error saving push token:', error);

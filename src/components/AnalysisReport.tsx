@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, memo } from 'react';
 import { FileText, DollarSign, Wrench, ArrowLeft, Download, ClipboardList, RefreshCw, ImageIcon, Plus, X, Edit2, Check, MousePointer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,7 +49,7 @@ interface AnalysisReportProps {
 }
 
 
-const AnalysisReport: React.FC<AnalysisReportProps> = ({
+const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
   report,
   rugInfo,
   photoUrls = [],
@@ -858,5 +858,8 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({
     </div>
   );
 };
+
+// Memoize the component to prevent unnecessary re-renders
+const AnalysisReport = memo(AnalysisReportComponent);
 
 export default AnalysisReport;
