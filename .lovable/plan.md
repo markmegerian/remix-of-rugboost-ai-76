@@ -1,131 +1,95 @@
 
 
-# Final Polish & iOS Readiness Plan
+# App Store URL Pages Implementation Plan
 
 ## Overview
-This plan addresses the remaining items identified during the comprehensive review to ensure the platform is production-ready and prepared for Apple App Store submission.
+Apple App Store requires two specific URLs for your listing:
+1. **Privacy Policy URL**: `https://app.rugboost.com/privacy`
+2. **Support URL**: `https://app.rugboost.com`
+
+Currently, the privacy policy exists at `/privacy-policy` and the root URL (`/`) just redirects users to login. We need to create proper pages for both URLs.
 
 ---
 
-## Phase 1: Fix React Console Warnings
+## What We'll Create
 
-### Issue
-React is showing "Function components cannot be given refs" warnings for Index and Auth pages due to lazy loading.
+### 1. Privacy Route Alias (`/privacy`)
+Add an additional route that serves the existing Privacy Policy page at the shorter `/privacy` URL that Apple expects.
 
-### Solution
-Wrap the Index and Auth components with `React.forwardRef` to properly handle refs passed by React Router.
-
-### Files to Modify
-- `src/pages/Index.tsx` - Add forwardRef wrapper
-- `src/pages/Auth.tsx` - Add forwardRef wrapper
-
----
-
-## Phase 2: Apply Component Memoization
-
-### Issue
-The AnalysisReport component performs expensive text parsing on every render.
-
-### Solution
-- Wrap `AnalysisReport` with `React.memo`
-- Use `useMemo` for the `formatReport` function to cache parsing results
-
-### Files to Modify
-- `src/components/AnalysisReport.tsx` - Add React.memo and useMemo
+### 2. Support/Landing Page (Root URL)
+Transform the root URL from a redirect into a proper landing page that:
+- Serves as the official Support page for App Store
+- Provides contact information and help resources
+- Includes links to Privacy Policy and Terms of Service
+- Has clear call-to-action buttons for login/signup
+- Works for unauthenticated visitors (Apple's reviewer)
 
 ---
 
-## Phase 3: Clean Up Production Console Logs
+## Implementation Details
 
-### Issue
-Several edge functions contain console.log statements that clutter production logs.
+### File Changes
 
-### Solution
-Remove or convert debugging logs to proper structured logging (keep error logs for troubleshooting).
+**1. Create Support Page** (`src/pages/Support.tsx`)
 
-### Files to Modify
-- `supabase/functions/analyze-rug/index.ts` - Remove verbose parsing logs
-- `supabase/functions/generate-invoice-pdf/index.ts` - Remove success log
-- `src/hooks/usePushToken.tsx` - Remove success log (keep error logs)
+A professional support landing page including:
+- Hero section with Rugboost branding
+- Contact information (email support)
+- FAQ section covering common questions
+- Links to legal pages (Privacy, Terms)
+- Login/Sign up buttons for existing users
+- Mobile-responsive design matching existing styling
 
----
+**2. Update App.tsx Routing**
 
-## Phase 4: iOS App Store Readiness (Documentation)
-
-These items require manual configuration in the native iOS project after syncing:
-
-### Info.plist Privacy Keys
-After running `npx cap sync`, add these keys to `ios/App/App/Info.plist`:
-
-```xml
-<key>NSCameraUsageDescription</key>
-<string>Rugboost needs camera access to capture photos of rugs for analysis and documentation.</string>
-
-<key>NSPhotoLibraryUsageDescription</key>
-<string>Rugboost needs photo library access to select existing rug photos for analysis.</string>
-
-<key>NSPhotoLibraryAddUsageDescription</key>
-<string>Rugboost saves rug analysis photos to your photo library for your records.</string>
-
-<key>NSUserNotificationsUsageDescription</key>
-<string>Rugboost sends notifications about job updates, payment confirmations, and analysis results.</string>
-
-<key>ITSAppUsesNonExemptEncryption</key>
-<false/>
-```
-
-### Podfile Configuration
-Ensure the post_install hook in `ios/App/Podfile` includes:
-
-```ruby
-post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
-    end
-  end
-end
-```
-
-### Capacitor Config Verification
-The `capacitor.config.ts` server block is already commented out for production builds.
+- Add `/privacy` as an alias route pointing to PrivacyPolicy
+- Add `/support` route for the new Support page
+- Update the root `/` route behavior to show Support page for unauthenticated users (or redirect authenticated users to their dashboard)
 
 ---
 
-## Implementation Summary
+## Support Page Content
 
-| Phase | Task | Impact | Effort |
-|-------|------|--------|--------|
-| 1 | Fix forwardRef console warnings | Low | Low |
-| 2 | Memoize AnalysisReport | Medium | Low |
-| 3 | Clean up production logs | Low | Low |
-| 4 | iOS configuration docs | Required for App Store | Manual |
+The support page will include:
 
----
+**Contact Section**
+- Support email: support@rugboost.com
+- Business hours and response time expectations
 
-## Expected Outcomes
+**FAQ Section**
+- How does AI rug analysis work?
+- How do I manage my jobs?
+- How do clients access their portal?
+- Payment and billing questions
 
-### Clean Production Build
-- No React warnings in console
-- Optimized re-rendering for heavy components
-- Clean edge function logs
-
-### App Store Ready
-- All privacy descriptions in place
-- Export compliance configured
-- Build settings optimized for Xcode
+**Quick Links**
+- Privacy Policy
+- Terms of Service
+- Sign In / Sign Up buttons
 
 ---
 
-## Post-Implementation Checklist
+## Route Summary
 
-After these changes, the following steps complete App Store submission:
+| URL | Purpose | Audience |
+|-----|---------|----------|
+| `/privacy` | Privacy Policy (App Store link) | Apple, Users |
+| `/privacy-policy` | Privacy Policy (existing) | Users |
+| `/support` | Support page (direct link) | Users |
+| `/` | Landing/Support (unauthenticated) or redirect (authenticated) | Everyone |
 
-1. Run `npm run build` to create production build
-2. Run `npx cap sync ios` to sync to native project
-3. Open `ios/App/App.xcworkspace` in Xcode
-4. Verify Info.plist contains all privacy keys
-5. Set app icons and splash screens via Assets.xcassets
-6. Archive and submit to App Store Connect
+---
+
+## Technical Details
+
+**New Files:**
+- `src/pages/Support.tsx` - Full support/landing page component
+
+**Modified Files:**
+- `src/App.tsx` - Add `/privacy` and `/support` routes, update `/` behavior
+
+**Styling:**
+- Uses existing Tailwind classes and design tokens
+- Matches PrivacyPolicy and TermsOfService page styling
+- Mobile-responsive with safe-area support
 
