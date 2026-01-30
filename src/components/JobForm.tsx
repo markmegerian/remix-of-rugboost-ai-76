@@ -1,7 +1,3 @@
-/**
- * JobForm Component - v3.0.0 CACHE BUSTER
- * NO useBlocker - uses custom navigation blocking
- */
 import React, { useState, useEffect } from 'react';
 import { User, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,10 +8,6 @@ import { toast } from 'sonner';
 import ClientSearch from './ClientSearch';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import UnsavedChangesDialog from './UnsavedChangesDialog';
-
-// Runtime check - confirms fresh bundle
-const COMPONENT_BUILD_ID = 'JobForm_v3_' + Math.random().toString(36).slice(2, 8);
-console.debug(`[JobForm] Loaded: ${COMPONENT_BUILD_ID}`);
 
 interface JobFormData {
   jobNumber: string;
@@ -49,11 +41,6 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mod
     clientPhone: initialData?.clientPhone || '',
     notes: initialData?.notes || '',
   });
-
-  // Log mount for debugging
-  useEffect(() => {
-    console.debug(`[JobForm] Mounted, build=${COMPONENT_BUILD_ID}`);
-  }, []);
 
   // Check if form is dirty (has unsaved changes)
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialValues);
