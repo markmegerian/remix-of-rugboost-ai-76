@@ -1,3 +1,9 @@
+/**
+ * useUnsavedChanges Hook - v2.0.0
+ * 
+ * Custom navigation blocking for BrowserRouter (no useBlocker dependency)
+ * Last updated: 2026-01-30
+ */
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -62,7 +68,7 @@ export const useUnsavedChanges = (hasChanges: boolean) => {
     };
 
     // Handle popstate (back/forward buttons)
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       if (hasChangesRef.current) {
         // Push current state back to prevent navigation
         window.history.pushState(null, '', location.pathname);
@@ -107,7 +113,7 @@ export const useUnsavedChanges = (hasChanges: boolean) => {
  * Hook to track form dirty state
  * Compare initial values with current values
  */
-export const useFormDirtyState = <T extends Record<string, any>>(
+export const useFormDirtyState = <T extends Record<string, unknown>>(
   initialValues: T,
   currentValues: T
 ): boolean => {

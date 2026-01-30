@@ -1,3 +1,7 @@
+/**
+ * RugForm Component - v2.0.0
+ * Updated: 2026-01-30 - Fixed navigation blocking
+ */
 import React, { useState, useCallback } from 'react';
 import { Loader2, Plus, Hash, Ruler, Camera, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,7 +68,7 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
   // Track if form has been modified
   const isDirty = formData.rugType !== '' || formData.notes !== '' || photos.length > 0;
 
-  // Handle unsaved changes warning
+  // Handle unsaved changes warning - uses custom implementation (no useBlocker)
   const { isBlocked, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty);
 
   const handleInputChange = (
@@ -228,7 +232,7 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
           ) : (
             <>
               <Plus className="h-5 w-5" />
-            Add Rug to Job
+              Add Rug to Job
             </>
           )}
         </Button>

@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/**
+ * JobForm Component - v2.0.0
+ * Updated: 2026-01-30 - Fixed navigation blocking
+ */
+import React, { useState, useEffect } from 'react';
 import { User, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,7 +49,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mod
   // Check if form is dirty (has unsaved changes)
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialValues);
 
-  // Handle unsaved changes warning
+  // Handle unsaved changes warning - uses custom implementation (no useBlocker)
   const { isBlocked, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
