@@ -1,67 +1,44 @@
 
-# Fix: useBlocker Router Compatibility Error
+# Fix: Force Cache Refresh for useBlocker Error
 
 ## Problem
-The app crashes with the error: **"useBlocker must be used within a data router"**
+The app still crashes with `useBlocker must be used within a data router` even though the source code has been updated to remove `useBlocker`. The error points to `RugForm.tsx:52:20`, but in the current source code line 52 is blank - this indicates a **stale build cache**.
 
-This happens because:
-- `useBlocker` from React Router v6 requires a **data router** (`createBrowserRouter`)
-- The app uses the simpler **component-based router** (`BrowserRouter`)
-- The `useUnsavedChanges` hook tries to use `useBlocker` which isn't supported
+## Root Cause
+The browser/build system is serving a cached version of the code that still contains the old `useBlocker` implementation. The file updates were made but the compiled bundle wasn't regenerated or the browser didn't fetch the new version.
 
 ## Solution
-Replace `useBlocker` with a custom implementation that works with `BrowserRouter`. This approach:
-- Keeps the existing routing structure intact (no app-wide migration)
-- Maintains the same user experience for unsaved changes warnings
-- Uses `useNavigate` and `useLocation` which work with any router
+Force a complete refresh by rewriting the affected files with small modifications to ensure the bundler regenerates the code:
 
-## Files to Change
+### 1. Rewrite useUnsavedChanges.ts
+- Add a version comment at the top of the file
+- Keep the same working implementation (no `useBlocker`)
+- This forces Vite to recompile the module
 
-### 1. Update useUnsavedChanges Hook
-**File:** `src/hooks/useUnsavedChanges.ts`
+### 2. Rewrite RugForm.tsx
+- Add a comment to force recompilation
+- Ensure the import and hook usage are correct
 
-Replace the `useBlocker` implementation with a custom navigation interception:
-- Track attempted navigation via a state variable
-- Intercept navigation by storing the target path
-- Show confirmation dialog before allowing navigation
-- Provide `confirmNavigation()` and `cancelNavigation()` functions
-
-### 2. Update JobForm Component
-**File:** `src/components/JobForm.tsx`
-
-- Update the dialog callbacks to use the new hook API
-- Replace `blocker.proceed?.()` with `confirmNavigation()`
-- Replace `blocker.reset?.()` with `cancelNavigation()`
-
-### 3. Update RugForm Component  
-**File:** `src/components/RugForm.tsx`
-
-- Same updates as JobForm for the new hook API
-
----
+### 3. Rewrite JobForm.tsx
+- Same treatment to ensure consistency
 
 ## Technical Details
 
-### New Hook API
+The current implementation in `useUnsavedChanges.ts` is correct:
+- Uses `useNavigate` and `useLocation` (compatible with BrowserRouter)
+- Intercepts `window.history.pushState/replaceState` for navigation blocking
+- Handles browser back/forward with `popstate` event
+- Returns `isBlocked`, `confirmNavigation`, `cancelNavigation`
 
-The updated `useUnsavedChanges` hook will return:
-- `isBlocked: boolean` - Whether navigation is blocked
-- `pendingPath: string | null` - Where user tried to navigate
-- `confirmNavigation: () => void` - Proceed with blocked navigation
-- `cancelNavigation: () => void` - Cancel and stay on page
+No logic changes needed - just forcing cache invalidation through file rewrites.
 
-### How It Works
+## Files to Modify
 
-```text
-User clicks link → Hook intercepts → Shows dialog → User confirms/cancels
-         ↓                 ↓                              ↓
-    Check hasChanges    Store path               Navigate or stay
-```
+| File | Change |
+|------|--------|
+| `src/hooks/useUnsavedChanges.ts` | Add version comment, rewrite file |
+| `src/components/RugForm.tsx` | Add comment, rewrite file |
+| `src/components/JobForm.tsx` | Add comment, rewrite file |
 
-The hook will use `window.history.pushState` interception to detect navigation attempts, store the intended destination, and only navigate when the user confirms.
-
-## Benefits
-1. Fixes the crash immediately
-2. No changes to app routing structure
-3. Same UX for users (dialog still appears)
-4. Browser refresh/close warning still works (beforeunload)
+## Expected Outcome
+After the rewrites, the bundler will recompile all three files and the browser will fetch fresh code that doesn't contain any `useBlocker` references.
