@@ -45,7 +45,7 @@ export interface BusinessBranding {
   business_address: string | null;
   business_phone: string | null;
   business_email: string | null;
-  logo_url: string | null;
+  logo_path: string | null;
 }
 
 export interface UpsellService {

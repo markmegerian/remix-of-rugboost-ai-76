@@ -74,7 +74,7 @@ export interface BusinessBranding {
   business_address: string | null;
   business_phone: string | null;
   business_email: string | null;
-  logo_url: string | null;
+  logo_path: string | null;
 }
 
 // Fetch all job detail data in parallel
@@ -108,10 +108,10 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
           .eq('job_id', jobId)
           .order('created_at', { ascending: true }),
         
-        // Branding
+        // Branding - use logo_path instead of logo_url for fresh signed URLs
         supabase
           .from('profiles')
-          .select('business_name, business_address, business_phone, business_email, logo_url')
+          .select('business_name, business_address, business_phone, business_email, logo_path')
           .eq('user_id', userId)
           .maybeSingle(),
         

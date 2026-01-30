@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format, isThisYear, isThisMonth, isThisWeek, parseISO } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
+import RugPhoto from '@/components/RugPhoto';
 
 interface HistoryRug {
   id: string;
@@ -353,10 +354,11 @@ const ClientHistory = () => {
                                       >
                                         <div className="flex items-center gap-3">
                                           {rug.photo_urls && rug.photo_urls[0] ? (
-                                            <img
-                                              src={rug.photo_urls[0]}
+                                            <RugPhoto
+                                              filePath={rug.photo_urls[0]}
                                               alt={rug.rug_number}
                                               className="w-12 h-12 object-cover rounded-md border"
+                                              loadingClassName="w-12 h-12"
                                             />
                                           ) : (
                                             <div className="w-12 h-12 rounded-md border bg-muted flex items-center justify-center">
