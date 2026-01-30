@@ -49,10 +49,17 @@ function sanitizeString(input: string): string {
     .trim();
 }
 
-// Validate URL is from allowed domains (Supabase storage)
-function isValidPhotoUrl(url: string): boolean {
+// Validate photo input - can be a URL or a storage path
+function isValidPhotoInput(input: string): boolean {
+  // Allow storage paths (e.g., "userId/photos/file.jpg")
+  if (!input.includes('://')) {
+    // It's a storage path - validate it's a reasonable path
+    return input.length > 0 && input.length < 500 && !input.includes('..') && !input.startsWith('/');
+  }
+  
+  // It's a URL - validate domain
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(input);
     const allowedHosts = [
       'tviommdnpvfceuprrwzf.supabase.co',
       'supabase.co',
@@ -61,6 +68,24 @@ function isValidPhotoUrl(url: string): boolean {
     return allowedHosts.some(host => parsed.hostname.endsWith(host));
   } catch {
     return false;
+  }
+}
+
+// Generate signed URL for a storage path
+async function getSignedUrlForPath(supabase: any, path: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from('rug-photos')
+      .createSignedUrl(path, 3600); // 1 hour expiry
+    
+    if (error) {
+      console.error('Error creating signed URL for path:', path, error);
+      return null;
+    }
+    return data.signedUrl;
+  } catch (err) {
+    console.error('Exception creating signed URL:', err);
+    return null;
   }
 }
 
@@ -76,8 +101,9 @@ const SUPPORTED_MODELS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash"] as
 type SupportedModel = typeof SUPPORTED_MODELS[number];
 
 // Input validation schema with stricter constraints
+// Now accepts both storage paths and full URLs
 const RequestSchema = z.object({
-  photos: z.array(z.string().url().refine(isValidPhotoUrl, { message: "Invalid photo URL domain" })).min(1).max(20),
+  photos: z.array(z.string().min(1).max(500).refine(isValidPhotoInput, { message: "Invalid photo path or URL" })).min(1).max(20),
   rugInfo: z.object({
     clientName: z.string().min(1).max(200).transform(sanitizeString),
     rugNumber: z.string().min(1).max(100).transform(sanitizeString),
@@ -419,10 +445,39 @@ serve(async (req) => {
     const width = typeof rugInfo.width === 'string' ? parseFloat(rugInfo.width) || 0 : rugInfo.width || 0;
     const squareFootage = length * width;
 
+    // Convert storage paths to signed URLs if needed
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseForStorage = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const resolvedPhotoUrls: string[] = [];
+    for (const photo of photos) {
+      if (!photo.includes('://')) {
+        // It's a storage path - generate signed URL
+        const signedUrl = await getSignedUrlForPath(supabaseForStorage, photo);
+        if (signedUrl) {
+          resolvedPhotoUrls.push(signedUrl);
+        } else {
+          console.warn('Failed to generate signed URL for path:', photo);
+        }
+      } else {
+        // It's already a URL
+        resolvedPhotoUrls.push(photo);
+      }
+    }
+    
+    if (resolvedPhotoUrls.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to resolve photo URLs. Please try again.' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log(`Resolved ${resolvedPhotoUrls.length} photo URLs from ${photos.length} inputs`);
+
     // Build the image content array for Gemini vision
     // Use "high" detail for Pro model, "low" for Flash to optimize speed/cost
     const imageDetail = model === "google/gemini-2.5-flash" ? "low" : "high";
-    const imageContent = photos.map((photoUrl: string) => ({
+    const imageContent = resolvedPhotoUrls.map((photoUrl: string) => ({
       type: "image_url",
       image_url: {
         url: photoUrl,
@@ -445,7 +500,7 @@ Dimensions: ${length || "Unknown"}' x ${width || "Unknown"}' (${squareFootage > 
 Inspector Notes: ${sanitizedNotes}
 ${servicePricesText}
 
-Please examine the attached ${photos.length} photograph(s) and write a professional estimate letter following the format specified. Address it to the client by name. Calculate all costs based on the rug's square footage (${squareFootage} sq ft) and perimeter for linear services.`;
+Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write a professional estimate letter following the format specified. Address it to the client by name. Calculate all costs based on the rug's square footage (${squareFootage} sq ft) and perimeter for linear services.`;
 
     // Use Lovable AI Gateway with selected model
     // Reduce max_tokens for Flash model since it's more concise
