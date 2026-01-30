@@ -13,7 +13,7 @@ import { useJobs, Job } from '@/hooks/useJobs';
 import { format } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import NotificationBell from '@/components/NotificationBell';
-import { JobListSkeleton } from '@/components/skeletons/JobListSkeleton';
+import { DashboardSkeleton, DashboardJobTableSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import MobileNav from '@/components/MobileNav';
 import { useTheme } from 'next-themes';
 
@@ -84,24 +84,7 @@ const Dashboard = () => {
   });
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-          <div className="container mx-auto flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-3">
-              <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10 border-0" />
-              <div>
-                <h1 className="text-xl font-bold text-foreground font-sans">RugBoost</h1>
-                <p className="text-xs text-muted-foreground">Job Dashboard</p>
-              </div>
-            </div>
-          </div>
-        </header>
-        <main className="container mx-auto px-4 py-8">
-          <JobListSkeleton />
-        </main>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -207,7 +190,7 @@ const Dashboard = () => {
 
           {/* Jobs Table */}
           {isLoading ? (
-            <JobListSkeleton />
+            <DashboardJobTableSkeleton />
           ) : (
             <Card className="shadow-medium">
               <CardHeader>
