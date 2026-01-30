@@ -22,7 +22,11 @@ import RateLimitFeedback from '@/components/RateLimitFeedback';
 import { checkLoginAllowed, recordFailedAttempt, clearAttempts } from '@/lib/authRateLimiter';
 
 const emailSchema = z.string().email('Please enter a valid email address');
-const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+const passwordSchema = z.string()
+  .min(10, 'Password must be at least 10 characters')
+  .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Must contain at least one number');
 const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
 
 const Auth = forwardRef<HTMLDivElement>((_, ref) => {
