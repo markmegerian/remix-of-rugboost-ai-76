@@ -1,91 +1,43 @@
 
-# Comprehensive Fix: Routing Error and System Issues
+# Reset Analysis Data for Demo Jobs
 
-## Issue 1: useBlocker Runtime Error (Critical)
+## Summary
+I'll clear the AI analysis data from the specified jobs so you can walk through the analysis process step-by-step with someone.
 
-**Root Cause**: The browser is serving a cached bundle that still contains the old `useBlocker` implementation, even though the source code has been completely updated. The error at `RugForm.tsx:52:20` doesn't match the current source where line 52 is just an interface closing brace.
+## Jobs to Reset
 
-**Solution**: Force a complete module graph reset by making structural changes to the hook file, not just adding comments. The previous "version comment" approach didn't trigger a full cache bust because Vite's dependency tracking wasn't affected.
+| Job # | Client | Rugs | Action |
+|-------|--------|------|--------|
+| 123123 | mark | 1 rug | Clear analysis |
+| asda | Mark Megerian | 1 rug | Clear analysis |
+| Kaye | Annie kate | 1 rug | Clear analysis |
+| Julia | Julia Rega | 1 rug | Clear analysis |
+| Martha | Martha Parker | 2 rugs | Clear analysis |
 
-**Approach**:
-1. Rename the export function to force all import sites to re-resolve
-2. Create a barrel file that re-exports to ensure module boundaries are reset
-3. Add a timestamp-based cache buster in the file content itself
+**Total: 6 rugs across 5 jobs**
 
----
+## What Will Be Reset
+For each rug (inspection):
+- `analysis_report` - Set to NULL (removes the AI-generated report)
+- `image_annotations` - Set to NULL (removes any damage markers)
+- `estimate_approved` - Set to false (allows re-approval)
 
-## Issue 2: Forms Missing Unsaved Changes Protection
-
-During the audit, I found several forms that could lose user data:
-
-| Component | Risk Level | Issue |
-|-----------|------------|-------|
-| `AccountSettings.tsx` | High | Extensive profile/branding settings with no save warning |
-| `RugInspectionForm.tsx` | Medium | Legacy form without protection (may not be in active use) |
-| `EditRugDialog.tsx` | Low | Dialog that could be dismissed accidentally |
-| `EstimateReview.tsx` | Medium | Manual price overrides could be lost |
-
----
-
-## Implementation Plan
-
-### Step 1: Fix the useBlocker Error (Nuclear Option)
-
-Since comment-based cache invalidation didn't work, I'll:
-
-1. **Restructure `useUnsavedChanges.ts`**:
-   - Move the implementation into a new internal function
-   - Add a unique runtime identifier that changes with each build
-   - Ensure the export signature remains the same
-
-2. **Touch all consuming components** with actual code changes (not just comments):
-   - Add a console.log statement (can be removed later) to force re-bundling
-   - Update the destructuring pattern slightly
-
-### Step 2: Verify No Hidden useBlocker References
-
-Double-check there are no:
-- Dynamic imports that might cache old code
-- Lazy-loaded chunks with stale references
-- Service worker caching old bundles
-
-### Step 3: Add Missing Unsaved Changes Protection (Optional Follow-up)
-
-Add the `useUnsavedChanges` hook to:
-- `AccountSettings.tsx` - Profile and branding forms
-- `EstimateReview.tsx` - When manual overrides are made
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/hooks/useUnsavedChanges.ts` | Restructure with runtime cache buster |
-| `src/components/RugForm.tsx` | Add debug log to force recompile |
-| `src/components/JobForm.tsx` | Add debug log to force recompile |
-
----
+Also need to remove any approved estimates for these jobs so the workflow starts fresh.
 
 ## Technical Details
 
-The new hook structure will include a runtime identifier:
+### Step 1: Clear Inspection Analysis Data
+Run SQL update to reset analysis fields on the 6 inspections identified.
 
-```text
-// Structure
-const HOOK_VERSION = Date.now(); // Changes with each deploy
-console.debug('[useUnsavedChanges] v' + HOOK_VERSION);
+### Step 2: Remove Approved Estimates
+Delete any `approved_estimates` records linked to these jobs so the estimate approval step can be redone.
 
-export const useUnsavedChanges = (hasChanges) => {
-  // Same implementation, guaranteed fresh bundle
-}
-```
+### Step 3: Reset Job Status (Optional)
+If you want jobs to appear as "active" again, can also reset the `all_estimates_approved` flag on the jobs table.
 
-Each consuming component will log on mount to verify the new code is running.
-
-## Expected Outcome
-
-After these changes:
-1. The `useBlocker` error will be gone permanently
-2. Console will show version logs confirming new code is loaded
-3. Navigation blocking will work correctly with BrowserRouter
+## After Reset
+You'll be able to:
+1. Open each job and see rugs without analysis
+2. Click "Analyze" to run the AI analysis fresh
+3. Review and approve estimates
+4. Walk through the complete workflow
