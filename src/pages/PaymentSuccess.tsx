@@ -9,6 +9,7 @@ import rugboostLogo from '@/assets/rugboost-logo.svg';
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // Support both route patterns
   const sessionId = searchParams.get('session_id');
   const returnToken = searchParams.get('token');
   

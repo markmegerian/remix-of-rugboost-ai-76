@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { copyToClipboard, openExternalUrl } from '@/lib/navigation';
 
 interface ClientPortalStatusProps {
   portalLink: string;
@@ -99,16 +100,17 @@ const ClientPortalStatus: React.FC<ClientPortalStatusProps> = ({
   isResending,
 }) => {
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(portalLink);
+    const success = await copyToClipboard(portalLink);
+    if (success) {
       toast.success('Link copied to clipboard');
-    } catch {
+    } else {
       toast.error('Failed to copy link');
     }
   };
 
   const handleOpenPortal = () => {
-    window.open(portalLink, '_blank');
+    // Use SPA navigation for portal links - stays inside WebView
+    openExternalUrl(portalLink, { inApp: true });
   };
 
   const steps = [

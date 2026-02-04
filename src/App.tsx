@@ -75,6 +75,8 @@ const App = () => (
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/jobs/new" element={<NewJob />} />
                     <Route path="/jobs/:jobId" element={<JobDetail />} />
+                    {/* Stable alias for Capacitor deep linking */}
+                    <Route path="/job/:jobId" element={<JobDetail />} />
                     <Route path="/settings" element={<AccountSettings />} />
                     <Route path="/analytics" element={<Analytics />} />
                     
@@ -85,6 +87,9 @@ const App = () => (
                     <Route path="/client/set-password" element={<ClientSetPassword />} />
                     <Route path="/client/payment-success" element={<PaymentSuccess />} />
                     <Route path="/client/payment-cancelled" element={<PaymentCancelled />} />
+                    {/* Stable payment routes for Capacitor deep linking */}
+                    <Route path="/payment/success" element={<PaymentSuccess />} />
+                    <Route path="/payment/cancel" element={<PaymentCancelled />} />
                     <Route path="/client/:accessToken" element={<ClientPortal />} />
                     
                     {/* Admin Routes */}
