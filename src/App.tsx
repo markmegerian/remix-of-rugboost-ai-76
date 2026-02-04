@@ -31,6 +31,7 @@ const ClientDashboard = lazy(() => import("./pages/ClientDashboard"));
 const ClientHistory = lazy(() => import("./pages/ClientHistory"));
 const ClientSetPassword = lazy(() => import("./pages/ClientSetPassword"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentCancelled = lazy(() => import("./pages/PaymentCancelled"));
 
 // Admin Pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -87,6 +88,7 @@ const App = () => (
                     <Route path="/client/history" element={<ClientHistory />} />
                     <Route path="/client/set-password" element={<ClientSetPassword />} />
                     <Route path="/client/payment-success" element={<PaymentSuccess />} />
+                    <Route path="/client/payment-cancelled" element={<PaymentCancelled />} />
                     <Route path="/client/:accessToken" element={<ClientPortal />} />
                     
                     {/* Admin Routes */}

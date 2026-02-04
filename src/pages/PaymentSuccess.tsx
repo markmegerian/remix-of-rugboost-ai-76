@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Loader2, Home, FileText } from 'lucide-react';
+import { CheckCircle, Loader2, Home, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,7 @@ const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const sessionId = searchParams.get('session_id');
+  const returnToken = searchParams.get('token');
   
   const [loading, setLoading] = useState(true);
   const [paymentDetails, setPaymentDetails] = useState<{
@@ -49,6 +50,14 @@ const PaymentSuccess = () => {
     }
   };
 
+  const handleReturnToJob = () => {
+    if (returnToken) {
+      navigate(`/client/${returnToken}`);
+    } else {
+      navigate('/client/dashboard');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -69,8 +78,8 @@ const PaymentSuccess = () => {
 
         <Card className="text-center">
           <CardHeader className="pb-4">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="h-10 w-10 text-primary" />
             </div>
             <CardTitle className="text-2xl">Payment Successful!</CardTitle>
             <CardDescription>
@@ -101,27 +110,36 @@ const PaymentSuccess = () => {
               <h3 className="font-semibold">What's Next?</h3>
               <ul className="text-sm text-muted-foreground text-left space-y-2">
                 <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                   <span>You'll receive a confirmation email with your receipt</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                   <span>Our team will begin working on your rugs shortly</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                   <span>We'll contact you when your rugs are ready for pickup or delivery</span>
                 </li>
               </ul>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <div className="flex flex-col gap-3 pt-4">
+              {returnToken && (
+                <Button
+                  onClick={handleReturnToJob}
+                  className="w-full gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Return to Job
+                </Button>
+              )}
               <Button
-                variant="outline"
-                className="flex-1"
+                variant={returnToken ? "outline" : "default"}
+                className="w-full gap-2"
                 onClick={() => navigate('/client/dashboard')}
               >
-                <Home className="h-4 w-4 mr-2" />
+                <Home className="h-4 w-4" />
                 Go to Dashboard
               </Button>
             </div>

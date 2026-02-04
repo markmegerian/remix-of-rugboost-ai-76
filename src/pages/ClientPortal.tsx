@@ -425,6 +425,11 @@ const ClientPortal = () => {
       }
 
       // Call edge function to create Stripe checkout session
+      // Build mobile-safe URLs (full page navigation, not popups)
+      const baseUrl = window.location.origin;
+      const successUrl = `${baseUrl}/client/payment-success?session_id={CHECKOUT_SESSION_ID}&token=${accessToken}`;
+      const cancelUrl = `${baseUrl}/client/payment-cancelled?token=${accessToken}&job=${job?.id}`;
+      
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           jobId: job?.id,
@@ -432,8 +437,8 @@ const ClientPortal = () => {
           selectedServices: servicesForCheckout,
           totalAmount: total,
           customerEmail: user?.email,
-          successUrl: `${window.location.origin}/client/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: window.location.href,
+          successUrl,
+          cancelUrl,
         },
       });
 
