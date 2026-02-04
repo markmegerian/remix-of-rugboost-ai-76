@@ -38,6 +38,9 @@ import PaymentTracking from '@/components/PaymentTracking';
 import PhotoUploadProgress from '@/components/PhotoUploadProgress';
 import { JobDetailSkeleton } from '@/components/skeletons/JobDetailSkeleton';
 import JobTimeline, { mapLegacyStatus, JobStatus, JOB_STATUSES, getNextAction, getNextStatus, TransitionContext } from '@/components/JobTimeline';
+import JobStatusControl from '@/components/JobStatusControl';
+import StatusGatedButton from '@/components/StatusGatedButton';
+import { useJobActions } from '@/hooks/useJobActions';
 import RugPhoto from '@/components/RugPhoto';
 import JobBreadcrumb from '@/components/JobBreadcrumb';
 
@@ -159,7 +162,7 @@ const JobDetail = () => {
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [generatingPortalLink, setGeneratingPortalLink] = useState(false);
   const [resendingInvite, setResendingInvite] = useState(false);
-  
+  const [adminOverride, setAdminOverride] = useState(false);
   // Mutable state derived from query data
   const [localApprovedEstimates, setLocalApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [localRugs, setLocalRugs] = useState<Rug[]>([]);
@@ -183,6 +186,18 @@ const JobDetail = () => {
   const clientPortalLink = jobData?.clientPortalLink || null;
   const clientPortalStatus = jobData?.clientPortalStatus || null;
   const serviceCompletions = jobData?.serviceCompletions || [];
+
+  // Compute current job status for action gating
+  const hasAnalyzedRugs = rugs.some(r => r.analysis_report);
+  const currentJobStatus = job ? mapLegacyStatus(
+    job.status, 
+    job.payment_status, 
+    hasAnalyzedRugs,
+    !!clientPortalLink
+  ) : 'picked_up' as JobStatus;
+  
+  // Get action states for status-based disabling (hook must be at top level)
+  const actions = useJobActions(currentJobStatus, adminOverride);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -1013,160 +1028,61 @@ const JobDetail = () => {
 
       <main className="container mx-auto px-4 py-8 space-y-6">
         <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} />
-        {/* Section 1: Job Timeline - Most prominent */}
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <CardTitle className="font-display text-2xl">
-                  Job {job.job_number}
-                </CardTitle>
-                <Dialog open={isEditingJob} onOpenChange={setIsEditingJob}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1">
-                      <Edit2 className="h-3 w-3" />
-                      Edit
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle className="font-display text-xl">Edit Job</DialogTitle>
-                    </DialogHeader>
-                    <JobForm
-                      onSubmit={handleEditJob}
-                      isLoading={savingJob}
-                      mode="edit"
-                      initialData={{
-                        jobNumber: job.job_number,
-                        clientName: job.client_name,
-                        clientEmail: job.client_email || '',
-                        clientPhone: job.client_phone || '',
-                        notes: job.notes || '',
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="flex items-center gap-2">
-                <Select value={job.status} onValueChange={handleStatusChange}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className="flex items-center gap-2">
-                          <option.icon className="h-4 w-4" />
-                          {option.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              // Build validation context for state machine
-              const hasAnalyzedRugs = rugs.some(r => r.analysis_report);
-              const hasApprovedEstimates = approvedEstimates.length > 0;
-              const hasPaidPayment = payments.some(p => p.status === 'paid' || p.status === 'completed');
-              const allServicesComplete = (() => {
-                if (approvedEstimates.length === 0) return false;
-                const allServiceIds = approvedEstimates.flatMap(ae => 
-                  (ae.services || []).map((s: any) => s.id || s.service_name)
-                );
-                const completedIds = serviceCompletions.map(sc => sc.service_id);
-                return allServiceIds.length > 0 && allServiceIds.every((id: string) => completedIds.includes(id));
-              })();
+        {/* Section 1: Job Status Control - Most prominent */}
+        {(() => {
+          // Build validation context for state machine
+          const hasApprovedEstimates = approvedEstimates.length > 0;
+          const hasPaidPayment = payments.some(p => p.status === 'paid' || p.status === 'completed');
+          const allServicesComplete = (() => {
+            if (approvedEstimates.length === 0) return false;
+            const allServiceIds = approvedEstimates.flatMap(ae => 
+              (ae.services || []).map((s: any) => s.id || s.service_name)
+            );
+            const completedIds = serviceCompletions.map(sc => sc.service_id);
+            return allServiceIds.length > 0 && allServiceIds.every((id: string) => completedIds.includes(id));
+          })();
+          
+          // For delivery address, check if job has notes with address info
+          const hasDeliveryAddress = !!(job.notes && job.notes.toLowerCase().includes('address'));
+          const hasDeliveryWindow = !!(job.notes && (job.notes.toLowerCase().includes('delivery') || job.notes.toLowerCase().includes('window')));
+          
+          const validationContext: TransitionContext = {
+            hasPortalLink: !!clientPortalLink,
+            hasDeliveryAddress,
+            hasDeliveryWindow,
+            hasAnalyzedRugs,
+            hasApprovedEstimates,
+            hasPaidPayment,
+            allServicesComplete,
+          };
+          
+          const handleTimelineStatusChange = async (newStatus: JobStatus) => {
+            try {
+              const { error } = await supabase
+                .from('jobs')
+                .update({ status: newStatus })
+                .eq('id', job.id);
               
-              // For delivery address, check if job has notes with address info or use a simple heuristic
-              const hasDeliveryAddress = !!(job.notes && job.notes.toLowerCase().includes('address'));
-              const hasDeliveryWindow = !!(job.notes && (job.notes.toLowerCase().includes('delivery') || job.notes.toLowerCase().includes('window')));
-              
-              const validationContext: TransitionContext = {
-                hasPortalLink: !!clientPortalLink,
-                hasDeliveryAddress,
-                hasDeliveryWindow,
-                hasAnalyzedRugs,
-                hasApprovedEstimates,
-                hasPaidPayment,
-                allServicesComplete,
-              };
-              
-              const currentTimelineStatus = mapLegacyStatus(
-                job.status, 
-                job.payment_status, 
-                hasAnalyzedRugs,
-                !!clientPortalLink
-              );
-              
-              const handleTimelineStatusChange = async (newStatus: JobStatus) => {
-                // Map the new timeline status to legacy status for DB
-                let legacyStatus = job.status;
-                if (newStatus === 'closed') legacyStatus = 'completed';
-                else if (['in_service', 'ready'].includes(newStatus)) legacyStatus = 'in-progress';
-                else if (['picked_up', 'inspected', 'estimate_sent', 'approved_unpaid', 'paid'].includes(newStatus)) legacyStatus = 'active';
-                else legacyStatus = 'active';
-                
-                // Update the job status in DB
-                try {
-                  const { error } = await supabase
-                    .from('jobs')
-                    .update({ status: newStatus }) // Store the new workflow status directly
-                    .eq('id', job.id);
-                  
-                  if (error) throw error;
-                  toast.success(`Status updated to ${JOB_STATUSES.find(s => s.value === newStatus)?.label}`);
-                  fetchJobDetails();
-                } catch (error) {
-                  console.error('Status update error:', error);
-                  toast.error('Failed to update status');
-                }
-              };
+              if (error) throw error;
+              toast.success(`Status updated to ${JOB_STATUSES.find(s => s.value === newStatus)?.label}`);
+              fetchJobDetails();
+            } catch (error) {
+              console.error('Status update error:', error);
+              toast.error('Failed to update status');
+            }
+          };
 
-              return (
-                <JobTimeline
-                  currentStatus={currentTimelineStatus}
-                  isAdmin={isAdmin}
-                  validationContext={validationContext}
-                  onStatusChange={handleTimelineStatusChange}
-                  onAction={(action) => {
-                    switch (action) {
-                      case 'pickup':
-                        handleTimelineStatusChange('picked_up');
-                        break;
-                      case 'analyze':
-                        handleAnalyzeAllRugs();
-                        break;
-                      case 'send_estimate':
-                        if (!clientPortalLink) generateClientPortalLink();
-                        break;
-                      case 'start_service':
-                        handleTimelineStatusChange('in_service');
-                        break;
-                      case 'complete_service':
-                        handleTimelineStatusChange('ready');
-                        break;
-                      case 'schedule_delivery':
-                        toast.info('Add delivery details in job notes to proceed');
-                        break;
-                      case 'deliver':
-                        handleTimelineStatusChange('delivered');
-                        break;
-                      case 'close':
-                        handleTimelineStatusChange('closed');
-                        break;
-                      default:
-                        toast.info('This action is coming soon');
-                    }
-                  }}
-                />
-              );
-            })()}
-          </CardContent>
-        </Card>
+          return (
+            <JobStatusControl
+              currentStatus={currentJobStatus}
+              validationContext={validationContext}
+              onAdvanceStatus={handleTimelineStatusChange}
+              isAdmin={isAdmin}
+              onOverrideChange={setAdminOverride}
+              className="border-primary/20"
+            />
+          );
+        })()}
 
         {/* Section A: Client & Logistics */}
         <Card>
@@ -1220,12 +1136,13 @@ const JobDetail = () => {
               </CardTitle>
               <div className="flex items-center gap-2">
                 {rugs.length > 0 && rugs.some(r => !r.analysis_report) && (
-                  <Button 
+                  <StatusGatedButton 
+                    actionState={actions.analyzeRug}
                     variant="warm"
                     size="sm"
                     className="gap-2"
                     onClick={handleAnalyzeAllRugs}
-                    disabled={analyzingAll}
+                    disabled={analyzingAll || !actions.analyzeRug.enabled}
                   >
                     {analyzingAll ? (
                       <>
@@ -1238,15 +1155,18 @@ const JobDetail = () => {
                         Analyze All
                       </>
                     )}
-                  </Button>
+                  </StatusGatedButton>
                 )}
+                <StatusGatedButton 
+                  actionState={actions.addRug}
+                  size="sm" 
+                  className="gap-1"
+                  onClick={() => actions.addRug.enabled && setIsAddingRug(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Rug
+                </StatusGatedButton>
                 <Dialog open={isAddingRug} onOpenChange={setIsAddingRug}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1">
-                      <Plus className="h-4 w-4" />
-                      Add Rug
-                    </Button>
-                  </DialogTrigger>
                   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle className="font-display text-xl">Add Rug to Job</DialogTitle>
@@ -1328,24 +1248,51 @@ const JobDetail = () => {
                         </>
                       ) : (
                         <>
-                          <Button variant="outline" size="sm" onClick={() => analyzeRug(rug)} disabled={!!analyzingRugId || analyzingAll} className="flex-1 gap-1">
+                          <StatusGatedButton 
+                            actionState={actions.analyzeRug}
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => analyzeRug(rug)} 
+                            disabled={!!analyzingRugId || analyzingAll} 
+                            className="flex-1 gap-1"
+                          >
                             <Sparkles className="h-3 w-3" />
                             Analyze
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            setCompareRug(rug);
-                            setShowCompareDialog(true);
-                          }} disabled={!!analyzingRugId || analyzingAll}>
+                          </StatusGatedButton>
+                          <StatusGatedButton 
+                            actionState={actions.analyzeRug}
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setCompareRug(rug);
+                              setShowCompareDialog(true);
+                            }} 
+                            disabled={!!analyzingRugId || analyzingAll}
+                            showLockIcon={false}
+                          >
                             <FlaskConical className="h-3 w-3" />
-                          </Button>
+                          </StatusGatedButton>
                         </>
                       )}
-                      <Button variant="ghost" size="sm" onClick={() => setEditingRug(rug)}>
+                      <StatusGatedButton 
+                        actionState={actions.editRug}
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setEditingRug(rug)}
+                        showLockIcon={false}
+                      >
                         <Edit2 className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteRug(rug.id)} className="text-destructive hover:text-destructive">
+                      </StatusGatedButton>
+                      <StatusGatedButton 
+                        actionState={actions.deleteRug}
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteRug(rug.id)} 
+                        className="text-destructive hover:text-destructive"
+                        showLockIcon={false}
+                      >
                         <Trash2 className="h-3 w-3" />
-                      </Button>
+                      </StatusGatedButton>
                     </div>
                   </div>
                 ))}
@@ -1511,8 +1458,9 @@ const JobDetail = () => {
                     </p>
                   </div>
                 </div>
-                <Button 
-                  variant="navy"
+                <StatusGatedButton 
+                  actionState={actions.sendToClient}
+                  variant="default"
                   onClick={generateClientPortalLink}
                   disabled={generatingPortalLink || approvedEstimates.length < rugs.filter(r => r.analysis_report).length}
                   className="gap-2"
@@ -1528,7 +1476,7 @@ const JobDetail = () => {
                       Generate Client Link
                     </>
                   )}
-                </Button>
+                </StatusGatedButton>
               </div>
             ) : rugs.some(r => r.analysis_report) ? (
               <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
