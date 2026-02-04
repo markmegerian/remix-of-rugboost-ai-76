@@ -10,6 +10,7 @@ import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useJobDetail, useInvalidateJobDetail } from '@/hooks/useJobDetail';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useUpdateJobStatus } from '@/hooks/useJobs';
@@ -36,7 +37,7 @@ import ServiceCompletionCard from '@/components/ServiceCompletionCard';
 import PaymentTracking from '@/components/PaymentTracking';
 import PhotoUploadProgress from '@/components/PhotoUploadProgress';
 import { JobDetailSkeleton } from '@/components/skeletons/JobDetailSkeleton';
-import JobTimeline, { mapLegacyStatus, JobStatus, JOB_STATUSES, getNextAction } from '@/components/JobTimeline';
+import JobTimeline, { mapLegacyStatus, JobStatus, JOB_STATUSES, getNextAction, getNextStatus, TransitionContext } from '@/components/JobTimeline';
 import RugPhoto from '@/components/RugPhoto';
 
 interface ClientPortalStatusData {
@@ -126,6 +127,7 @@ const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { isAdmin } = useAdminAuth();
   const invalidateJobDetail = useInvalidateJobDetail();
   const updateJobStatus = useUpdateJobStatus();
   
@@ -1061,33 +1063,104 @@ const JobDetail = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <JobTimeline
-              currentStatus={mapLegacyStatus(
+            {(() => {
+              // Build validation context for state machine
+              const hasAnalyzedRugs = rugs.some(r => r.analysis_report);
+              const hasApprovedEstimates = approvedEstimates.length > 0;
+              const hasPaidPayment = payments.some(p => p.status === 'paid' || p.status === 'completed');
+              const allServicesComplete = (() => {
+                if (approvedEstimates.length === 0) return false;
+                const allServiceIds = approvedEstimates.flatMap(ae => 
+                  (ae.services || []).map((s: any) => s.id || s.service_name)
+                );
+                const completedIds = serviceCompletions.map(sc => sc.service_id);
+                return allServiceIds.length > 0 && allServiceIds.every((id: string) => completedIds.includes(id));
+              })();
+              
+              // For delivery address, check if job has notes with address info or use a simple heuristic
+              const hasDeliveryAddress = !!(job.notes && job.notes.toLowerCase().includes('address'));
+              const hasDeliveryWindow = !!(job.notes && (job.notes.toLowerCase().includes('delivery') || job.notes.toLowerCase().includes('window')));
+              
+              const validationContext: TransitionContext = {
+                hasPortalLink: !!clientPortalLink,
+                hasDeliveryAddress,
+                hasDeliveryWindow,
+                hasAnalyzedRugs,
+                hasApprovedEstimates,
+                hasPaidPayment,
+                allServicesComplete,
+              };
+              
+              const currentTimelineStatus = mapLegacyStatus(
                 job.status, 
                 job.payment_status, 
-                rugs.some(r => r.analysis_report),
+                hasAnalyzedRugs,
                 !!clientPortalLink
-              )}
-              onAction={(action) => {
-                switch (action) {
-                  case 'analyze':
-                    handleAnalyzeAllRugs();
-                    break;
-                  case 'send_estimate':
-                    if (!clientPortalLink) generateClientPortalLink();
-                    break;
-                  case 'start_service':
-                  case 'complete_service':
-                    handleStatusChange('in-progress');
-                    break;
-                  case 'close':
-                    handleStatusChange('completed');
-                    break;
-                  default:
-                    toast.info('This action is coming soon');
+              );
+              
+              const handleTimelineStatusChange = async (newStatus: JobStatus) => {
+                // Map the new timeline status to legacy status for DB
+                let legacyStatus = job.status;
+                if (newStatus === 'closed') legacyStatus = 'completed';
+                else if (['in_service', 'ready'].includes(newStatus)) legacyStatus = 'in-progress';
+                else if (['picked_up', 'inspected', 'estimate_sent', 'approved_unpaid', 'paid'].includes(newStatus)) legacyStatus = 'active';
+                else legacyStatus = 'active';
+                
+                // Update the job status in DB
+                try {
+                  const { error } = await supabase
+                    .from('jobs')
+                    .update({ status: newStatus }) // Store the new workflow status directly
+                    .eq('id', job.id);
+                  
+                  if (error) throw error;
+                  toast.success(`Status updated to ${JOB_STATUSES.find(s => s.value === newStatus)?.label}`);
+                  fetchJobDetails();
+                } catch (error) {
+                  console.error('Status update error:', error);
+                  toast.error('Failed to update status');
                 }
-              }}
-            />
+              };
+
+              return (
+                <JobTimeline
+                  currentStatus={currentTimelineStatus}
+                  isAdmin={isAdmin}
+                  validationContext={validationContext}
+                  onStatusChange={handleTimelineStatusChange}
+                  onAction={(action) => {
+                    switch (action) {
+                      case 'pickup':
+                        handleTimelineStatusChange('picked_up');
+                        break;
+                      case 'analyze':
+                        handleAnalyzeAllRugs();
+                        break;
+                      case 'send_estimate':
+                        if (!clientPortalLink) generateClientPortalLink();
+                        break;
+                      case 'start_service':
+                        handleTimelineStatusChange('in_service');
+                        break;
+                      case 'complete_service':
+                        handleTimelineStatusChange('ready');
+                        break;
+                      case 'schedule_delivery':
+                        toast.info('Add delivery details in job notes to proceed');
+                        break;
+                      case 'deliver':
+                        handleTimelineStatusChange('delivered');
+                        break;
+                      case 'close':
+                        handleTimelineStatusChange('closed');
+                        break;
+                      default:
+                        toast.info('This action is coming soon');
+                    }
+                  }}
+                />
+              );
+            })()}
           </CardContent>
         </Card>
 
