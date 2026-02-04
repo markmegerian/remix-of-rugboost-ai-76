@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   CreditCard, Clock, CheckCircle, AlertCircle, 
-  Download, FileText, ExternalLink, Receipt, Loader2
+  Download, FileText, ExternalLink, Receipt, Loader2, Copy
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { copyToClipboard, openExternalUrl, isNativeApp } from '@/lib/navigation';
 
 interface SelectedService {
   id: string;
@@ -296,19 +303,32 @@ const PaymentTracking: React.FC<PaymentTrackingProps> = ({
                           </Button>
                         )}
                         {payment.stripe_payment_intent_id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            asChild
-                          >
-                            <a 
-                              href={`https://dashboard.stripe.com/payments/${payment.stripe_payment_intent_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    // In native app, copy ID. In web, open Stripe dashboard
+                                    if (isNativeApp()) {
+                                      const success = await copyToClipboard(payment.stripe_payment_intent_id!);
+                                      if (success) {
+                                        toast.success('Payment ID copied');
+                                      }
+                                    } else {
+                                      openExternalUrl(`https://dashboard.stripe.com/payments/${payment.stripe_payment_intent_id}`);
+                                    }
+                                  }}
+                                >
+                                  {isNativeApp() ? <Copy className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isNativeApp() ? 'Copy Payment ID' : 'View in Stripe'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </div>
                     </TableCell>
