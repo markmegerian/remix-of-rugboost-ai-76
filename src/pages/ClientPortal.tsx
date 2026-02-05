@@ -269,10 +269,10 @@ const ClientPortal = () => {
     return rugs.reduce((sum, rug) => sum + rug.total, 0);
   };
 
-  const handleProceedToPayment = async (acceptRecommendations: boolean = true, acceptPreventative: boolean = true) => {
+  const handleProceedToPayment = async (declinedServiceIds: Set<string> = new Set()) => {
     setIsProcessingPayment(true);
     try {
-      // Filter services based on client acceptance
+      // Filter services - exclude declined ones
       const servicesForCheckout: { 
         rugNumber: string; 
         rugId: string;
@@ -281,14 +281,10 @@ const ClientPortal = () => {
       }[] = [];
       
       rugs.forEach(rug => {
-        // Filter services based on category and acceptance
-        const filteredServices = rug.services.filter(service => {
-          const category = categorizeService(service.name);
-          if (category === 'required') return true; // Always include required
-          if (category === 'recommended') return acceptRecommendations;
-          if (category === 'preventative') return acceptPreventative;
-          return true;
-        });
+        // Filter out declined services (required services can never be declined)
+        const filteredServices = rug.services.filter(service => 
+          !declinedServiceIds.has(service.id)
+        );
         
         if (filteredServices.length > 0) {
           servicesForCheckout.push({

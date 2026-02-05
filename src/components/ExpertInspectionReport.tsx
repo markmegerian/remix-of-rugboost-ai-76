@@ -1,14 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
  import { Button } from '@/components/ui/button';
  import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
  import { 
   ChevronDown, ChevronUp, 
-  FileText, ImageIcon, Lock, MessageSquare, Shield, ClipboardCheck
+  FileText, ImageIcon, Lock, MessageSquare, Shield, ClipboardCheck,
+  AlertTriangle, X, Check
  } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
  import { 
    SERVICE_CATEGORIES, 
    categorizeService, 
@@ -42,7 +51,7 @@ import { Label } from '@/components/ui/label';
    clientName: string;
    jobNumber: string;
    businessName: string | null;
-  onApprove: (acceptedRecommendations: boolean, acceptedPreventative: boolean) => void;
+  onApprove: (declinedServiceIds: Set<string>) => void;
    onRequestClarification?: () => void;
    isProcessing?: boolean;
    totalAmount: number;
@@ -89,6 +98,44 @@ function generateConditionSummary(services: Service[]): string {
   return `Assessment indicates ${conditions.join(', ')}. Services outlined below address identified conditions.`;
 }
 
+// Get consequence text for declining a service
+function getDeclineConsequence(serviceName: string, category: ServiceCategory): string {
+  const name = serviceName.toLowerCase();
+  
+  if (category === 'recommended') {
+    if (name.includes('stain')) {
+      return 'Existing stains may become permanently set over time if not addressed during this service.';
+    }
+    if (name.includes('odor') || name.includes('urine')) {
+      return 'Odor contamination may persist and could attract pets to re-soil the area.';
+    }
+    if (name.includes('repair') || name.includes('binding') || name.includes('fringe')) {
+      return 'Structural damage may worsen during cleaning and normal use if not stabilized.';
+    }
+    if (name.includes('moth') || name.includes('pest')) {
+      return 'Untreated pest damage may continue to spread to undamaged areas.';
+    }
+    return 'Deferring this service may result in suboptimal cleaning results or accelerated wear.';
+  }
+  
+  if (category === 'preventative') {
+    if (name.includes('protection') || name.includes('scotchgard')) {
+      return 'Fibers will remain more vulnerable to future staining and soiling.';
+    }
+    if (name.includes('pad')) {
+      return 'Rug may experience increased friction and accelerated wear on the backing.';
+    }
+    return 'Preventative treatments help extend the interval between professional cleanings.';
+  }
+  
+  return 'This service addresses conditions identified during inspection.';
+}
+
+// Check if service is high-cost (threshold: $100)
+function isHighCostService(service: Service): boolean {
+  return service.quantity * service.unitPrice >= 100;
+}
+
  const ExpertInspectionReport: React.FC<ExpertInspectionReportProps> = ({
    rugs,
    clientName,
@@ -101,24 +148,68 @@ function generateConditionSummary(services: Service[]): string {
  }) => {
    const [expandedRugs, setExpandedRugs] = useState<Set<string>>(new Set(rugs.map(r => r.id)));
    const [showReport, setShowReport] = useState<string | null>(null);
-  const [acceptRecommendations, setAcceptRecommendations] = useState(true);
-  const [acceptPreventative, setAcceptPreventative] = useState(true);
+  const [declinedServices, setDeclinedServices] = useState<Set<string>>(new Set());
+  const [confirmDecline, setConfirmDecline] = useState<Service | null>(null);
    
    // Aggregate services across all rugs
    const allServices = rugs.flatMap(r => r.services);
    const allGrouped = groupServicesByCategory(allServices);
    
    const requiredTotal = calculateCategoryTotal(allGrouped.required);
-   const recommendedTotal = calculateCategoryTotal(allGrouped.recommended);
-   const preventativeTotal = calculateCategoryTotal(allGrouped.preventative);
-
-  // Calculate final total based on selections
-  const finalTotal = useMemo(() => {
-    let total = requiredTotal;
-    if (acceptRecommendations) total += recommendedTotal;
-    if (acceptPreventative) total += preventativeTotal;
-    return total;
-  }, [requiredTotal, recommendedTotal, preventativeTotal, acceptRecommendations, acceptPreventative]);
+  
+  // Calculate totals based on declined services
+  const { finalTotal, declinedTotal, acceptedRecommended, acceptedPreventative } = useMemo(() => {
+    let accepted = requiredTotal;
+    let declined = 0;
+    let recAccepted: Service[] = [];
+    let prevAccepted: Service[] = [];
+    
+    allGrouped.recommended.forEach(s => {
+      const cost = s.quantity * s.unitPrice;
+      if (declinedServices.has(s.id)) {
+        declined += cost;
+      } else {
+        accepted += cost;
+        recAccepted.push(s);
+      }
+    });
+    
+    allGrouped.preventative.forEach(s => {
+      const cost = s.quantity * s.unitPrice;
+      if (declinedServices.has(s.id)) {
+        declined += cost;
+      } else {
+        accepted += cost;
+        prevAccepted.push(s);
+      }
+    });
+    
+    return {
+      finalTotal: accepted,
+      declinedTotal: declined,
+      acceptedRecommended: recAccepted,
+      acceptedPreventative: prevAccepted,
+    };
+  }, [requiredTotal, allGrouped, declinedServices]);
+  
+  const handleDeclineService = useCallback((service: Service) => {
+    setConfirmDecline(service);
+  }, []);
+  
+  const confirmDeclineService = useCallback(() => {
+    if (confirmDecline) {
+      setDeclinedServices(prev => new Set([...prev, confirmDecline.id]));
+      setConfirmDecline(null);
+    }
+  }, [confirmDecline]);
+  
+  const restoreService = useCallback((serviceId: string) => {
+    setDeclinedServices(prev => {
+      const next = new Set(prev);
+      next.delete(serviceId);
+      return next;
+    });
+  }, []);
    
    const toggleRug = (rugId: string) => {
      setExpandedRugs(prev => {
@@ -271,8 +362,8 @@ function generateConditionSummary(services: Service[]): string {
          );
        })}
  
-      {/* 3. Services Required for Proper Care - Non-Negotiable */}
-      {requiredTotal > 0 && (
+      {/* 3. Services Required for Proper Care - Non-Interactive, Locked */}
+      {allGrouped.required.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -280,7 +371,7 @@ function generateConditionSummary(services: Service[]): string {
               <CardTitle className="text-base">Services Required for Proper Care</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              These services are necessary to safely clean and stabilize the rug.
+              These services are required to safely clean and handle the rug based on its material and condition.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -291,7 +382,7 @@ function generateConditionSummary(services: Service[]): string {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{service.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Standard protocol for this material and condition type
+                      ${(service.quantity * service.unitPrice).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -301,92 +392,93 @@ function generateConditionSummary(services: Service[]): string {
         </Card>
       )}
 
-      {/* 4. Expert-Recommended Enhancements - Grouped Acceptance */}
-      {recommendedTotal > 0 && (
-        <Card className={!acceptRecommendations ? 'opacity-60' : ''}>
+      {/* 4. Expert-Recommended Services - Individually Declinable */}
+      {allGrouped.recommended.length > 0 && (
+        <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Expert-Recommended Enhancements</CardTitle>
-                <CardDescription className="text-xs mt-1">
-                  These services are recommended to improve results and reduce long-term risk.
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="accept-recommended"
-                  checked={acceptRecommendations}
-                  onCheckedChange={setAcceptRecommendations}
-                />
-                <Label htmlFor="accept-recommended" className="text-xs text-muted-foreground sr-only">
-                  Accept recommendations
-                </Label>
-              </div>
-            </div>
+            <CardTitle className="text-base">Expert-Recommended Services</CardTitle>
+            <CardDescription className="text-xs mt-1">
+              Recommended based on professional inspection findings. Included in your assessment.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {allGrouped.recommended.map((service, idx) => (
-                <div key={service.id || idx} className="flex items-start gap-3 py-2">
-                  <div className="h-4 w-4 rounded-full border border-muted-foreground/30 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{service.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Addresses identified condition factors
-                    </p>
-                  </div>
-                </div>
+                <ServiceLineItem
+                  key={service.id || idx}
+                  service={service}
+                  category="recommended"
+                  isDeclined={declinedServices.has(service.id)}
+                  onDecline={() => handleDeclineService(service)}
+                  onRestore={() => restoreService(service.id)}
+                  isHighCost={isHighCostService(service)}
+                />
               ))}
             </div>
-            {!acceptRecommendations && (
-              <p className="text-xs text-muted-foreground mt-3 italic">
-                Expert recommendations declined. Required services will proceed as scheduled.
-              </p>
-            )}
           </CardContent>
         </Card>
       )}
 
-      {/* 5. Preventative Care Recommendations - Softer Visual */}
-      {preventativeTotal > 0 && (
-        <Card className={`border-dashed ${!acceptPreventative ? 'opacity-50' : 'opacity-80'}`}>
+      {/* 5. Preventative / Longevity Services - Soft Visual, Individually Declinable */}
+      {allGrouped.preventative.length > 0 && (
+        <Card className="border-dashed opacity-90">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <CardTitle className="text-base text-muted-foreground">Preventative Care</CardTitle>
-                  <CardDescription className="text-xs mt-1">
-                    Not required at this time, but recommended to reduce future deterioration.
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="accept-preventative"
-                  checked={acceptPreventative}
-                  onCheckedChange={setAcceptPreventative}
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base text-muted-foreground">Preventative Care</CardTitle>
+            </div>
+            <CardDescription className="text-xs mt-1">
+              Optional treatments to extend rug longevity. Included in your assessment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {allGrouped.preventative.map((service, idx) => (
+                <ServiceLineItem
+                  key={service.id || idx}
+                  service={service}
+                  category="preventative"
+                  isDeclined={declinedServices.has(service.id)}
+                  onDecline={() => handleDeclineService(service)}
+                  onRestore={() => restoreService(service.id)}
+                  isHighCost={isHighCostService(service)}
                 />
-                <Label htmlFor="accept-preventative" className="text-xs text-muted-foreground sr-only">
-                  Accept preventative care
-                </Label>
-              </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Declined Services Summary */}
+      {declinedServices.size > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <CardTitle className="text-sm text-amber-700">Declined Services</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {allGrouped.preventative.map((service, idx) => (
-                <div key={service.id || idx} className="flex items-start gap-3 py-2 text-muted-foreground">
-                  <Shield className="h-4 w-4 mt-0.5 flex-shrink-0 opacity-50" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">{service.name}</p>
-                    <p className="text-xs opacity-70">
-                      Long-term protection measure
-                    </p>
+              {[...allGrouped.recommended, ...allGrouped.preventative]
+                .filter(s => declinedServices.has(s.id))
+                .map((service) => (
+                  <div key={service.id} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground line-through">{service.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-primary"
+                      onClick={() => restoreService(service.id)}
+                    >
+                      Restore
+                    </Button>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
+            <p className="text-xs text-amber-700 mt-3">
+              These services will not be performed. Associated risks have been acknowledged.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -414,14 +506,15 @@ function generateConditionSummary(services: Service[]): string {
             ${finalTotal.toFixed(2)}
            </div>
           <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-            {requiredTotal > 0 && (
-              <p>Required services: ${requiredTotal.toFixed(2)}</p>
+            <p>Required: ${requiredTotal.toFixed(2)}</p>
+            {acceptedRecommended.length > 0 && (
+              <p>Recommended ({acceptedRecommended.length}): ${calculateCategoryTotal(acceptedRecommended).toFixed(2)}</p>
             )}
-            {recommendedTotal > 0 && acceptRecommendations && (
-              <p>Expert recommendations: ${recommendedTotal.toFixed(2)}</p>
+            {acceptedPreventative.length > 0 && (
+              <p>Preventative ({acceptedPreventative.length}): ${calculateCategoryTotal(acceptedPreventative).toFixed(2)}</p>
             )}
-            {preventativeTotal > 0 && acceptPreventative && (
-              <p>Preventative care: ${preventativeTotal.toFixed(2)}</p>
+            {declinedTotal > 0 && (
+              <p className="text-amber-600">Declined: -${declinedTotal.toFixed(2)}</p>
             )}
            </div>
          </CardContent>
@@ -430,7 +523,7 @@ function generateConditionSummary(services: Service[]): string {
       {/* 8. Primary CTA - One Action */}
       <div className="space-y-4">
          <Button 
-           onClick={() => onApprove(acceptRecommendations, acceptPreventative)}
+           onClick={() => onApprove(declinedServices)}
            disabled={isProcessing}
           className="w-full h-14 text-lg font-medium"
            size="lg"
@@ -443,7 +536,10 @@ function generateConditionSummary(services: Service[]): string {
          </Button>
          
         <p className="text-xs text-center text-muted-foreground">
-          Approval authorizes the services outlined above and initiates payment.
+          {declinedServices.size > 0 
+            ? `Approval authorizes ${allServices.length - declinedServices.size} services with ${declinedServices.size} declined.`
+            : 'Approval authorizes all services outlined above and initiates payment.'
+          }
         </p>
         
          {onRequestClarification && (
@@ -458,8 +554,117 @@ function generateConditionSummary(services: Service[]): string {
            </Button>
          )}
        </div>
+
+      {/* Decline Confirmation Modal */}
+      <AlertDialog open={!!confirmDecline} onOpenChange={() => setConfirmDecline(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Decline Service
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                You are declining: <strong>{confirmDecline?.name}</strong>
+              </p>
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  {confirmDecline && getDeclineConsequence(confirmDecline.name, categorizeService(confirmDecline.name))}
+                </p>
+              </div>
+              <p className="text-sm">
+                This service will not be performed. You may restore it before final approval.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Service</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeclineService}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Decline Service
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
      </div>
    );
  };
+
+// Service Line Item Component
+interface ServiceLineItemProps {
+  service: Service;
+  category: ServiceCategory;
+  isDeclined: boolean;
+  onDecline: () => void;
+  onRestore: () => void;
+  isHighCost: boolean;
+}
+
+const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
+  service,
+  category,
+  isDeclined,
+  onDecline,
+  onRestore,
+  isHighCost,
+}) => {
+  const cost = service.quantity * service.unitPrice;
+  
+  if (isDeclined) {
+    return (
+      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 opacity-60">
+        <div className="flex items-center gap-2">
+          <X className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground line-through">{service.name}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-primary"
+          onClick={onRestore}
+        >
+          <Check className="h-3 w-3 mr-1" />
+          Restore
+        </Button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className={`py-2 px-3 rounded-lg border ${isHighCost ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20' : 'border-border bg-background'}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+            <span className="text-sm font-medium">{service.name}</span>
+            {isHighCost && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300">
+                Significant
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground ml-6">
+            ${cost.toFixed(2)}
+          </p>
+          {isHighCost && (
+            <p className="text-xs text-muted-foreground ml-6 mt-1 italic">
+              {getDeclineConsequence(service.name, category).split('.')[0]}.
+            </p>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-muted-foreground hover:text-destructive"
+          onClick={onDecline}
+        >
+          Decline
+        </Button>
+      </div>
+    </div>
+  );
+};
  
  export default ExpertInspectionReport;
