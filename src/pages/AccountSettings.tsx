@@ -19,6 +19,7 @@ import { useSignedUrl } from "@/hooks/useSignedUrl";
 import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
+import { validatePassword, PASSWORD_REQUIREMENTS } from "@/lib/passwordValidation";
 
 interface Profile {
   id: string;
@@ -49,6 +50,8 @@ const AccountSettings = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -238,10 +241,12 @@ const AccountSettings = () => {
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    const validation = validatePassword(passwordData.newPassword);
+    if (!validation.valid) {
+      setPasswordError(validation.error || "Invalid password");
       return;
     }
+    setPasswordError("");
 
     setChangingPassword(true);
     try {
@@ -423,7 +428,10 @@ const AccountSettings = () => {
                     name="newPassword"
                     type={showNewPassword ? "text" : "password"}
                     value={passwordData.newPassword}
-                    onChange={handlePasswordInputChange}
+                    onChange={(e) => {
+                      handlePasswordInputChange(e);
+                      if (passwordError) setPasswordError("");
+                    }}
                     placeholder="Enter new password"
                   />
                   <Button
@@ -440,17 +448,40 @@ const AccountSettings = () => {
                     )}
                   </Button>
                 </div>
+                <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  {PASSWORD_REQUIREMENTS.map((req) => (
+                    <li key={req}>• {req}</li>
+                  ))}
+                </ul>
+                {passwordError && (
+                  <p className="text-sm text-destructive">{passwordError}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={handlePasswordInputChange}
-                  placeholder="Confirm new password"
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmNewPassword ? "text" : "password"}
+                    value={passwordData.confirmPassword}
+                    onChange={handlePasswordInputChange}
+                    placeholder="Confirm new password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                  >
+                    {showConfirmNewPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
               </div>
               <Button
                 onClick={handlePasswordChange}

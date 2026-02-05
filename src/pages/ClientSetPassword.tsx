@@ -8,14 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
-import { z } from 'zod';
-
-// Enforce strong password requirements
-const passwordSchema = z.string()
-  .min(8, 'Password must be at least 8 characters')
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number');
+import { validatePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
 
 const ClientSetPassword = () => {
   const navigate = useNavigate();
@@ -30,15 +23,13 @@ const ClientSetPassword = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const validatePassword = (value: string) => {
-    try {
-      passwordSchema.parse(value);
+  const handlePasswordValidation = (value: string) => {
+    const result = validatePassword(value);
+    if (result.valid) {
       setError('');
       return true;
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        setError(e.errors[0].message);
-      }
+    } else {
+      setError(result.error || 'Invalid password');
       return false;
     }
   };
@@ -46,7 +37,7 @@ const ClientSetPassword = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validatePassword(password)) return;
+    if (!handlePasswordValidation(password)) return;
     
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -123,7 +114,7 @@ const ClientSetPassword = () => {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onBlur={() => validatePassword(password)}
+                    onBlur={() => handlePasswordValidation(password)}
                     className="pl-10 pr-10"
                     required
                   />
@@ -141,6 +132,11 @@ const ClientSetPassword = () => {
                     )}
                   </Button>
                 </div>
+                <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  {PASSWORD_REQUIREMENTS.map((req) => (
+                    <li key={req}>• {req}</li>
+                  ))}
+                </ul>
               </div>
 
               <div className="space-y-2">

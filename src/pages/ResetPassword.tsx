@@ -7,17 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { z } from 'zod';
+import { passwordSchema, PASSWORD_REQUIREMENTS } from '@/lib/passwordValidation';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
-
-const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+ import { z } from 'zod';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,9 +52,10 @@ const ResetPassword = () => {
 
     try {
       passwordSchema.parse(password);
+      setPasswordError('');
     } catch (err) {
       if (err instanceof z.ZodError) {
-        toast.error(err.errors[0].message);
+        setPasswordError(err.errors[0].message);
         return;
       }
     }
@@ -179,7 +181,10 @@ const ResetPassword = () => {
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (passwordError) setPasswordError('');
+                      }}
                       className="pl-10 pr-10"
                       required
                     />
@@ -197,6 +202,14 @@ const ResetPassword = () => {
                       )}
                     </Button>
                   </div>
+                  <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    {PASSWORD_REQUIREMENTS.map((req) => (
+                      <li key={req}>• {req}</li>
+                    ))}
+                  </ul>
+                  {passwordError && (
+                    <p className="text-sm text-destructive">{passwordError}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -205,13 +218,26 @@ const ResetPassword = () => {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="confirmPassword"
-                      type="password"
+                      type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                   </div>
                 </div>
 
