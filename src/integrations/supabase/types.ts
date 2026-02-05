@@ -700,6 +700,63 @@ export type Database = {
         }
         Relationships: []
       }
+      price_overrides: {
+        Row: {
+          adjusted_price: number
+          created_at: string
+          id: string
+          inspection_id: string | null
+          job_id: string | null
+          original_price: number
+          overridden_by: string
+          override_notes: string | null
+          override_reason: string
+          service_id: string
+          service_name: string
+        }
+        Insert: {
+          adjusted_price: number
+          created_at?: string
+          id?: string
+          inspection_id?: string | null
+          job_id?: string | null
+          original_price: number
+          overridden_by: string
+          override_notes?: string | null
+          override_reason: string
+          service_id: string
+          service_name: string
+        }
+        Update: {
+          adjusted_price?: number
+          created_at?: string
+          id?: string
+          inspection_id?: string | null
+          job_id?: string | null
+          original_price?: number
+          overridden_by?: string
+          override_notes?: string | null
+          override_reason?: string
+          service_id?: string
+          service_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_overrides_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_overrides_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bank_account_number: string | null

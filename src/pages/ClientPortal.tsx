@@ -21,6 +21,8 @@ interface ServiceItem {
   quantity: number;
   unitPrice: number;
   priority: 'high' | 'medium' | 'low';
+  adjustedTotal: number;
+  pricingFactors?: string[];
 }
 
 interface RugData {
@@ -242,6 +244,13 @@ const ClientPortal = () => {
         .filter(r => estimateMap.has(r.id))
         .map(r => {
           const estimate = estimateMap.get(r.id)!;
+          // Process services to ensure adjustedTotal is set
+          const rawServices = Array.isArray(estimate.services) ? estimate.services as ServiceItem[] : [];
+          const processedServices = rawServices.map(svc => ({
+            ...svc,
+            // Use adjustedTotal if provided, otherwise calculate from quantity * unitPrice
+            adjustedTotal: svc.adjustedTotal ?? (svc.quantity * svc.unitPrice),
+          }));
           return {
             id: r.id,
             rug_number: r.rug_number,
@@ -251,7 +260,7 @@ const ClientPortal = () => {
             photo_urls: r.photo_urls,
             analysis_report: r.analysis_report,
             estimate_id: estimate.id,
-            services: Array.isArray(estimate.services) ? estimate.services as ServiceItem[] : [],
+            services: processedServices,
             total: estimate.total_amount,
           };
         });

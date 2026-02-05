@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
- import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; 
  import { Button } from '@/components/ui/button';
  import { Separator } from '@/components/ui/separator';
  import { 
@@ -26,9 +26,9 @@ import {
  } from '@/lib/serviceCategories';
  import RugPhoto from '@/components/RugPhoto';
  
-// Check if service is high-cost (threshold: $100)
-function isHighCostService(service: Service): boolean {
-  return service.quantity * service.unitPrice >= 100;
+// Check if service is significant value (threshold: $100)
+function isSignificantValue(service: Service): boolean {
+  return service.adjustedTotal >= 100;
 }
  
  interface Service {
@@ -37,6 +37,8 @@ function isHighCostService(service: Service): boolean {
    quantity: number;
    unitPrice: number;
    priority?: string;
+  adjustedTotal: number; // Final price after risk/severity adjustments
+  pricingFactors?: string[]; // Internal tags (not shown to clients)
  }
  
  interface RugData {
@@ -81,8 +83,8 @@ function isHighCostService(service: Service): boolean {
  }
  
  // Calculate category totals
- function calculateCategoryTotal(services: Service[]): number {
-   return services.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+function calculateCategoryTotal(services: Service[], useAdjusted = true): number {
+  return services.reduce((sum, s) => sum + (useAdjusted ? s.adjustedTotal : s.quantity * s.unitPrice), 0);
  }
  
 // Generate condition summary based on services
@@ -126,7 +128,7 @@ function generateConditionSummary(services: Service[]): string {
    const allServices = rugs.flatMap(r => r.services);
    const allGrouped = groupServicesByCategory(allServices);
    
-   const requiredTotal = calculateCategoryTotal(allGrouped.required);
+  const requiredTotal = calculateCategoryTotal(allGrouped.required, true);
   
   // Calculate totals based on declined services
   const { finalTotal, declinedTotal, acceptedRecommended, acceptedHighCost, acceptedPreventative } = useMemo(() => {
@@ -137,7 +139,7 @@ function generateConditionSummary(services: Service[]): string {
     let prevAccepted: Service[] = [];
     
     allGrouped.recommended.forEach(s => {
-      const cost = s.quantity * s.unitPrice;
+      const cost = s.adjustedTotal;
       if (declinedServices.has(s.id)) {
         declined += cost;
       } else {
@@ -147,7 +149,7 @@ function generateConditionSummary(services: Service[]): string {
     });
     
     allGrouped.high_cost.forEach(s => {
-      const cost = s.quantity * s.unitPrice;
+      const cost = s.adjustedTotal;
       if (declinedServices.has(s.id)) {
         declined += cost;
       } else {
@@ -157,7 +159,7 @@ function generateConditionSummary(services: Service[]): string {
     });
     
     allGrouped.preventative.forEach(s => {
-      const cost = s.quantity * s.unitPrice;
+      const cost = s.adjustedTotal;
       if (declinedServices.has(s.id)) {
         declined += cost;
       } else {
@@ -416,7 +418,7 @@ function generateConditionSummary(services: Service[]): string {
                   isDeclined={declinedServices.has(service.id)}
                   onDecline={() => handleDeclineService(service)}
                   onRestore={() => restoreService(service.id)}
-                  isHighCost={isHighCostService(service)}
+                   isSignificant={isSignificantValue(service)}
                 />
               ))}
             </div>
@@ -447,7 +449,7 @@ function generateConditionSummary(services: Service[]): string {
                   isDeclined={declinedServices.has(service.id)}
                   onDecline={() => handleDeclineService(service)}
                   onRestore={() => restoreService(service.id)}
-                  isHighCost={true}
+                   isSignificant={true}
                 />
               ))}
             </div>
@@ -480,7 +482,7 @@ function generateConditionSummary(services: Service[]): string {
                   isDeclined={declinedServices.has(service.id)}
                   onDecline={() => handleDeclineService(service)}
                   onRestore={() => restoreService(service.id)}
-                  isHighCost={isHighCostService(service)}
+                   isSignificant={isSignificantValue(service)}
                 />
               ))}
             </div>
@@ -530,6 +532,13 @@ function generateConditionSummary(services: Service[]): string {
           corrected through cleaning alone. The services outlined represent our professional assessment 
           of appropriate care based on current condition. Authorization confirms understanding that 
           results depend on material condition at time of service.
+        </p>
+      </div>
+
+      {/* Pricing Context Statement */}
+      <div className="bg-muted/30 rounded-lg p-4 border border-dashed mb-4">
+        <p className="text-xs text-muted-foreground italic leading-relaxed">
+          Pricing reflects the material, condition, and recommended care identified during professional inspection.
         </p>
       </div>
 
@@ -728,7 +737,7 @@ interface ServiceLineItemProps {
   isDeclined: boolean;
   onDecline: () => void;
   onRestore: () => void;
-  isHighCost: boolean;
+  isSignificant: boolean;
 }
 
 const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
@@ -737,9 +746,9 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
   isDeclined,
   onDecline,
   onRestore,
-  isHighCost,
+  isSignificant,
 }) => {
-  const cost = service.quantity * service.unitPrice;
+  const cost = service.adjustedTotal;
   
   if (isDeclined) {
     return (
@@ -765,7 +774,7 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
     <div className={`py-2 px-3 rounded-lg border ${
       category === 'high_cost' 
         ? 'border-primary/40 bg-primary/5' 
-        : isHighCost 
+        : isSignificant 
           ? 'border-primary/20 bg-muted/30' 
           : 'border-border bg-background'
     }`}>
@@ -779,7 +788,7 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
                 Structural
               </span>
             )}
-            {category !== 'high_cost' && isHighCost && (
+            {category !== 'high_cost' && isSignificant && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 High Value
               </span>
@@ -788,7 +797,7 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
           <p className="text-xs text-muted-foreground ml-6">
             ${cost.toFixed(2)}
           </p>
-          {(category === 'high_cost' || isHighCost) && (
+          {(category === 'high_cost' || isSignificant) && (
             <p className="text-xs text-muted-foreground ml-6 mt-1 italic">
               {getServiceDeclineConsequence(service.name, category).split('.')[0]}.
             </p>
