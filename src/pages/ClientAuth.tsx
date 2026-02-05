@@ -44,6 +44,7 @@ const ClientAuth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [invalidToken, setInvalidToken] = useState(false);
   
   // Brute-force protection state
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
@@ -63,31 +64,37 @@ const ClientAuth = () => {
           .rpc('validate_access_token', { _token: accessToken })
           .single();
 
-        if (!tokenError && tokenData) {
-          if (tokenData.invited_email) {
-            setInvitedEmail(tokenData.invited_email);
-            setLoginEmail(tokenData.invited_email);
-            
-            // NEW: For invited clients, show password setup directly instead of login
-            // The user was already created by the invite-client edge function
-            setShowPasswordSetup(true);
-          }
+        if (tokenError || !tokenData) {
+          // Token is invalid or expired
+          setInvalidToken(true);
+          setCheckingInvite(false);
+          return;
+        }
 
-          // Get business name for display
-          if (tokenData.staff_user_id) {
-            const { data: brandingData } = await supabase
-              .from('profiles')
-              .select('business_name')
-              .eq('user_id', tokenData.staff_user_id)
-              .single();
-            
-            if (brandingData?.business_name) {
-              setBusinessName(brandingData.business_name);
-            }
+        if (tokenData.invited_email) {
+          setInvitedEmail(tokenData.invited_email);
+          setLoginEmail(tokenData.invited_email);
+          
+          // NEW: For invited clients, show password setup directly instead of login
+          // The user was already created by the invite-client edge function
+          setShowPasswordSetup(true);
+        }
+
+        // Get business name for display
+        if (tokenData.staff_user_id) {
+          const { data: brandingData } = await supabase
+            .from('profiles')
+            .select('business_name')
+            .eq('user_id', tokenData.staff_user_id)
+            .single();
+          
+          if (brandingData?.business_name) {
+            setBusinessName(brandingData.business_name);
           }
         }
       } catch (error) {
         console.error('Error checking invitation:', error);
+        setInvalidToken(true);
       } finally {
         setCheckingInvite(false);
       }
@@ -348,6 +355,62 @@ const ClientAuth = () => {
     );
   }
 
+  // Show invalid/expired token error screen
+  if (invalidToken && accessToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <img src={rugboostLogo} alt="Logo" className="h-16 w-16 mb-4" />
+            <h1 className="font-display text-2xl font-bold text-foreground">Access Link Issue</h1>
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <CardTitle>This access link is invalid or has expired</CardTitle>
+              <CardDescription>
+                The link you used is no longer valid. This can happen if:
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+                <li>The link has expired</li>
+                <li>The link was already used</li>
+                <li>The link was incorrectly copied</li>
+              </ul>
+              
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Please contact the business that sent you this link to request a new invitation.
+                </AlertDescription>
+              </Alert>
+
+              <div className="pt-4 border-t">
+                <p className="text-sm text-center text-muted-foreground mb-3">
+                  Already have an account?
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setInvalidToken(false);
+                    navigate('/client/auth');
+                  }}
+                >
+                  Sign in to existing account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   // Show password setup for new invited clients
   if (showPasswordSetup && invitedEmail && accessToken) {
     return (
@@ -416,7 +479,7 @@ const ClientAuth = () => {
                     <p className="text-sm text-destructive">{errors.newPassword}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Minimum 10 characters with uppercase, lowercase, and number
+                    Minimum 8 characters with uppercase, lowercase, and number
                   </p>
                 </div>
 

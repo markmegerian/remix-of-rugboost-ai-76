@@ -44,13 +44,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Ensure user has staff role and profile (for OAuth signups where triggers may not fire)
+  // Ensure user has profile (for OAuth signups where triggers may not fire)
+  // Only assign staff role if user has NO existing roles (true new internal user)
   const ensureUserSetup = async (userId: string, userEmail: string, fullName?: string) => {
     try {
-      // Ensure staff role exists
-      await supabase
+      // Check if user already has any roles
+      const { data: existingRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .upsert({ user_id: userId, role: 'staff' as AppRole }, { onConflict: 'user_id,role' });
+        .select('role')
+        .eq('user_id', userId);
+
+      // Only assign staff role if user has ZERO roles (true new internal user)
+      // This prevents clients from being auto-assigned staff role
+      if (!rolesError && (!existingRoles || existingRoles.length === 0)) {
+        await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: 'staff' as AppRole });
+      }
 
       // Ensure profile exists
       const { data: existingProfile } = await supabase
