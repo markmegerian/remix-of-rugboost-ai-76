@@ -21,9 +21,15 @@ import {
  import { 
    SERVICE_CATEGORIES, 
    categorizeService, 
-   type ServiceCategory 
+  type ServiceCategory,
+  getServiceDeclineConsequence
  } from '@/lib/serviceCategories';
  import RugPhoto from '@/components/RugPhoto';
+ 
+// Check if service is high-cost (threshold: $100)
+function isHighCostService(service: Service): boolean {
+  return service.quantity * service.unitPrice >= 100;
+}
  
  interface Service {
    id: string;
@@ -62,6 +68,7 @@ import {
    const grouped: Record<ServiceCategory, Service[]> = {
      required: [],
      recommended: [],
+    high_cost: [],
      preventative: []
    };
    
@@ -98,44 +105,6 @@ function generateConditionSummary(services: Service[]): string {
   return `Assessment indicates ${conditions.join(', ')}. Services outlined below address identified conditions.`;
 }
 
-// Get consequence text for declining a service
-function getDeclineConsequence(serviceName: string, category: ServiceCategory): string {
-  const name = serviceName.toLowerCase();
-  
-  if (category === 'recommended') {
-    if (name.includes('stain')) {
-      return 'Existing stains may become permanently set over time if not addressed during this service.';
-    }
-    if (name.includes('odor') || name.includes('urine')) {
-      return 'Odor contamination may persist and could attract pets to re-soil the area.';
-    }
-    if (name.includes('repair') || name.includes('binding') || name.includes('fringe')) {
-      return 'Structural damage may worsen during cleaning and normal use if not stabilized.';
-    }
-    if (name.includes('moth') || name.includes('pest')) {
-      return 'Untreated pest damage may continue to spread to undamaged areas.';
-    }
-    return 'Deferring this service may result in suboptimal cleaning results or accelerated wear.';
-  }
-  
-  if (category === 'preventative') {
-    if (name.includes('protection') || name.includes('scotchgard')) {
-      return 'Fibers will remain more vulnerable to future staining and soiling.';
-    }
-    if (name.includes('pad')) {
-      return 'Rug may experience increased friction and accelerated wear on the backing.';
-    }
-    return 'Preventative treatments help extend the interval between professional cleanings.';
-  }
-  
-  return 'This service addresses conditions identified during inspection.';
-}
-
-// Check if service is high-cost (threshold: $100)
-function isHighCostService(service: Service): boolean {
-  return service.quantity * service.unitPrice >= 100;
-}
-
  const ExpertInspectionReport: React.FC<ExpertInspectionReportProps> = ({
    rugs,
    clientName,
@@ -158,10 +127,11 @@ function isHighCostService(service: Service): boolean {
    const requiredTotal = calculateCategoryTotal(allGrouped.required);
   
   // Calculate totals based on declined services
-  const { finalTotal, declinedTotal, acceptedRecommended, acceptedPreventative } = useMemo(() => {
+  const { finalTotal, declinedTotal, acceptedRecommended, acceptedHighCost, acceptedPreventative } = useMemo(() => {
     let accepted = requiredTotal;
     let declined = 0;
     let recAccepted: Service[] = [];
+    let highCostAccepted: Service[] = [];
     let prevAccepted: Service[] = [];
     
     allGrouped.recommended.forEach(s => {
@@ -171,6 +141,16 @@ function isHighCostService(service: Service): boolean {
       } else {
         accepted += cost;
         recAccepted.push(s);
+      }
+    });
+    
+    allGrouped.high_cost.forEach(s => {
+      const cost = s.quantity * s.unitPrice;
+      if (declinedServices.has(s.id)) {
+        declined += cost;
+      } else {
+        accepted += cost;
+        highCostAccepted.push(s);
       }
     });
     
@@ -188,6 +168,7 @@ function isHighCostService(service: Service): boolean {
       finalTotal: accepted,
       declinedTotal: declined,
       acceptedRecommended: recAccepted,
+      acceptedHighCost: highCostAccepted,
       acceptedPreventative: prevAccepted,
     };
   }, [requiredTotal, allGrouped, declinedServices]);
@@ -419,13 +400,47 @@ function isHighCostService(service: Service): boolean {
         </Card>
       )}
 
-      {/* 5. Preventative / Longevity Services - Soft Visual, Individually Declinable */}
+      {/* 5. Structural / High-Impact Services - Stronger Disclaimers */}
+      {allGrouped.high_cost.length > 0 && (
+        <Card className="border-2 border-primary/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Structural / High-Impact Services</CardTitle>
+            </div>
+            <CardDescription className="text-xs mt-1">
+              Significant restoration work addressing structural integrity or severe condition issues. 
+              Each service requires explicit confirmation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {allGrouped.high_cost.map((service, idx) => (
+                <ServiceLineItem
+                  key={service.id || idx}
+                  service={service}
+                  category="high_cost"
+                  isDeclined={declinedServices.has(service.id)}
+                  onDecline={() => handleDeclineService(service)}
+                  onRestore={() => restoreService(service.id)}
+                  isHighCost={true}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-4 pt-3 border-t border-dashed">
+              <strong>Note:</strong> Declining structural services may affect long-term rug integrity and value.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 6. Preventative / Longevity Services - Soft Visual, Individually Declinable */}
       {allGrouped.preventative.length > 0 && (
-        <Card className="border-dashed opacity-90">
+        <Card className="border-dashed">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base text-muted-foreground">Preventative Care</CardTitle>
+              <CardTitle className="text-base">Preventative Care</CardTitle>
             </div>
             <CardDescription className="text-xs mt-1">
               Optional treatments to extend rug longevity. Included in your assessment.
@@ -451,16 +466,16 @@ function isHighCostService(service: Service): boolean {
 
       {/* Declined Services Summary */}
       {declinedServices.size > 0 && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+        <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <CardTitle className="text-sm text-amber-700">Declined Services</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm text-destructive">Declined Services</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {[...allGrouped.recommended, ...allGrouped.preventative]
+              {[...allGrouped.recommended, ...allGrouped.high_cost, ...allGrouped.preventative]
                 .filter(s => declinedServices.has(s.id))
                 .map((service) => (
                   <div key={service.id} className="flex items-center justify-between text-sm">
@@ -476,7 +491,7 @@ function isHighCostService(service: Service): boolean {
                   </div>
                 ))}
             </div>
-            <p className="text-xs text-amber-700 mt-3">
+            <p className="text-xs text-destructive/80 mt-3">
               These services will not be performed. Associated risks have been acknowledged.
             </p>
           </CardContent>
@@ -510,11 +525,14 @@ function isHighCostService(service: Service): boolean {
             {acceptedRecommended.length > 0 && (
               <p>Recommended ({acceptedRecommended.length}): ${calculateCategoryTotal(acceptedRecommended).toFixed(2)}</p>
             )}
+            {acceptedHighCost.length > 0 && (
+              <p>Structural ({acceptedHighCost.length}): ${calculateCategoryTotal(acceptedHighCost).toFixed(2)}</p>
+            )}
             {acceptedPreventative.length > 0 && (
               <p>Preventative ({acceptedPreventative.length}): ${calculateCategoryTotal(acceptedPreventative).toFixed(2)}</p>
             )}
             {declinedTotal > 0 && (
-              <p className="text-amber-600">Declined: -${declinedTotal.toFixed(2)}</p>
+              <p className="text-destructive">Declined: -${declinedTotal.toFixed(2)}</p>
             )}
            </div>
          </CardContent>
@@ -560,16 +578,16 @@ function isHighCostService(service: Service): boolean {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               Decline Service
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
                 You are declining: <strong>{confirmDecline?.name}</strong>
               </p>
-              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  {confirmDecline && getDeclineConsequence(confirmDecline.name, categorizeService(confirmDecline.name))}
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                <p className="text-sm text-destructive">
+                  {confirmDecline && getServiceDeclineConsequence(confirmDecline.name, categorizeService(confirmDecline.name))}
                 </p>
               </div>
               <p className="text-sm">
@@ -581,7 +599,7 @@ function isHighCostService(service: Service): boolean {
             <AlertDialogCancel>Keep Service</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmDeclineService}
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               Decline Service
             </AlertDialogAction>
@@ -633,24 +651,35 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
   }
   
   return (
-    <div className={`py-2 px-3 rounded-lg border ${isHighCost ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20' : 'border-border bg-background'}`}>
+    <div className={`py-2 px-3 rounded-lg border ${
+      category === 'high_cost' 
+        ? 'border-primary/40 bg-primary/5' 
+        : isHighCost 
+          ? 'border-primary/20 bg-muted/30' 
+          : 'border-border bg-background'
+    }`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+            <Check className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="text-sm font-medium">{service.name}</span>
-            {isHighCost && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300">
-                Significant
+            {category === 'high_cost' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
+                Structural
+              </span>
+            )}
+            {category !== 'high_cost' && isHighCost && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                High Value
               </span>
             )}
           </div>
           <p className="text-xs text-muted-foreground ml-6">
             ${cost.toFixed(2)}
           </p>
-          {isHighCost && (
+          {(category === 'high_cost' || isHighCost) && (
             <p className="text-xs text-muted-foreground ml-6 mt-1 italic">
-              {getDeclineConsequence(service.name, category).split('.')[0]}.
+              {getServiceDeclineConsequence(service.name, category).split('.')[0]}.
             </p>
           )}
         </div>

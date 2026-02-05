@@ -51,6 +51,7 @@
    const grouped: Record<ServiceCategory, Service[]> = {
      required: [],
      recommended: [],
+    high_cost: [],
      preventative: []
    };
    
