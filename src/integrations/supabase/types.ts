@@ -289,6 +289,79 @@ export type Database = {
           },
         ]
       }
+      declined_services: {
+        Row: {
+          acknowledged_at: string
+          acknowledged_by_client_id: string | null
+          created_at: string
+          decline_consequence: string | null
+          declined_amount: number
+          id: string
+          inspection_id: string
+          job_id: string
+          quantity: number
+          restored_at: string | null
+          service_category: string
+          service_id: string
+          service_name: string
+          unit_price: number
+        }
+        Insert: {
+          acknowledged_at?: string
+          acknowledged_by_client_id?: string | null
+          created_at?: string
+          decline_consequence?: string | null
+          declined_amount?: number
+          id?: string
+          inspection_id: string
+          job_id: string
+          quantity?: number
+          restored_at?: string | null
+          service_category: string
+          service_id: string
+          service_name: string
+          unit_price?: number
+        }
+        Update: {
+          acknowledged_at?: string
+          acknowledged_by_client_id?: string | null
+          created_at?: string
+          decline_consequence?: string | null
+          declined_amount?: number
+          id?: string
+          inspection_id?: string
+          job_id?: string
+          quantity?: number
+          restored_at?: string | null
+          service_category?: string
+          service_id?: string
+          service_name?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "declined_services_acknowledged_by_client_id_fkey"
+            columns: ["acknowledged_by_client_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "declined_services_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "declined_services_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_templates: {
         Row: {
           body: string
@@ -325,6 +398,7 @@ export type Database = {
           client_email: string | null
           client_name: string | null
           client_phone: string | null
+          condition_flags: Json | null
           created_at: string
           estimate_approved: boolean | null
           id: string
@@ -335,6 +409,7 @@ export type Database = {
           photo_urls: string[] | null
           rug_number: string
           rug_type: string
+          system_services: Json | null
           user_id: string | null
           width: number | null
         }
@@ -343,6 +418,7 @@ export type Database = {
           client_email?: string | null
           client_name?: string | null
           client_phone?: string | null
+          condition_flags?: Json | null
           created_at?: string
           estimate_approved?: boolean | null
           id?: string
@@ -353,6 +429,7 @@ export type Database = {
           photo_urls?: string[] | null
           rug_number: string
           rug_type: string
+          system_services?: Json | null
           user_id?: string | null
           width?: number | null
         }
@@ -361,6 +438,7 @@ export type Database = {
           client_email?: string | null
           client_name?: string | null
           client_phone?: string | null
+          condition_flags?: Json | null
           created_at?: string
           estimate_approved?: boolean | null
           id?: string
@@ -371,6 +449,7 @@ export type Database = {
           photo_urls?: string[] | null
           rug_number?: string
           rug_type?: string
+          system_services?: Json | null
           user_id?: string | null
           width?: number | null
         }

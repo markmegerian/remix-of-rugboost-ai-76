@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import ExpertInspectionReport from '@/components/ExpertInspectionReport';
 import { categorizeService } from '@/lib/serviceCategories';
+import { getServiceDeclineConsequence } from '@/lib/serviceCategories';
 
 interface ServiceItem {
   id: string;
@@ -333,6 +334,42 @@ const ClientPortal = () => {
               approved_estimate_id: rugSelection.estimateId,
               selected_services: rugSelection.services as unknown as any,
               total_selected: selectionTotal,
+            });
+        }
+      }
+
+      // Log declined services for audit trail
+      if (declinedServiceIds.size > 0) {
+        const allServices = rugs.flatMap(rug => 
+          rug.services.map(s => ({ ...s, rugId: rug.id }))
+        );
+        
+        const declinedServicesToLog = allServices.filter(s => declinedServiceIds.has(s.id));
+        
+        for (const service of declinedServicesToLog) {
+          const category = categorizeService(service.name);
+          const consequence = getServiceDeclineConsequence(service.name, category);
+          
+          // Find the inspection_id for this rug
+          const rug = rugs.find(r => r.services.some(s => s.id === service.id));
+          if (!rug) continue;
+          
+          await supabase
+            .from('declined_services')
+            .upsert({
+              job_id: job?.id,
+              inspection_id: rug.id,
+              service_id: service.id,
+              service_name: service.name,
+              service_category: category,
+              unit_price: service.unitPrice,
+              quantity: service.quantity,
+              declined_amount: service.unitPrice * service.quantity,
+              decline_consequence: consequence,
+              acknowledged_at: new Date().toISOString(),
+            }, {
+              onConflict: 'job_id,service_id',
+              ignoreDuplicates: false,
             });
         }
       }
