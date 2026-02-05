@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,9 +32,23 @@ type CompanyFormValues = z.infer<typeof companySchema>;
 
 const CompanySetup: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { refetchCompany } = useCompany();
+  const { user, loading: authLoading } = useAuth();
+  const { refetchCompany, hasCompany, loading: companyLoading } = useCompany();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  // Redirect if already has a company
+  useEffect(() => {
+    if (!companyLoading && hasCompany) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [hasCompany, companyLoading, navigate]);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -44,6 +58,20 @@ const CompanySetup: React.FC = () => {
       businessPhone: '',
     },
   });
+
+  // Show loading while checking auth
+  if (authLoading || companyLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Don't render form if not authenticated
+  if (!user) {
+    return null;
+  }
 
   const generateSlug = (name: string): string => {
     return name
