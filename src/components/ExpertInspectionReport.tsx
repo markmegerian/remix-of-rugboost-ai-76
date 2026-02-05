@@ -5,7 +5,7 @@ import React, { useState, useMemo, useCallback } from 'react';
  import { 
   ChevronDown, ChevronUp, 
   FileText, ImageIcon, Lock, MessageSquare, Shield, ClipboardCheck,
-  AlertTriangle, X, Check
+  AlertTriangle, X, Check, ZoomIn, ChevronLeft, ChevronRight
  } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -119,6 +119,8 @@ function generateConditionSummary(services: Service[]): string {
    const [showReport, setShowReport] = useState<string | null>(null);
   const [declinedServices, setDeclinedServices] = useState<Set<string>>(new Set());
   const [confirmDecline, setConfirmDecline] = useState<Service | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<string[] | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
    
    // Aggregate services across all rugs
    const allServices = rugs.flatMap(r => r.services);
@@ -192,6 +194,16 @@ function generateConditionSummary(services: Service[]): string {
     });
   }, []);
    
+  const openLightbox = (photos: string[], index: number) => {
+    setLightboxImages(photos);
+    setLightboxIndex(index);
+  };
+  
+  const closeLightbox = () => {
+    setLightboxImages(null);
+    setLightboxIndex(0);
+  };
+  
    const toggleRug = (rugId: string) => {
      setExpandedRugs(prev => {
        const newSet = new Set(prev);
@@ -294,21 +306,33 @@ function generateConditionSummary(services: Service[]): string {
 
                    {/* Photos */}
                    {rug.photo_urls && rug.photo_urls.length > 0 && (
-                     <div className="flex gap-2 overflow-x-auto pb-2">
-                       {rug.photo_urls.slice(0, 4).map((url, idx) => (
-                         <RugPhoto
-                           key={idx}
-                           filePath={url}
-                           alt={`${rug.rug_number} photo ${idx + 1}`}
-                           className="w-20 h-20 object-cover rounded-lg border flex-shrink-0"
-                           loadingClassName="w-20 h-20"
-                         />
-                       ))}
-                       {rug.photo_urls.length > 4 && (
-                         <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center text-sm text-muted-foreground flex-shrink-0">
-                           +{rug.photo_urls.length - 4}
+                     <div className="space-y-2">
+                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                         <ImageIcon className="h-3 w-3" />
+                         <span>{rug.photo_urls.length} inspection photo{rug.photo_urls.length !== 1 ? 's' : ''}</span>
+                       </div>
+                       <div className="flex gap-2 overflow-x-auto pb-2">
+                         {rug.photo_urls.map((url, idx) => (
+                           <button
+                             key={idx}
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               openLightbox(rug.photo_urls!, idx);
+                             }}
+                             className="relative group flex-shrink-0"
+                           >
+                             <RugPhoto
+                               filePath={url}
+                               alt={`${rug.rug_number} photo ${idx + 1}`}
+                               className="w-20 h-20 object-cover rounded-lg border transition-opacity group-hover:opacity-80"
+                               loadingClassName="w-20 h-20"
+                             />
+                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                               <ZoomIn className="h-5 w-5 text-white drop-shadow-lg" />
+                             </div>
+                           </button>
+                         ))}
                          </div>
-                       )}
                      </div>
                    )}
                    
@@ -606,6 +630,93 @@ function generateConditionSummary(services: Service[]): string {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo Lightbox */}
+      {lightboxImages && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          {/* Close button */}
+          <button 
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            onClick={closeLightbox}
+          >
+            <X className="h-6 w-6" />
+          </button>
+          
+          {/* Photo counter */}
+          <div className="absolute top-4 left-4 text-white/80 text-sm">
+            {lightboxIndex + 1} / {lightboxImages.length}
+          </div>
+          
+          {/* Navigation - Previous */}
+          {lightboxImages.length > 1 && (
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length);
+              }}
+            >
+              <ChevronLeft className="h-8 w-8" />
+            </button>
+          )}
+          
+          {/* Main Image */}
+          <div 
+            className="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <RugPhoto
+              filePath={lightboxImages[lightboxIndex]}
+              alt={`Photo ${lightboxIndex + 1}`}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+              loadingClassName="w-64 h-64"
+            />
+          </div>
+          
+          {/* Navigation - Next */}
+          {lightboxImages.length > 1 && (
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxIndex((prev) => (prev + 1) % lightboxImages.length);
+              }}
+            >
+              <ChevronRight className="h-8 w-8" />
+            </button>
+          )}
+          
+          {/* Thumbnail strip */}
+          {lightboxImages.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 max-w-[90vw] overflow-x-auto p-2">
+              {lightboxImages.map((url, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxIndex(idx);
+                  }}
+                  className={`flex-shrink-0 rounded border-2 transition-all ${
+                    idx === lightboxIndex 
+                      ? 'border-white opacity-100' 
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <RugPhoto
+                    filePath={url}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-12 h-12 object-cover rounded"
+                    loadingClassName="w-12 h-12"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
      </div>
    );
  };
