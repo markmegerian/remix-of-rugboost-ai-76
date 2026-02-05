@@ -1,34 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Loader2, CheckCircle, Image, FileText, DollarSign, 
-  ChevronDown, ChevronUp, Check, X, CreditCard, LogOut, History, Lock
+  Loader2, X, LogOut, History, Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
-import RugPhoto from '@/components/RugPhoto';
-
-// Helper to check if a service is a mandatory cleaning service
-const isCleaningService = (serviceName: string): boolean => {
-  const lowerName = serviceName.toLowerCase();
-  return lowerName.includes('cleaning') || 
-         lowerName.includes('wash') || 
-         lowerName.includes('clean');
-};
+import ExpertInspectionReport from '@/components/ExpertInspectionReport';
 
 interface ServiceItem {
   id: string;
@@ -73,8 +55,6 @@ const ClientPortal = () => {
   const [job, setJob] = useState<JobData | null>(null);
   const [rugs, setRugs] = useState<RugData[]>([]);
   const [branding, setBranding] = useState<BusinessBranding | null>(null);
-  const [selectedServices, setSelectedServices] = useState<Map<string, Set<string>>>(new Map());
-  const [expandedRugs, setExpandedRugs] = useState<Set<string>>(new Set());
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
   const [clientJobAccessId, setClientJobAccessId] = useState<string | null>(null);
@@ -272,17 +252,6 @@ const ClientPortal = () => {
         });
 
       setRugs(processedRugs);
-
-      // Initialize all services as selected by default
-      const initialSelections = new Map<string, Set<string>>();
-      processedRugs.forEach(rug => {
-        const serviceIds = new Set(rug.services.map(s => s.id));
-        initialSelections.set(rug.id, serviceIds);
-      });
-      setSelectedServices(initialSelections);
-
-      // Expand all rugs by default
-      setExpandedRugs(new Set(processedRugs.map(r => r.id)));
     } catch (error) {
       console.error('Error loading portal data:', error);
       toast.error('Failed to load portal data');
@@ -291,81 +260,15 @@ const ClientPortal = () => {
     }
   };
 
-  const toggleService = (rugId: string, serviceId: string) => {
-    // Find the service to check if it's mandatory
-    const rug = rugs.find(r => r.id === rugId);
-    const service = rug?.services.find(s => s.id === serviceId);
-    
-    // Prevent toggling off cleaning services (mandatory)
-    if (service && isCleaningService(service.name)) {
-      return; // Don't allow toggling cleaning services
-    }
-
-    setSelectedServices(prev => {
-      const newMap = new Map(prev);
-      const rugServices = new Set(newMap.get(rugId) || []);
-      
-      if (rugServices.has(serviceId)) {
-        rugServices.delete(serviceId);
-      } else {
-        rugServices.add(serviceId);
-      }
-      
-      newMap.set(rugId, rugServices);
-      return newMap;
-    });
-  };
-
-  const toggleAllServices = (rugId: string, selectAll: boolean) => {
-    const rug = rugs.find(r => r.id === rugId);
-    if (!rug) return;
-
-    setSelectedServices(prev => {
-      const newMap = new Map(prev);
-      if (selectAll) {
-        newMap.set(rugId, new Set(rug.services.map(s => s.id)));
-      } else {
-        // When clearing all, keep mandatory cleaning services selected
-        const mandatoryServiceIds = rug.services
-          .filter(s => isCleaningService(s.name))
-          .map(s => s.id);
-        newMap.set(rugId, new Set(mandatoryServiceIds));
-      }
-      return newMap;
-    });
-  };
-
-  const calculateSelectedTotal = () => {
-    let total = 0;
-    rugs.forEach(rug => {
-      const selectedIds = selectedServices.get(rug.id) || new Set();
-      rug.services.forEach(service => {
-        if (selectedIds.has(service.id)) {
-          total += service.quantity * service.unitPrice;
-        }
-      });
-    });
-    return total;
-  };
-
-  const getSelectedServicesCount = () => {
-    let count = 0;
-    selectedServices.forEach(services => {
-      count += services.size;
-    });
-    return count;
+  // Calculate total - all services are included (expert decides, not client)
+  const calculateTotal = () => {
+    return rugs.reduce((sum, rug) => sum + rug.total, 0);
   };
 
   const handleProceedToPayment = async () => {
-    const selectedCount = getSelectedServicesCount();
-    if (selectedCount === 0) {
-      toast.error('Please select at least one service');
-      return;
-    }
-
     setIsProcessingPayment(true);
     try {
-      // Prepare selected services data per rug with estimate ID
+      // All services are included - no client selection
       const servicesForCheckout: { 
         rugNumber: string; 
         rugId: string;
@@ -374,19 +277,17 @@ const ClientPortal = () => {
       }[] = [];
       
       rugs.forEach(rug => {
-        const selectedIds = selectedServices.get(rug.id) || new Set();
-        const rugSelectedServices = rug.services.filter(s => selectedIds.has(s.id));
-        if (rugSelectedServices.length > 0) {
+        if (rug.services.length > 0) {
           servicesForCheckout.push({
             rugNumber: rug.rug_number,
             rugId: rug.id,
             estimateId: rug.estimate_id,
-            services: rugSelectedServices,
+            services: rug.services,
           });
         }
       });
 
-      const total = calculateSelectedTotal();
+      const total = calculateTotal();
 
       // Save client service selections to database before checkout
       for (const rugSelection of servicesForCheckout) {
