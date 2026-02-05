@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Eye, Plus, LogOut, ChevronRight, PlayCircle, Clock, CheckCircle, Settings, Users, Moon, Sun, DollarSign, TrendingUp } from 'lucide-react';
+import { Briefcase, Eye, Plus, LogOut, ChevronRight, PlayCircle, Clock, CheckCircle, Settings, Users, DollarSign, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,7 +14,6 @@ import NotificationBell from '@/components/NotificationBell';
 import { DashboardSkeleton, DashboardJobTableSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import MobileNav from '@/components/MobileNav';
 import JobsFilter, { JobFilters } from '@/components/JobsFilter';
-import { useTheme } from 'next-themes';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -70,7 +69,6 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { isAdmin } = useAdminAuth();
-  const { theme, setTheme } = useTheme();
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS);
   
   const { 
@@ -120,15 +118,6 @@ const Dashboard = () => {
               </Button>
             )}
             <NotificationBell />
-            <Button 
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
-              variant="ghost" 
-              size="icon" 
-              className="hidden sm:flex"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
             <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden sm:flex">
               <Settings className="h-4 w-4" />
             </Button>
