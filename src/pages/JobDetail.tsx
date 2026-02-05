@@ -46,6 +46,7 @@ import JobBreadcrumb from '@/components/JobBreadcrumb';
 import MobileJobActionBar from '@/components/MobileJobActionBar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import EditClientInfoDialog from '@/components/EditClientInfoDialog';
+import ExpertEstimateCard from '@/components/ExpertEstimateCard';
 
 interface ClientPortalStatusData {
   accessToken: string;
@@ -104,24 +105,8 @@ interface Payment {
   metadata: any;
 }
 
-// Service groupings for Expert Estimate display
-const SERVICE_GROUPS = {
-  essential: {
-    label: 'Essential Services',
-    description: 'Core cleaning and repair work necessary for rug health and longevity.',
-    keywords: ['cleaning', 'wash', 'stain', 'repair', 'reweaving', 'hole', 'tear', 'foundation', 'dry rot', 'soaking']
-  },
-  protective: {
-    label: 'Protective Services', 
-    description: 'Structural maintenance to preserve edges and prevent future damage.',
-    keywords: ['binding', 'overcast', 'fringe', 'edge', 'selvedge', 'blocking', 'stretching', 'shearing', 'zenjireh']
-  },
-  optional: {
-    label: 'Optional Restoration',
-    description: 'Additional treatments for enhanced protection and appearance.',
-    keywords: ['protection', 'moth', 'padding', 'fiber protect', 'scotchgard', 'storage']
-  }
-};
+// Import service categories from centralized module
+import { SERVICE_CATEGORIES, categorizeService } from '@/lib/serviceCategories';
 
 // Legacy status options (for backwards compatibility with existing Select)
 const STATUS_OPTIONS = [
@@ -1390,114 +1375,48 @@ const JobDetail = () => {
 
         {/* Section D: Expert Estimate - Mobile optimized */}
         {approvedEstimates.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2 md:pb-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                    Expert Estimate
-                  </CardTitle>
-                  <CardDescription className="text-xs md:text-sm">
-                    Professional assessment
-                  </CardDescription>
-                </div>
-                <div className="flex items-center justify-between sm:justify-end sm:text-right gap-4">
-                  <div>
-                    <p className="text-xl md:text-2xl font-bold text-primary">
-                      ${approvedEstimates.reduce((sum, ae) => sum + ae.total_amount, 0).toFixed(2)}
-                    </p>
-                    <p className="text-[10px] md:text-xs text-muted-foreground">
-                      {approvedEstimates.length} rug{approvedEstimates.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 md:space-y-4 pt-0">
-              {approvedEstimates.map((ae) => {
-                const rug = rugs.find(r => r.id === ae.inspection_id);
-                // Group services by category
-                const groupedServices = {
-                  essential: ae.services.filter((s: any) => 
-                    SERVICE_GROUPS.essential.keywords.some(k => s.name.toLowerCase().includes(k))
-                  ),
-                  protective: ae.services.filter((s: any) => 
-                    SERVICE_GROUPS.protective.keywords.some(k => s.name.toLowerCase().includes(k))
-                  ),
-                  optional: ae.services.filter((s: any) => 
-                    SERVICE_GROUPS.optional.keywords.some(k => s.name.toLowerCase().includes(k)) ||
-                    !SERVICE_GROUPS.essential.keywords.some(k => s.name.toLowerCase().includes(k)) &&
-                    !SERVICE_GROUPS.protective.keywords.some(k => s.name.toLowerCase().includes(k))
-                  ),
-                };
-                
-                return (
-                  <div key={ae.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="font-medium">{rug?.rug_number || 'Unknown Rug'}</p>
-                        <p className="text-sm text-muted-foreground">{rug?.rug_type} • {rug?.length && rug?.width ? `${rug.length}' × ${rug.width}'` : 'N/A'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">${ae.total_amount.toFixed(2)}</p>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs h-6 px-2"
-                          onClick={() => {
-                            setSelectedRug(rug || null);
-                            setShowEstimateReview(true);
-                          }}
-                        >
-                          <Edit2 className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Grouped services */}
-                    {Object.entries(groupedServices).map(([groupKey, services]) => {
-                      if (services.length === 0) return null;
-                      const group = SERVICE_GROUPS[groupKey as keyof typeof SERVICE_GROUPS];
-                      return (
-                        <div key={groupKey} className="mb-3 last:mb-0">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">{group.label}</p>
-                          <p className="text-[10px] text-muted-foreground/70 mb-2">{group.description}</p>
-                          <div className="space-y-1">
-                            {services.map((service: any, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between text-sm">
-                                <span>{service.name}</span>
-                                <span className="font-medium">${(service.quantity * service.unitPrice).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-              
-              {/* Actions */}
-              <div className="flex items-center gap-2 pt-2">
-                {rugs.some(r => r.analysis_report) && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={handleDownloadJobPDF} className="gap-1">
-                      <FileText className="h-4 w-4" />
-                      Download Report
-                    </Button>
-                    {job.client_email && (
-                      <Button variant="outline" size="sm" onClick={handleOpenEmailPreview} disabled={sendingEmail} className="gap-1">
-                        <Mail className="h-4 w-4" />
-                        Email Report
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <ExpertEstimateCard
+            estimates={approvedEstimates}
+            rugs={rugs.map(r => ({
+              id: r.id,
+              rug_number: r.rug_number,
+              rug_type: r.rug_type,
+              length: r.length,
+              width: r.width
+            }))}
+            onViewDetails={(rugId) => {
+              const rug = rugs.find(r => r.id === rugId);
+              if (rug) {
+                setSelectedRug(rug);
+                setShowReport(true);
+              }
+            }}
+            onEditEstimate={(rugId) => {
+              const rug = rugs.find(r => r.id === rugId);
+              if (rug) {
+                setSelectedRug(rug);
+                setShowEstimateReview(true);
+              }
+            }}
+            showEditButton={adminOverride}
+            isAdminOverride={adminOverride}
+          />
+        )}
+
+        {/* Download/Email Actions for Estimates */}
+        {approvedEstimates.length > 0 && rugs.some(r => r.analysis_report) && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadJobPDF} className="gap-1">
+              <FileText className="h-4 w-4" />
+              Download Full Report
+            </Button>
+            {job.client_email && (
+              <Button variant="outline" size="sm" onClick={handleOpenEmailPreview} disabled={sendingEmail} className="gap-1">
+                <Mail className="h-4 w-4" />
+                Email Report
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Section E: Client Approval & Payment */}
@@ -1528,9 +1447,9 @@ const JobDetail = () => {
                 <div className="flex items-center gap-3">
                   <AlertCircle className="h-5 w-5 text-amber-500" />
                   <div>
-                    <p className="font-medium">Ready to send to client</p>
+                    <p className="font-medium">Ready to send Expert Inspection Report</p>
                     <p className="text-sm text-muted-foreground">
-                      Generate a portal link to let the client review and approve services
+                      Client will receive the expert assessment for approval and payment
                     </p>
                   </div>
                 </div>
@@ -1549,7 +1468,7 @@ const JobDetail = () => {
                   ) : (
                     <>
                       <Link className="h-4 w-4" />
-                      Generate Client Link
+                      Send to Client
                     </>
                   )}
                 </StatusGatedButton>
@@ -1558,9 +1477,9 @@ const JobDetail = () => {
               <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
                 <AlertCircle className="h-5 w-5 text-amber-500" />
                 <div>
-                  <p className="font-medium">Approve estimates first</p>
+                  <p className="font-medium">Confirm expert assessment first</p>
                   <p className="text-sm text-muted-foreground">
-                    Review and approve the estimate for each analyzed rug before sending to the client
+                    Review and confirm the expert assessment for each rug before sending to client
                   </p>
                 </div>
               </div>

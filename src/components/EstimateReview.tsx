@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2, Lightbulb, Lock, AlertTriangle, Shield, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import TeachAIDialog from './TeachAIDialog';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import UnsavedChangesDialog from './UnsavedChangesDialog';
+import { categorizeService, SERVICE_CATEGORIES, canStaffEditService, type ServiceCategory } from '@/lib/serviceCategories';
 import {
   Select,
   SelectContent,
@@ -70,6 +72,8 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showTeachAI, setShowTeachAI] = useState(false);
+  const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+  const [isAdminOverride, setIsAdminOverride] = useState(false);
   const [pendingFeedback, setPendingFeedback] = useState<{
     originalService: string;
     originalPrice: number;
@@ -312,6 +316,15 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   };
 
   const handleRemoveService = (id: string) => {
+    // Check if this is a required service
+    const service = services.find(s => s.id === id);
+    if (service) {
+      const category = categorizeService(service.name);
+      if (category === 'required' && !isAdminOverride) {
+        setShowOverrideWarning(true);
+        return;
+      }
+    }
     setServices(prev => prev.filter(s => s.id !== id));
     if (editingId === id) setEditingId(null);
     setHasModifications(true);
@@ -415,10 +428,10 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-primary" />
-            Estimate Review
+            Expert Service Assessment
           </CardTitle>
           <CardDescription>
-            Review and adjust the AI-recommended services before finalizing
+            Based on professional inspection, the following services have been identified
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -445,15 +458,34 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         </CardContent>
       </Card>
 
+      {/* Override Warning */}
+      {showOverrideWarning && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Required services cannot be removed</strong> without administrative override. 
+            These services are deemed essential for proper rug care. Contact an administrator 
+            if you believe this assessment is incorrect.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Services List */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Services</CardTitle>
-            <Button variant="outline" size="sm" onClick={handleAddService} className="gap-1">
-              <Plus className="h-4 w-4" />
-              Add Service
-            </Button>
+            <div>
+              <CardTitle>Identified Services</CardTitle>
+              <CardDescription className="text-xs mt-1">
+                Services are categorized by necessity based on expert assessment
+              </CardDescription>
+            </div>
+            {isAdminOverride && (
+              <Button variant="outline" size="sm" onClick={handleAddService} className="gap-1">
+                <Plus className="h-4 w-4" />
+                Add Service
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -466,7 +498,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
             services.map((service, index) => (
               <div key={service.id}>
                 {index > 0 && <Separator className="my-4" />}
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-4" data-category={categorizeService(service.name)}>
                   <div className="flex-1 space-y-3">
                     {editingId === service.id ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -529,11 +561,22 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                     ) : (
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Badge 
-                            variant="outline" 
-                            className={PRIORITY_COLORS[service.priority]}
+                          {/* Category Icon */}
+                          {categorizeService(service.name) === 'required' && (
+                            <Lock className="h-4 w-4 text-destructive flex-shrink-0" />
+                          )}
+                          {categorizeService(service.name) === 'recommended' && (
+                            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                          )}
+                          {categorizeService(service.name) === 'preventative' && (
+                            <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          )}
+                          <Badge
+                            variant={SERVICE_CATEGORIES[categorizeService(service.name)].badgeVariant}
+                            className="text-[10px]"
                           >
-                            {service.priority}
+                            {categorizeService(service.name) === 'required' ? 'Required' : 
+                             categorizeService(service.name) === 'recommended' ? 'Recommended' : 'Preventative'}
                           </Badge>
                           <span className="font-medium">{service.name}</span>
                         </div>
@@ -546,23 +589,26 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                               ${(service.quantity * service.unitPrice).toFixed(2)}
                             </p>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingId(service.id)}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveService(service.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {/* Only show edit/delete for non-required or with admin override */}
+                          {(canStaffEditService(categorizeService(service.name), isAdminOverride)) && (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingId(service.id)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveService(service.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -576,9 +622,14 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
           {services.length > 0 && (
             <>
               <Separator className="my-4" />
-              <div className="flex items-center justify-between text-lg font-semibold">
-                <span>Total Estimate</span>
-                <span className="text-primary">${calculateTotal().toFixed(2)}</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-lg font-semibold">
+                  <span>Total Investment Required</span>
+                  <span className="text-primary">${calculateTotal().toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Based on professional inspection and expert assessment
+                </p>
               </div>
             </>
           )}
@@ -645,7 +696,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
           ) : (
             <>
               <Save className="h-4 w-4" />
-              {existingApprovedEstimate ? 'Update Estimate' : 'Approve Estimate'}
+              {existingApprovedEstimate ? 'Confirm Assessment' : 'Approve Expert Assessment'}
             </>
           )}
         </Button>
