@@ -95,6 +95,18 @@ const CompanySetup: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      // 0. Ensure user has staff role (needed for company creation, especially for OAuth signups)
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({ user_id: user.id, role: 'staff' })
+        .select()
+        .single();
+      
+      // Ignore duplicate key error (role already exists)
+      if (roleError && !roleError.message.includes('duplicate key')) {
+        console.error('Error ensuring staff role:', roleError);
+      }
+
       // 1. Create the company
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
