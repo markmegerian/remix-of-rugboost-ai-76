@@ -44,6 +44,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Ensure user has staff role and profile (for OAuth signups where triggers may not fire)
+  const ensureUserSetup = async (userId: string, userEmail: string, fullName?: string) => {
+    try {
+      // Ensure staff role exists
+      await supabase
+        .from('user_roles')
+        .upsert({ user_id: userId, role: 'staff' as AppRole }, { onConflict: 'user_id,role' });
+
+      // Ensure profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        await supabase
+          .from('profiles')
+          .insert({ user_id: userId, full_name: fullName || userEmail?.split('@')[0] || 'User' });
+      }
+    } catch (err) {
+      console.error('Error ensuring user setup:', err);
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -52,8 +77,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer role fetching to avoid deadlock
+          // Defer to avoid deadlock - ensure setup for new signups (especially OAuth)
           setTimeout(async () => {
+            // For new signups or OAuth, ensure user has required records
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              const fullName = session.user.user_metadata?.full_name || 
+                               session.user.user_metadata?.name ||
+                               session.user.email?.split('@')[0];
+              await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+            }
+            
             const userRoles = await fetchUserRoles(session.user.id);
             setRoles(userRoles);
             setLoading(false);
@@ -71,6 +104,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        // Ensure user setup on initial load too
+        const fullName = session.user.user_metadata?.full_name || 
+                         session.user.user_metadata?.name ||
+                         session.user.email?.split('@')[0];
+        await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+        
         const userRoles = await fetchUserRoles(session.user.id);
         setRoles(userRoles);
       }
