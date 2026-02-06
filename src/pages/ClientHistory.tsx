@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { format, isThisYear, isThisMonth, isThisWeek, parseISO } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import RugPhoto from '@/components/RugPhoto';
+import { batchSignUrls } from '@/hooks/useSignedUrls';
 
 interface HistoryRug {
   id: string;
@@ -159,6 +160,14 @@ const ClientHistory = () => {
       );
 
       setJobs(jobsWithDetails);
+      
+      // Preload all photo URLs BEFORE showing content for instant display
+      const allPhotoPaths = jobsWithDetails.flatMap(job => 
+        job.rugs.flatMap(rug => rug.photo_urls || [])
+      );
+      if (allPhotoPaths.length > 0) {
+        await batchSignUrls(allPhotoPaths);
+      }
     } catch (error) {
       console.error('Error fetching client history:', error);
       toast.error('Failed to load history');

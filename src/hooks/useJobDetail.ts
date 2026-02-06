@@ -207,12 +207,12 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         serviceCompletions = completionsData || [];
       }
 
-      // Preload all photo URLs in a single batch request for faster rendering
+      // Preload all photo URLs in a single batch request BEFORE returning
+      // This ensures photos appear instantly when the page renders
       const rugs = (rugsResult.data || []) as Rug[];
       const allPhotoPaths = rugs.flatMap(rug => rug.photo_urls || []);
       if (allPhotoPaths.length > 0) {
-        // Fire and forget - don't await, let it cache in background
-        batchSignUrls(allPhotoPaths).catch(console.error);
+        await batchSignUrls(allPhotoPaths);
       }
 
       return {

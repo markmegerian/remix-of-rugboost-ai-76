@@ -14,6 +14,7 @@ import rugboostLogo from '@/assets/rugboost-logo.svg';
 import ExpertInspectionReport from '@/components/ExpertInspectionReport';
 import { categorizeService } from '@/lib/serviceCategories';
 import { getServiceDeclineConsequence } from '@/lib/serviceCategories';
+import { batchSignUrls } from '@/hooks/useSignedUrls';
 
 interface ServiceItem {
   id: string;
@@ -266,6 +267,13 @@ const ClientPortal = () => {
         });
 
       setRugs(processedRugs);
+      
+      // Preload all photo URLs in a single batch request BEFORE showing content
+      // This ensures photos appear instantly when the page renders
+      const allPhotoPaths = processedRugs.flatMap(rug => rug.photo_urls || []);
+      if (allPhotoPaths.length > 0) {
+        await batchSignUrls(allPhotoPaths);
+      }
     } catch (error) {
       console.error('Error loading portal data:', error);
       toast.error('Failed to load portal data');
