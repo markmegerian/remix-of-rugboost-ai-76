@@ -26,6 +26,16 @@ interface ServiceItem {
   pricingFactors?: string[];
 }
 
+interface PhotoAnnotations {
+  photoIndex: number;
+  annotations: Array<{
+    label: string;
+    location: string;
+    x: number;
+    y: number;
+  }>;
+}
+
 interface RugData {
   id: string;
   rug_number: string;
@@ -34,6 +44,7 @@ interface RugData {
   width: number | null;
   photo_urls: string[] | null;
   analysis_report: string | null;
+  image_annotations: PhotoAnnotations[] | null;
   estimate_id: string;
   services: ServiceItem[];
   total: number;
@@ -221,7 +232,8 @@ const ClientPortal = () => {
           length,
           width,
           photo_urls,
-          analysis_report
+          analysis_report,
+          image_annotations
         `)
         .eq('job_id', jobData.id);
 
@@ -260,6 +272,7 @@ const ClientPortal = () => {
             width: r.width,
             photo_urls: r.photo_urls,
             analysis_report: r.analysis_report,
+            image_annotations: Array.isArray(r.image_annotations) ? r.image_annotations as unknown as PhotoAnnotations[] : null,
             estimate_id: estimate.id,
             services: processedServices,
             total: estimate.total_amount,

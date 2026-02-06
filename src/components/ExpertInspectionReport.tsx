@@ -43,6 +43,16 @@ function isSignificantValue(service: Service): boolean {
   rugNumber?: string; // Which rug this service belongs to
  }
  
+ interface PhotoAnnotations {
+   photoIndex: number;
+   annotations: Array<{
+     label: string;
+     location: string;
+     x: number;
+     y: number;
+   }>;
+ }
+
  interface RugData {
    id: string;
    rug_number: string;
@@ -51,6 +61,7 @@ function isSignificantValue(service: Service): boolean {
    width: number | null;
    photo_urls: string[] | null;
    analysis_report: string | null;
+   image_annotations: PhotoAnnotations[] | null;
    estimate_id: string;
    services: Service[];
    total: number;
@@ -125,6 +136,7 @@ function generateConditionSummary(services: Service[]): string {
   const [confirmDecline, setConfirmDecline] = useState<Service | null>(null);
   const [lightboxImages, setLightboxImages] = useState<string[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxAnnotations, setLightboxAnnotations] = useState<PhotoAnnotations[] | null>(null);
    
    // Aggregate services across all rugs, adding rug identification
    const allServices = rugs.flatMap(r => 
@@ -200,14 +212,16 @@ function generateConditionSummary(services: Service[]): string {
     });
   }, []);
    
-  const openLightbox = (photos: string[], index: number) => {
+  const openLightbox = (photos: string[], index: number, annotations?: PhotoAnnotations[] | null) => {
     setLightboxImages(photos);
     setLightboxIndex(index);
+    setLightboxAnnotations(annotations || null);
   };
   
   const closeLightbox = () => {
     setLightboxImages(null);
     setLightboxIndex(0);
+    setLightboxAnnotations(null);
   };
   
    const toggleRug = (rugId: string) => {
@@ -316,6 +330,7 @@ function generateConditionSummary(services: Service[]): string {
                        photoUrls={rug.photo_urls}
                        rugNumber={rug.rug_number}
                        initialCount={3}
+                       annotations={rug.image_annotations}
                        onOpenLightbox={openLightbox}
                      />
                    )}
@@ -662,9 +677,9 @@ function generateConditionSummary(services: Service[]): string {
             </button>
           )}
           
-          {/* Main Image */}
+          {/* Main Image with Annotations */}
           <div 
-            className="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+            className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <RugPhoto
@@ -673,6 +688,34 @@ function generateConditionSummary(services: Service[]): string {
               className="max-w-full max-h-[85vh] object-contain rounded-lg"
               loadingClassName="w-64 h-64"
             />
+            {/* Annotation markers on lightbox image */}
+            {lightboxAnnotations && (() => {
+              const currentAnnotation = lightboxAnnotations.find(a => a.photoIndex === lightboxIndex);
+              const markers = currentAnnotation?.annotations || [];
+              return markers.map((annotation, annIdx) => (
+                <div
+                  key={annIdx}
+                  className="absolute z-10 group"
+                  style={{
+                    left: `${annotation.x}%`,
+                    top: `${annotation.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <div className="relative cursor-pointer">
+                    <div className="w-8 h-8 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-sm font-bold shadow-lg border-2 border-white">
+                      {annIdx + 1}
+                    </div>
+                    {/* Tooltip on hover */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 pointer-events-none">
+                      <div className="bg-white text-foreground px-3 py-2 rounded-md shadow-lg text-sm whitespace-nowrap border border-border max-w-[250px]">
+                        {annotation.label}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
           
           {/* Navigation - Next */}
@@ -687,6 +730,29 @@ function generateConditionSummary(services: Service[]): string {
               <ChevronRight className="h-8 w-8" />
             </button>
           )}
+          {/* Annotation Legend */}
+          {lightboxAnnotations && (() => {
+            const currentAnnotation = lightboxAnnotations.find(a => a.photoIndex === lightboxIndex);
+            const markers = currentAnnotation?.annotations || [];
+            if (markers.length === 0) return null;
+            return (
+              <div 
+                className="absolute bottom-20 left-1/2 -translate-x-1/2 max-w-[90vw] bg-black/70 backdrop-blur-sm rounded-lg p-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-wrap gap-3 justify-center">
+                  {markers.map((annotation, annIdx) => (
+                    <div key={annIdx} className="flex items-center gap-2 text-white text-sm">
+                      <span className="w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold">
+                        {annIdx + 1}
+                      </span>
+                      <span className="max-w-[150px] truncate">{annotation.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           
           {/* Thumbnail strip */}
           {lightboxImages.length > 1 && (

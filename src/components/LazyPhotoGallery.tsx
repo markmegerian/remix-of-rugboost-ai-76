@@ -1,20 +1,33 @@
 import React, { useState, useCallback } from 'react';
 import { ImageIcon, ZoomIn, ChevronDown, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import RugPhoto from '@/components/RugPhoto';
 import { batchSignUrls } from '@/hooks/useSignedUrls';
+
+interface ImageAnnotation {
+  label: string;
+  location: string;
+  x: number;
+  y: number;
+}
+
+interface PhotoAnnotations {
+  photoIndex: number;
+  annotations: ImageAnnotation[];
+}
 
 interface LazyPhotoGalleryProps {
   photoUrls: string[];
   rugNumber: string;
   initialCount?: number;
-  onOpenLightbox: (photos: string[], startIndex: number) => void;
+  annotations?: PhotoAnnotations[] | null;
+  onOpenLightbox: (photos: string[], startIndex: number, annotations?: PhotoAnnotations[] | null) => void;
 }
 
 const LazyPhotoGallery: React.FC<LazyPhotoGalleryProps> = ({
   photoUrls,
   rugNumber,
   initialCount = 3,
+  annotations = null,
   onOpenLightbox,
 }) => {
   const [showAll, setShowAll] = useState(false);
@@ -45,7 +58,14 @@ const LazyPhotoGallery: React.FC<LazyPhotoGalleryProps> = ({
   
   const handlePhotoClick = (index: number) => (e: React.MouseEvent) => {
     e.stopPropagation();
-    onOpenLightbox(photoUrls, index);
+    onOpenLightbox(photoUrls, index, annotations);
+  };
+
+  // Get annotations for a specific photo
+  const getPhotoAnnotations = (photoIndex: number): ImageAnnotation[] => {
+    if (!annotations) return [];
+    const photoAnnotation = annotations.find(a => a.photoIndex === photoIndex);
+    return photoAnnotation?.annotations || [];
   };
   
   if (photoUrls.length === 0) return null;
@@ -60,23 +80,57 @@ const LazyPhotoGallery: React.FC<LazyPhotoGalleryProps> = ({
       </div>
       
       <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap">
-        {visiblePhotos.map((url, idx) => (
-          <button
-            key={idx}
-            onClick={handlePhotoClick(idx)}
-            className="relative group flex-shrink-0"
-          >
-            <RugPhoto
-              filePath={url}
-              alt={`${rugNumber} photo ${idx + 1}`}
-              className="w-20 h-20 object-cover rounded-lg border transition-opacity group-hover:opacity-80"
-              loadingClassName="w-20 h-20"
-            />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <ZoomIn className="h-5 w-5 text-white drop-shadow-lg" />
-            </div>
-          </button>
-        ))}
+        {visiblePhotos.map((url, idx) => {
+          const photoAnnotations = getPhotoAnnotations(idx);
+          const hasAnnotations = photoAnnotations.length > 0;
+          
+          return (
+            <button
+              key={idx}
+              onClick={handlePhotoClick(idx)}
+              className="relative group flex-shrink-0"
+            >
+              <RugPhoto
+                filePath={url}
+                alt={`${rugNumber} photo ${idx + 1}`}
+                className="w-20 h-20 object-cover rounded-lg border transition-opacity group-hover:opacity-80"
+                loadingClassName="w-20 h-20"
+              />
+              
+              {/* Annotation markers overlay on thumbnails */}
+              {hasAnnotations && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {photoAnnotations.map((annotation, annIdx) => (
+                    <div
+                      key={annIdx}
+                      className="absolute"
+                      style={{
+                        left: `${annotation.x}%`,
+                        top: `${annotation.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    >
+                      <div className="w-4 h-4 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[8px] font-bold shadow border border-white">
+                        {annIdx + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <ZoomIn className="h-5 w-5 text-white drop-shadow-lg" />
+              </div>
+              
+              {/* Badge showing annotation count */}
+              {hasAnnotations && (
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[10px] font-bold shadow border border-white">
+                  {photoAnnotations.length}
+                </div>
+              )}
+            </button>
+          );
+        })}
         
         {/* Show More Button */}
         {hasMore && (
@@ -101,3 +155,4 @@ const LazyPhotoGallery: React.FC<LazyPhotoGalleryProps> = ({
 };
 
 export default LazyPhotoGallery;
+export type { PhotoAnnotations, ImageAnnotation };
