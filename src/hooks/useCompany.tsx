@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import type { PlanTier, BillingStatus } from '@/lib/planFeatures';
 
 type CompanyRole = 'company_admin' | 'staff';
 
@@ -12,6 +13,10 @@ interface Company {
   payment_account_connected: boolean;
   stripe_account_id: string | null;
   settings: Record<string, unknown>;
+  plan_tier: PlanTier;
+  billing_status: BillingStatus;
+  trial_ends_at: string | null;
+  max_staff_users: number;
   created_at: string;
   updated_at: string;
 }

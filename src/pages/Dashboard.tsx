@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { useJobsWithFilters, JobWithDetails } from '@/hooks/useJobsWithFilters';
 import { format } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
@@ -15,6 +16,7 @@ import NotificationBell from '@/components/NotificationBell';
 import { DashboardSkeleton, DashboardJobTableSkeleton } from '@/components/skeletons/DashboardSkeleton';
 import MobileNav from '@/components/MobileNav';
 import JobsFilter, { JobFilters } from '@/components/JobsFilter';
+import { BillingStatusBanner } from '@/components/BillingStatusBanner';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -71,6 +73,7 @@ const Dashboard = () => {
   const { user, loading: authLoading, signOut, isStaff } = useAuth();
   const { company, branding, hasCompany, loading: companyLoading, isCompanyAdmin } = useCompany();
   const { isAdmin } = useAdminAuth();
+  const { canCreateJobs, billingStatus } = usePlanFeatures();
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS);
   
   const { 
@@ -122,7 +125,13 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => navigate('/jobs/new')} size="sm" className="gap-2">
+            <Button 
+              onClick={() => navigate('/jobs/new')} 
+              size="sm" 
+              className="gap-2"
+              disabled={!canCreateJobs}
+              title={!canCreateJobs ? 'Subscription required to create new jobs' : undefined}
+            >
               <Plus className="h-4 w-4" />
               <span className="hidden xs:inline">New Job</span>
             </Button>
@@ -147,6 +156,9 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* Billing Status Banner */}
+        <BillingStatusBanner />
+        
         <div className="space-y-6">
           {/* Stats Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

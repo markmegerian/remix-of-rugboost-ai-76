@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { toast } from 'sonner';
+import { DEFAULT_SERVICE_PRICES, DEFAULT_ENABLED_SERVICES } from '@/lib/planFeatures';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,23 +96,28 @@ const CompanySetup: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // 1. Create the company
+      // 1. Create the company with plan defaults
       const { data: companyData, error: companyError } = await supabase
         .from('companies')
         .insert({
           name: values.name,
           slug: generateSlug(values.name),
+          plan_tier: 'starter',
+          billing_status: 'trialing',
+          // trial_ends_at defaults to 14 days from now in DB
         })
         .select()
         .single();
 
       if (companyError) throw companyError;
 
+      const companyId = companyData.id;
+
       // 2. Create company membership (as admin)
       const { error: membershipError } = await supabase
         .from('company_memberships')
         .insert({
-          company_id: companyData.id,
+          company_id: companyId,
           user_id: user.id,
           role: 'company_admin',
         });
@@ -122,13 +128,45 @@ const CompanySetup: React.FC = () => {
       const { error: brandingError } = await supabase
         .from('company_branding')
         .insert({
-          company_id: companyData.id,
+          company_id: companyId,
           business_name: values.name,
           business_email: values.businessEmail || null,
           business_phone: values.businessPhone || null,
         });
 
       if (brandingError) throw brandingError;
+
+      // 4. Initialize default service prices (company-scoped)
+      const servicePrices = DEFAULT_SERVICE_PRICES.map(price => ({
+        ...price,
+        company_id: companyId,
+        is_active: true,
+      }));
+
+      const { error: pricesError } = await supabase
+        .from('company_service_prices')
+        .insert(servicePrices);
+
+      if (pricesError) {
+        console.error('Error creating default prices:', pricesError);
+        // Non-fatal - continue with setup
+      }
+
+      // 5. Initialize enabled services toggles
+      const enabledServices = DEFAULT_ENABLED_SERVICES.map(serviceName => ({
+        company_id: companyId,
+        service_name: serviceName,
+        is_enabled: true,
+      }));
+
+      const { error: servicesError } = await supabase
+        .from('company_enabled_services')
+        .insert(enabledServices);
+
+      if (servicesError) {
+        console.error('Error creating enabled services:', servicesError);
+        // Non-fatal - continue with setup
+      }
 
       toast.success('Company created successfully!');
       
