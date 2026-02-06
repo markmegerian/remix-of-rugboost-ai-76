@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const AI_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
@@ -362,8 +362,8 @@ serve(async (req) => {
       console.warn("UserId mismatch - using authenticated user:", authenticatedUserId);
     }
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!AI_API_KEY) {
+      throw new Error("AI API key is not configured");
     }
 
 
@@ -502,7 +502,7 @@ ${servicePricesText}
 
 Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write a professional estimate letter following the format specified. Address it to the client by name. Calculate all costs based on the rug's square footage (${squareFootage} sq ft) and perimeter for linear services.`;
 
-    // Use Lovable AI Gateway with selected model
+    // Use AI Gateway with selected model
     // Reduce max_tokens for Flash model since it's more concise
     const maxTokens = model === "google/gemini-2.5-flash" ? 5000 : 8000;
     const startTime = Date.now();
@@ -510,7 +510,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -536,7 +536,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Lovable AI Gateway error:", response.status, errorText);
+      console.error("AI Gateway error:", response.status, errorText);
       
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Please try again in a moment.");

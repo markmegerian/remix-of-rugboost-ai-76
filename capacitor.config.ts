@@ -1,14 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.fef72b1bd1214ff6bcc3c957ca919cde',
+  appId: 'com.rugboost.app',
   appName: 'Rugboost',
   webDir: 'dist',
-  // COMMENTED OUT for production/App Store builds - uncomment for live reload development
-  // server: {
-  //   url: 'https://fef72b1b-d121-4ff6-bcc3-c957ca919cde.lovableproject.com?forceHideBadge=true',
-  //   cleartext: true
-  // },
   ios: {
     contentInset: 'automatic',
     preferredContentMode: 'mobile',

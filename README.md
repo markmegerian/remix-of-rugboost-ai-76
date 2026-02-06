@@ -1,73 +1,89 @@
-# Welcome to your Lovable project
+# RugBoost - AI-Powered Rug Inspection Platform
 
-## Project info
+## About
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+RugBoost is an AI-powered rug inspection and business management platform designed for professional rug cleaning businesses. Core features include:
 
-## How can I edit this code?
+- AI-powered rug type, origin, and condition identification
+- Automated estimates based on rug analysis
+- Full job lifecycle management (intake to delivery)
+- Client portal for estimate approvals and payments
+- Mobile-optimized interface with native iOS/Android app support
 
-There are several ways of editing your application.
+## Technology Stack
 
-**Use Lovable**
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS
+- **UI Components**: shadcn/ui
+- **Backend**: Supabase (Auth, Database, Edge Functions, Storage)
+- **AI**: Google Gemini Vision API
+- **Payments**: Stripe
+- **Mobile**: Capacitor (iOS/Android)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ & npm
+- Supabase project (for backend functionality)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to the project directory
+cd rugboost
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Create a `.env` file with the following variables:
 
-**Use GitHub Codespaces**
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Deployment
 
-## What technologies are used for this project?
+### Web Deployment
 
-This project is built with:
+Build the production bundle:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```sh
+npm run build
+```
 
-## How can I deploy this project?
+Deploy the `dist` folder to your preferred hosting platform (Vercel, Netlify, VPS, etc.).
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Mobile Apps
 
-## Can I connect a custom domain to my Lovable project?
+The project uses Capacitor for native mobile builds:
 
-Yes, you can!
+```sh
+# Add iOS platform
+npx cap add ios
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+# Add Android platform  
+npx cap add android
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# Sync web assets
+npx cap sync
+
+# Open in Xcode (iOS)
+npx cap open ios
+
+# Open in Android Studio (Android)
+npx cap open android
+```
+
+## License
+
+Copyright © 2024 RugBoost. All rights reserved.
