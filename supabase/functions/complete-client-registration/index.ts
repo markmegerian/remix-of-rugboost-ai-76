@@ -124,19 +124,53 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] Registration request from IP: ${clientIp.substring(0, 10)}*** for: ${normalizedEmail.substring(0, 3)}***`);
     console.log(`[${requestId}] Rate limit status - Remaining: ${rateCheck.remaining}, Reset in: ${Math.ceil(rateCheck.resetIn / 1000)}s`);
 
-    // Validate the access token and get the auth_user_id
-    const { data: tokenData, error: tokenError } = await supabaseAdmin
-      .rpc('validate_access_token', { _token: accessToken });
+    // STEP 1: Atomically claim the token
+    // This prevents replay attacks and race conditions by ensuring only one request can proceed
+    const { data: claimedToken, error: claimError } = await supabaseAdmin
+      .from('client_job_access')
+      .update({ consumed_at: new Date().toISOString() })
+      .eq('access_token', accessToken)
+      .is('consumed_at', null)
+      .gt('expires_at', new Date().toISOString()) // Not expired (or no expiry)
+      .select('id, auth_user_id, invited_email, client_id, job_id')
+      .maybeSingle();
 
-    if (tokenError || !tokenData || tokenData.length === 0) {
-      console.error(`[${requestId}] Token validation error:`, tokenError?.message || 'No token data');
+    // Also try tokens without expiry
+    let accessInfo = claimedToken;
+    if (!accessInfo && !claimError) {
+      const { data: claimedNoExpiry, error: claimNoExpiryError } = await supabaseAdmin
+        .from('client_job_access')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('access_token', accessToken)
+        .is('consumed_at', null)
+        .is('expires_at', null)
+        .select('id, auth_user_id, invited_email, client_id, job_id')
+        .maybeSingle();
+      
+      if (claimNoExpiryError) {
+        console.error(`[${requestId}] Claim error (no expiry):`, claimNoExpiryError.message);
+      }
+      accessInfo = claimedNoExpiry;
+    }
+
+    if (claimError) {
+      console.error(`[${requestId}] Token claim error:`, claimError.message);
       return new Response(
-        JSON.stringify({ error: 'Invalid or expired access link. Please request a new link from the business.' }),
+        JSON.stringify({ error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const accessInfo = tokenData[0];
+    if (!accessInfo) {
+      console.log(`[${requestId}] Token claim failed - no rows affected (already consumed, expired, or invalid)`);
+      return new Response(
+        JSON.stringify({ error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[${requestId}] Token claimed successfully: ${accessInfo.id.substring(0, 8)}***`);
+
     const authUserId = accessInfo.auth_user_id;
     
     // CRITICAL: Check if auth_user_id exists on the invite
@@ -153,16 +187,17 @@ Deno.serve(async (req) => {
     const invitedEmail = accessInfo.invited_email?.toLowerCase().trim();
     if (invitedEmail && invitedEmail !== normalizedEmail) {
       console.error(`[${requestId}] Email mismatch - invited: ${invitedEmail.substring(0, 3)}***, provided: ${normalizedEmail.substring(0, 3)}***`);
+      // Token is already consumed, so this is a failed attempt - don't unconsume
       return new Response(
-        JSON.stringify({ error: 'Email does not match the invitation' }),
+        JSON.stringify({ error: 'Email does not match the invitation. Please request a new link from the business.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log(`[${requestId}] Using auth_user_id from invite: ${authUserId.substring(0, 8)}***`);
 
-    // Update the user's password using the stored auth_user_id
-    // No listUsers() call needed - we have the definitive user ID
+    // STEP 2: Update the user's password using the stored auth_user_id
+    // Token is already claimed - if this fails, user must request a new link
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       authUserId,
       {
@@ -175,26 +210,37 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error(`[${requestId}] Error updating user password:`, updateError.message);
-      throw updateError;
+      // Do NOT unconsume the token - return error asking for new link
+      return new Response(
+        JSON.stringify({ error: 'Failed to set password. Please request a new access link from the business.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     console.log(`[${requestId}] Password updated successfully`);
 
-    // Ensure client account exists and is linked
+    // STEP 3: Ensure client account exists and is linked
     const { data: existingClient } = await supabaseAdmin
       .from('client_accounts')
       .select('id')
       .eq('user_id', authUserId)
       .maybeSingle();
 
-    let clientId = existingClient?.id;
+    let clientId = existingClient?.id || accessInfo.client_id;
 
     if (!clientId) {
+      // Get job info for client name
+      const { data: jobInfo } = await supabaseAdmin
+        .from('jobs')
+        .select('client_name')
+        .eq('id', accessInfo.job_id)
+        .maybeSingle();
+
       const { data: newClient, error: clientError } = await supabaseAdmin
         .from('client_accounts')
         .insert({
           user_id: authUserId,
           email: normalizedEmail,
-          full_name: accessInfo.client_name || '',
+          full_name: jobInfo?.client_name || '',
         })
         .select('id')
         .single();
@@ -216,7 +262,7 @@ Deno.serve(async (req) => {
         .is('client_id', null);
     }
 
-    // Ensure client role exists - ONLY 'client' role, never 'staff'
+    // STEP 4: Ensure client role exists - ONLY 'client' role, never 'staff'
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({ user_id: authUserId, role: 'client' });

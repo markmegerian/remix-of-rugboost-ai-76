@@ -213,6 +213,7 @@ export type Database = {
         Row: {
           access_token: string
           client_id: string | null
+          consumed_at: string | null
           created_at: string | null
           email_error: string | null
           email_sent_at: string | null
@@ -226,6 +227,7 @@ export type Database = {
         Insert: {
           access_token: string
           client_id?: string | null
+          consumed_at?: string | null
           created_at?: string | null
           email_error?: string | null
           email_sent_at?: string | null
@@ -239,6 +241,7 @@ export type Database = {
         Update: {
           access_token?: string
           client_id?: string | null
+          consumed_at?: string | null
           created_at?: string | null
           email_error?: string | null
           email_sent_at?: string | null
