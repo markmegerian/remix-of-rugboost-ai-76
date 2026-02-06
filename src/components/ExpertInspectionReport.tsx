@@ -2,12 +2,19 @@ import React, { useState, useMemo, useCallback } from 'react';
  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; 
  import { Button } from '@/components/ui/button';
  import { Separator } from '@/components/ui/separator';
+ import { Badge } from '@/components/ui/badge';
  import { 
   ChevronDown, ChevronUp, 
   FileText, ImageIcon, Lock, MessageSquare, Shield, ClipboardCheck,
-  AlertTriangle, X, Check, ZoomIn, ChevronLeft, ChevronRight
+  AlertTriangle, X, Check, ZoomIn, ChevronLeft, ChevronRight, UserPlus
  } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+ import {
+   Tooltip,
+   TooltipContent,
+   TooltipProvider,
+   TooltipTrigger,
+ } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +48,12 @@ function isSignificantValue(service: Service): boolean {
   adjustedTotal: number; // Final price after risk/severity adjustments
   pricingFactors?: string[]; // Internal tags (not shown to clients)
   rugNumber?: string; // Which rug this service belongs to
+  // Staff addition tracking
+  source?: 'ai' | 'staff';
+  addedBy?: string;
+  addedByName?: string;
+  addedAt?: string;
+  reasonNote?: string;
  }
  
  interface PhotoAnnotations {
@@ -873,6 +886,26 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 High Value
               </span>
+            )}
+            {/* Staff-added badge for clients */}
+            {service.source === 'staff' && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-[10px] gap-1 border-primary/50">
+                      <UserPlus className="h-3 w-3" />
+                      Added after review
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    {service.reasonNote ? (
+                      <p className="text-xs">{service.reasonNote}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Added by staff after initial assessment</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
           {showRugLabel && service.rugNumber && (
