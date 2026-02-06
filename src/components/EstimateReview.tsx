@@ -14,6 +14,8 @@ import TeachAIDialog from './TeachAIDialog';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import UnsavedChangesDialog from './UnsavedChangesDialog';
 import { categorizeService, SERVICE_CATEGORIES, canStaffEditService, type ServiceCategory } from '@/lib/serviceCategories';
+import { LockedIndicator } from '@/components/LifecycleErrorState';
+import { LIFECYCLE_ERRORS } from '@/lib/lifecycleStateMachine';
 import {
   Select,
   SelectContent,
@@ -49,6 +51,8 @@ interface EstimateReviewProps {
     services: ServiceItem[];
     total_amount: number;
   } | null;
+  /** If true, estimate is locked and cannot be modified */
+  isLocked?: boolean;
 }
 
 const PRIORITY_COLORS = {
@@ -66,6 +70,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   onApprove,
   availableServices = [],
   existingApprovedEstimate,
+  isLocked = false,
 }) => {
   const { user } = useAuth();
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -268,9 +273,13 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   };
 
   const handleUpdateService = (id: string, updates: Partial<ServiceItem>) => {
+    if (isLocked) {
+      toast.error(LIFECYCLE_ERRORS.JOB_LOCKED);
+      return;
+    }
     const originalService = originalServicesRef.current.find(s => s.id === id);
     
-    setServices(prev => 
+    setServices(prev =>
       prev.map(s => {
         if (s.id !== id) return s;
         const updated = { ...s, ...updates };
@@ -303,6 +312,10 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   };
 
   const handleAddService = () => {
+    if (isLocked) {
+      toast.error(LIFECYCLE_ERRORS.JOB_LOCKED);
+      return;
+    }
     const newService: ServiceItem = {
       id: crypto.randomUUID(),
       name: 'New Service',
@@ -316,6 +329,10 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   };
 
   const handleRemoveService = (id: string) => {
+    if (isLocked) {
+      toast.error(LIFECYCLE_ERRORS.JOB_LOCKED);
+      return;
+    }
     // Check if this is a required service
     const service = services.find(s => s.id === id);
     if (service) {
@@ -335,6 +352,11 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   };
 
   const handleApprove = async () => {
+    if (isLocked) {
+      toast.error(LIFECYCLE_ERRORS.JOB_LOCKED);
+      return;
+    }
+    
     if (services.length === 0) {
       toast.error('Please add at least one service');
       return;

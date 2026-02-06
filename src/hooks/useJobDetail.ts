@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { queryKeys } from '@/lib/queryKeys';
 import { batchSignUrls } from '@/hooks/useSignedUrls';
+import { useCompany } from './useCompany';
+import { validateTenantAccess } from './useLifecycleGuards';
 
 export interface JobDetail {
   id: string;
@@ -14,6 +16,7 @@ export interface JobDetail {
   created_at: string;
   client_approved_at?: string | null;
   payment_status?: string;
+  company_id?: string | null;
 }
 
 export interface Rug {
@@ -28,6 +31,7 @@ export interface Rug {
   image_annotations: unknown;
   created_at: string;
   estimate_approved?: boolean;
+  company_id?: string | null;
 }
 
 export interface ApprovedEstimate {
@@ -78,8 +82,10 @@ export interface BusinessBranding {
   logo_path: string | null;
 }
 
-// Fetch all job detail data in parallel
+// Fetch all job detail data in parallel with tenant isolation
 export const useJobDetail = (jobId: string | undefined, userId: string | undefined) => {
+  const { companyId, loading: companyLoading } = useCompany();
+
   return useQuery({
     queryKey: queryKeys.jobs.detail(jobId || ''),
     queryFn: async () => {
@@ -95,47 +101,58 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         paymentsResult,
         portalResult,
       ] = await Promise.all([
-        // Job details
+        // Job details - RLS enforces company scope
         supabase
           .from('jobs')
-          .select('*')
+          .select('*, company_id')
           .eq('id', jobId)
           .maybeSingle(),
         
-        // Rugs
+        // Rugs - RLS enforces company scope via job_id
         supabase
           .from('inspections')
-          .select('*')
+          .select('*, company_id')
           .eq('job_id', jobId)
           .order('created_at', { ascending: true }),
         
-        // Branding - use logo_path instead of logo_url for fresh signed URLs
-        supabase
-          .from('profiles')
-          .select('business_name, business_address, business_phone, business_email, logo_path')
-          .eq('user_id', userId)
-          .maybeSingle(),
+        // Branding - company-scoped if available, fallback to user profile
+        companyId 
+          ? supabase
+              .from('company_branding')
+              .select('business_name, business_address, business_phone, business_email, logo_path')
+              .eq('company_id', companyId)
+              .maybeSingle()
+          : supabase
+              .from('profiles')
+              .select('business_name, business_address, business_phone, business_email, logo_path')
+              .eq('user_id', userId)
+              .maybeSingle(),
         
-        // Service prices
-        supabase
-          .from('service_prices')
-          .select('service_name, unit_price, is_additional')
-          .eq('user_id', userId),
+        // Service prices - company-scoped if available
+        companyId
+          ? supabase
+              .from('company_service_prices')
+              .select('service_name, unit_price, is_additional')
+              .eq('company_id', companyId)
+          : supabase
+              .from('service_prices')
+              .select('service_name, unit_price, is_additional')
+              .eq('user_id', userId),
         
-        // Approved estimates
+        // Approved estimates - RLS enforces company scope via job_id
         supabase
           .from('approved_estimates')
           .select('id, inspection_id, services, total_amount')
           .eq('job_id', jobId),
         
-        // Payments
+        // Payments - RLS enforces company scope via job_id
         supabase
           .from('payments')
           .select('*')
           .eq('job_id', jobId)
           .order('created_at', { ascending: false }),
         
-        // Client portal access
+        // Client portal access - RLS enforces company scope
         supabase
           .from('client_job_access')
           .select(`
@@ -145,7 +162,8 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
             email_error,
             first_accessed_at,
             password_set_at,
-            client_id
+            client_id,
+            company_id
           `)
           .eq('job_id', jobId)
           .maybeSingle(),
@@ -154,6 +172,15 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
       // Check for errors
       if (jobResult.error) throw jobResult.error;
       if (!jobResult.data) throw new Error('Job not found');
+
+      // Validate tenant access (RLS should handle this, but double-check)
+      const job = jobResult.data as JobDetail;
+      if (companyId && job.company_id) {
+        const tenantCheck = validateTenantAccess(job.company_id, companyId);
+        if (!tenantCheck.valid) {
+          throw new Error(tenantCheck.error);
+        }
+      }
 
       // Process service prices
       const servicePrices: ServicePrice[] = (pricesResult.data || [])
@@ -216,7 +243,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
       }
 
       return {
-        job: jobResult.data as JobDetail,
+        job,
         rugs,
         branding: brandingResult.data as BusinessBranding | null,
         servicePrices,
@@ -228,7 +255,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         serviceCompletions,
       };
     },
-    enabled: !!jobId && !!userId,
+    enabled: !!jobId && !!userId && !companyLoading,
     staleTime: 30000,
   });
 };

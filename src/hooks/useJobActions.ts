@@ -1,5 +1,13 @@
 import { useMemo } from 'react';
 import { JobStatus } from '@/components/JobTimeline';
+import {
+  LifecycleStatus,
+  isStatusLocked,
+  isEstimateSent,
+  canPerformAction,
+  LIFECYCLE_ERRORS,
+} from '@/lib/lifecycleStateMachine';
+import { useCompany } from './useCompany';
 
 /**
  * Defines which actions are allowed at each job status
@@ -41,7 +49,7 @@ export interface JobActions {
   deleteJob: JobActionState;
 }
 
-// Status-based action rules
+// Status-based action rules (consolidated with lifecycle state machine)
 const ACTION_RULES: Record<keyof JobActions, { 
   allowedStatuses: JobStatus[];
   blockedReason: string;
@@ -107,8 +115,17 @@ const ACTION_RULES: Record<keyof JobActions, {
 export function getActionState(
   action: keyof JobActions,
   currentStatus: JobStatus,
-  isAdminOverride: boolean = false
+  isAdminOverride: boolean = false,
+  hasCompanyContext: boolean = true
 ): JobActionState {
+  // Block all mutations if no company context
+  if (!hasCompanyContext && action !== 'editJobDetails') {
+    return { 
+      enabled: false, 
+      reason: LIFECYCLE_ERRORS.MISSING_COMPANY_CONTEXT 
+    };
+  }
+
   if (isAdminOverride) {
     return { enabled: true };
   }
@@ -129,25 +146,28 @@ export function useJobActions(
   currentStatus: JobStatus,
   isAdminOverride: boolean = false
 ): JobActions {
+  const { companyId, loading: companyLoading } = useCompany();
+  const hasCompanyContext = !!companyId || companyLoading;
+
   return useMemo(() => {
     const actions: JobActions = {
-      addRug: getActionState('addRug', currentStatus, isAdminOverride),
-      editRug: getActionState('editRug', currentStatus, isAdminOverride),
-      deleteRug: getActionState('deleteRug', currentStatus, isAdminOverride),
-      uploadPhotos: getActionState('uploadPhotos', currentStatus, isAdminOverride),
-      analyzeRug: getActionState('analyzeRug', currentStatus, isAdminOverride),
-      reanalyzeRug: getActionState('reanalyzeRug', currentStatus, isAdminOverride),
-      approveEstimate: getActionState('approveEstimate', currentStatus, isAdminOverride),
-      editEstimate: getActionState('editEstimate', currentStatus, isAdminOverride),
-      sendToClient: getActionState('sendToClient', currentStatus, isAdminOverride),
-      resendInvite: getActionState('resendInvite', currentStatus, isAdminOverride),
-      markServiceComplete: getActionState('markServiceComplete', currentStatus, isAdminOverride),
-      scheduleDelivery: getActionState('scheduleDelivery', currentStatus, isAdminOverride),
-      editJobDetails: getActionState('editJobDetails', currentStatus, isAdminOverride),
-      deleteJob: getActionState('deleteJob', currentStatus, isAdminOverride),
+      addRug: getActionState('addRug', currentStatus, isAdminOverride, hasCompanyContext),
+      editRug: getActionState('editRug', currentStatus, isAdminOverride, hasCompanyContext),
+      deleteRug: getActionState('deleteRug', currentStatus, isAdminOverride, hasCompanyContext),
+      uploadPhotos: getActionState('uploadPhotos', currentStatus, isAdminOverride, hasCompanyContext),
+      analyzeRug: getActionState('analyzeRug', currentStatus, isAdminOverride, hasCompanyContext),
+      reanalyzeRug: getActionState('reanalyzeRug', currentStatus, isAdminOverride, hasCompanyContext),
+      approveEstimate: getActionState('approveEstimate', currentStatus, isAdminOverride, hasCompanyContext),
+      editEstimate: getActionState('editEstimate', currentStatus, isAdminOverride, hasCompanyContext),
+      sendToClient: getActionState('sendToClient', currentStatus, isAdminOverride, hasCompanyContext),
+      resendInvite: getActionState('resendInvite', currentStatus, isAdminOverride, hasCompanyContext),
+      markServiceComplete: getActionState('markServiceComplete', currentStatus, isAdminOverride, hasCompanyContext),
+      scheduleDelivery: getActionState('scheduleDelivery', currentStatus, isAdminOverride, hasCompanyContext),
+      editJobDetails: getActionState('editJobDetails', currentStatus, isAdminOverride, hasCompanyContext),
+      deleteJob: getActionState('deleteJob', currentStatus, isAdminOverride, hasCompanyContext),
     };
     return actions;
-  }, [currentStatus, isAdminOverride]);
+  }, [currentStatus, isAdminOverride, hasCompanyContext]);
 }
 
 // Helper to get a human-readable status requirement
@@ -174,4 +194,18 @@ export function getStatusRequirement(action: keyof JobActions): string {
     return `Requires status: ${labels[0]}`;
   }
   return `Allowed when: ${labels.join(', ')}`;
+}
+
+/**
+ * Check if a job status is "locked" (no scope/pricing changes allowed)
+ */
+export function isJobLocked(status: JobStatus): boolean {
+  return isStatusLocked(status as LifecycleStatus);
+}
+
+/**
+ * Check if estimate has been sent to client
+ */
+export function hasEstimateBeenSent(status: JobStatus): boolean {
+  return isEstimateSent(status as LifecycleStatus);
 }

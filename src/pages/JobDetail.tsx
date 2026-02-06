@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useCompany } from '@/hooks/useCompany';
 import { useJobDetail, useInvalidateJobDetail } from '@/hooks/useJobDetail';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useUpdateJobStatus } from '@/hooks/useJobs';
@@ -37,10 +38,11 @@ import ServiceCompletionCard from '@/components/ServiceCompletionCard';
 import PaymentTracking from '@/components/PaymentTracking';
 import PhotoUploadProgress from '@/components/PhotoUploadProgress';
 import { JobDetailSkeleton } from '@/components/skeletons/JobDetailSkeleton';
-import JobTimeline, { mapLegacyStatus, JobStatus, JOB_STATUSES, getNextAction, getNextStatus, TransitionContext } from '@/components/JobTimeline';
+import JobTimeline, { mapLegacyStatus, JobStatus, JOB_STATUSES, getNextAction, getNextStatus, TransitionContext, isJobStatusLocked } from '@/components/JobTimeline';
 import JobStatusControl from '@/components/JobStatusControl';
 import StatusGatedButton from '@/components/StatusGatedButton';
-import { useJobActions } from '@/hooks/useJobActions';
+import { useJobActions, isJobLocked } from '@/hooks/useJobActions';
+import { LockedIndicator } from '@/components/LifecycleErrorState';
 import RugPhoto from '@/components/RugPhoto';
 import JobBreadcrumb from '@/components/JobBreadcrumb';
 import MobileJobActionBar from '@/components/MobileJobActionBar';
@@ -120,6 +122,7 @@ const JobDetail = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin } = useAdminAuth();
+  const { companyId } = useCompany();
   const invalidateJobDetail = useInvalidateJobDetail();
   const updateJobStatus = useUpdateJobStatus();
   
@@ -287,13 +290,14 @@ const JobDetail = () => {
         .delete()
         .eq('job_id', jobId);
 
-      // Create client job access record
+      // Create client job access record with company_id for tenant isolation
       const { error } = await supabase
         .from('client_job_access')
         .insert({
           job_id: jobId,
           access_token: accessToken,
           invited_email: job.client_email,
+          company_id: companyId, // Required for RLS
         });
 
       if (error) throw error;
@@ -1067,6 +1071,17 @@ const JobDetail = () => {
         <div className="hidden md:block">
           <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} />
         </div>
+        
+        {/* Locked status indicator - shown when job is past payment */}
+        {isJobLocked(currentJobStatus) && (
+          <LockedIndicator 
+            message={currentJobStatus === 'closed' 
+              ? 'This job is closed. All data is read-only.' 
+              : 'This job is locked. Scope and pricing cannot be modified.'
+            } 
+          />
+        )}
+        
         {/* Section 1: Job Status Control - Most prominent */}
         {(() => {
           // Build validation context for state machine

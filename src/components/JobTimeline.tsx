@@ -10,8 +10,17 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import {
+  LifecycleStatus,
+  LIFECYCLE_ORDER,
+  getStatusIndex,
+  isStatusLocked,
+  isTerminal,
+  validateTransition as validateLifecycleTransition,
+  TransitionContext as LifecycleTransitionContext,
+} from '@/lib/lifecycleStateMachine';
 
-// Job workflow statuses in order
+// Job workflow statuses in order (synced with lifecycle state machine)
 export const JOB_STATUSES = [
   { value: 'intake_scheduled', label: 'Intake Scheduled', icon: Calendar, description: 'Pickup appointment set' },
   { value: 'picked_up', label: 'Picked Up', icon: Truck, description: 'Rugs collected from client' },
@@ -137,7 +146,7 @@ export function isTransitionAllowed(currentStatus: JobStatus, targetStatus: JobS
   return ALLOWED_TRANSITIONS[currentStatus] === targetStatus;
 }
 
-// Validate a transition with context
+// Validate a transition with context (delegates to lifecycle state machine)
 export function validateTransition(
   targetStatus: JobStatus, 
   context: TransitionContext
@@ -147,6 +156,16 @@ export function validateTransition(
     return { valid: true };
   }
   return validator(context);
+}
+
+// Check if status is locked (delegates to lifecycle state machine)
+export function isJobStatusLocked(status: JobStatus): boolean {
+  return isStatusLocked(status as LifecycleStatus);
+}
+
+// Check if status is terminal (delegates to lifecycle state machine)
+export function isJobStatusTerminal(status: JobStatus): boolean {
+  return isTerminal(status as LifecycleStatus);
 }
 
 // Get the next actionable step based on current status

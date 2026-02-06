@@ -16,6 +16,13 @@ import { categorizeService } from '@/lib/serviceCategories';
 import { getServiceDeclineConsequence } from '@/lib/serviceCategories';
 import { batchSignUrls } from '@/hooks/useSignedUrls';
 import { openExternalUrl } from '@/lib/navigation';
+import { LifecycleErrorState, LifecycleAlert } from '@/components/LifecycleErrorState';
+import { 
+  LifecycleStatus, 
+  isEstimateSent, 
+  isStatusLocked, 
+  LIFECYCLE_ERRORS 
+} from '@/lib/lifecycleStateMachine';
 
 interface ServiceItem {
   id: string;
@@ -135,16 +142,20 @@ const ClientPortal = () => {
         .single();
 
       if (tokenError || !tokenData) {
-        toast.error('Invalid or expired access link');
+        toast.error(LIFECYCLE_ERRORS.INVALID_TOKEN);
         navigate('/');
         return;
       }
+
+      // Validate that client has access to this specific job's company
+      const jobCompanyId = tokenData.company_id as string | null;
 
       // Build access data structure from RPC result
       const accessData = {
         id: tokenData.access_id as string,
         job_id: tokenData.job_id as string,
         client_id: tokenData.client_id as string | null,
+        company_id: jobCompanyId,
         jobs: {
           id: tokenData.job_id as string,
           job_number: tokenData.job_number as string,
@@ -153,6 +164,14 @@ const ClientPortal = () => {
           user_id: tokenData.staff_user_id as string
         }
       };
+
+      // Check if job status allows client access
+      const jobStatus = tokenData.job_status as LifecycleStatus;
+      if (!isEstimateSent(jobStatus)) {
+        toast.error('This estimate is not ready for viewing yet.');
+        navigate('/');
+        return;
+      }
       
 
       // Check if user's client account is linked
