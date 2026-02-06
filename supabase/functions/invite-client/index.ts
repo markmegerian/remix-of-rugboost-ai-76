@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
       customTemplate = template;
     }
 
-    // Send invite email
+    // Send invite email - clean transactional template
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (resendApiKey && portalUrl) {
       try {
@@ -283,68 +283,84 @@ Deno.serve(async (req) => {
         };
 
         let emailSubject: string;
-        let emailBody: string;
+        let emailHtml: string;
 
         if (customTemplate) {
           emailSubject = replaceTemplateVariables(customTemplate.subject, templateVariables);
-          emailBody = replaceTemplateVariables(customTemplate.body, templateVariables);
+          const emailBody = replaceTemplateVariables(customTemplate.body, templateVariables);
+          // Wrap custom template in basic HTML
+          emailHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f3f4f6;padding:40px 20px;">
+<div style="max-width:600px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;">
+${emailBody.split('\n').map(line => 
+  line.startsWith('http') 
+    ? `<p style="text-align:center;"><a href="${escapeHtml(line)}" style="display:inline-block;background:#2c5f7c;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;">Access Your Portal</a></p>`
+    : `<p style="color:#374151;margin:15px 0;">${escapeHtml(line) || '&nbsp;'}</p>`
+).join('')}
+</div>
+</body></html>`;
         } else {
-          emailSubject = `Your Rug Inspection Estimate is Ready - ${businessName}`;
-          emailBody = `Dear ${fullName || 'Valued Customer'},
-
-Thank you for choosing ${businessName} for your rug care needs.
-
-We have completed the inspection of your rugs and prepared a detailed estimate for the recommended services. Please click the link below to review your estimate and approve the services you'd like us to proceed with:
-
-${portalUrl}
-
-Your Job Number: #${jobNumber || 'N/A'}
-
-If you have any questions, please don't hesitate to contact us${businessPhone ? ` at ${businessPhone}` : ''}.
-
-Best regards,
-${businessName}`;
+          // Clean transactional invite email
+          emailSubject = `You're Invited to View Your Rug Inspection - ${businessName}`;
+          
+          emailHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif;background:#f3f4f6;">
+  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+    <div style="background:#1a3d5c;padding:30px;text-align:center;border-radius:8px 8px 0 0;">
+      <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:600;">${escapeHtml(businessName)}</h1>
+    </div>
+    
+    <div style="background:#ffffff;padding:40px 30px;border-radius:0 0 8px 8px;">
+      <p style="color:#1f2937;font-size:16px;margin:0 0 20px;">Dear ${escapeHtml(fullName || 'Valued Customer')},</p>
+      
+      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Thank you for choosing ${escapeHtml(businessName)} for your rug care needs.
+      </p>
+      
+      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        We have created a secure portal for you to view your inspection details and manage your service.
+      </p>
+      
+      ${jobNumber ? `<div style="background:#f9fafb;border-left:4px solid #2c5f7c;padding:15px 20px;margin:25px 0;">
+        <p style="color:#1f2937;font-size:14px;margin:0;"><strong>Job Number:</strong> #${escapeHtml(jobNumber)}</p>
+      </div>` : ''}
+      
+      <div style="text-align:center;margin:30px 0;">
+        <a href="${escapeHtml(portalUrl)}" 
+           style="display:inline-block;background:#2c5f7c;color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">
+          Access Your Portal
+        </a>
+      </div>
+      
+      <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:30px 0 0;">
+        If you have questions, please contact us${businessPhone ? ` at ${escapeHtml(businessPhone)}` : ''}.
+      </p>
+      
+      <p style="color:#374151;font-size:15px;margin:25px 0 0;">
+        Best regards,<br>
+        <strong>${escapeHtml(businessName)}</strong>
+      </p>
+    </div>
+    
+    <div style="text-align:center;padding:20px;color:#6b7280;font-size:12px;">
+      ${businessPhone ? `<p style="margin:0;">${escapeHtml(businessPhone)}</p>` : ''}
+      ${businessEmail ? `<p style="margin:5px 0 0;">${escapeHtml(businessEmail)}</p>` : ''}
+    </div>
+  </div>
+</body>
+</html>`;
         }
-
-        const emailHtml = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f3f4f6; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #1e40af, #3b82f6); color: white; padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0; }
-              .content { background: white; padding: 40px 30px; border-radius: 0 0 16px 16px; }
-              .cta-button { display: inline-block; background: #3b82f6; color: white; padding: 15px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 25px 0; }
-              .footer { text-align: center; padding: 30px 20px; color: #6b7280; font-size: 14px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1 style="margin: 0; font-size: 28px;">${escapeHtml(businessName)}</h1>
-                <p style="margin: 10px 0 0; opacity: 0.9;">Your Estimate is Ready</p>
-              </div>
-              <div class="content">
-                ${emailBody.split('\n').map(line => 
-                  line.startsWith('http') 
-                    ? `<p style="text-align: center;"><a href="${escapeHtml(line)}" class="cta-button">View Your Estimate</a></p>`
-                    : `<p style="margin: 15px 0;">${escapeHtml(line) || '&nbsp;'}</p>`
-                ).join('')}
-              </div>
-              <div class="footer">
-                ${businessPhone ? `<p style="margin: 0;">📞 ${escapeHtml(businessPhone)}</p>` : ''}
-                ${businessEmail ? `<p style="margin: 5px 0 0;">✉️ ${escapeHtml(businessEmail)}</p>` : ''}
-              </div>
-            </div>
-          </body>
-          </html>
-        `;
 
         const { error: emailError } = await resend.emails.send({
           from: `${businessName} <${fromEmail}>`,
           to: [normalizedEmail],
+          replyTo: businessEmail || 'support@rugboost.com',
           subject: emailSubject,
           html: emailHtml,
         });

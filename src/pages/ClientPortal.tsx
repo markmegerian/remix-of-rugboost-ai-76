@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Loader2, X, LogOut, History
+  Loader2, X, LogOut, History, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import {
   isStatusLocked, 
   LIFECYCLE_ERRORS 
 } from '@/lib/lifecycleStateMachine';
+import { useInspectionPdf } from '@/hooks/useInspectionPdf';
 
 interface ServiceItem {
   id: string;
@@ -63,6 +64,7 @@ interface JobData {
   job_number: string;
   client_name: string;
   status: string;
+  created_at: string;
 }
 
 interface BusinessBranding {
@@ -75,6 +77,7 @@ const ClientPortal = () => {
   const { accessToken } = useParams<{ accessToken: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { generateAndDownload, isGenerating } = useInspectionPdf();
 
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState<JobData | null>(null);
@@ -228,7 +231,23 @@ const ClientPortal = () => {
       setClientJobAccessId(accessData.id);
       setStaffUserId((accessData.jobs as any).user_id);
 
-      const jobData = accessData.jobs as unknown as JobData;
+      // Fetch full job data including created_at
+      const { data: fullJobData } = await supabase
+        .from('jobs')
+        .select('id, job_number, client_name, status, created_at')
+        .eq('id', accessData.job_id)
+        .single();
+
+      const jobData: JobData = fullJobData ? {
+        id: fullJobData.id,
+        job_number: fullJobData.job_number,
+        client_name: fullJobData.client_name,
+        status: fullJobData.status,
+        created_at: fullJobData.created_at,
+      } : {
+        ...(accessData.jobs as any),
+        created_at: new Date().toISOString(),
+      };
       setJob(jobData);
 
       // Fetch branding
@@ -599,6 +618,28 @@ const ClientPortal = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => generateAndDownload({
+                jobId: job.id,
+                jobNumber: job.job_number,
+                clientName: job.client_name,
+                rugs,
+                totalAmount,
+                createdAt: job.created_at,
+                branding,
+              })}
+              disabled={isGenerating}
+              className="gap-1"
+            >
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">Download PDF</span>
+            </Button>
             <Button 
               variant="outline" 
               size="sm" 
