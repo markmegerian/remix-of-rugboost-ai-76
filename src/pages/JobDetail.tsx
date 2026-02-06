@@ -283,8 +283,10 @@ const JobDetail = () => {
 
     setGeneratingPortalLink(true);
     try {
-      // Generate a unique access token
-      const accessToken = crypto.randomUUID();
+      // Generate a unique access token and its hash
+      const { generateSecureToken, hashToken } = await import('@/lib/tokenSecurity');
+      const accessToken = generateSecureToken();
+      const accessTokenHash = await hashToken(accessToken);
 
       // Delete any existing pending payments for this job (to avoid duplicates when re-generating)
       await supabase
@@ -299,12 +301,13 @@ const JobDetail = () => {
         .delete()
         .eq('job_id', jobId);
 
-      // Create client job access record with company_id for tenant isolation
+      // Create client job access record with hashed token for security
       const { error } = await supabase
         .from('client_job_access')
         .insert({
           job_id: jobId,
-          access_token: accessToken,
+          access_token: accessToken, // Keep for legacy compatibility during migration
+          access_token_hash: accessTokenHash, // Secure hashed token for validation
           invited_email: job.client_email,
           company_id: companyId, // Required for RLS
         });

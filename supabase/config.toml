@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.send-inspection-ready]
 verify_jwt = false
+
+[functions.validate-token]
+verify_jwt = false
+
+[functions.complete-client-registration]
+verify_jwt = false
