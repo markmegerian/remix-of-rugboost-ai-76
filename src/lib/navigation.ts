@@ -3,11 +3,14 @@
  * Avoids popups and window.open for WebView compatibility.
  */
 
+import { isNative } from '@/lib/platformUrls';
+
 /**
  * Check if running in a native Capacitor app
+ * @deprecated Use isNative() from platformUrls.ts instead
  */
 export const isNativeApp = (): boolean => {
-  return !!(window as any).Capacitor?.isNativePlatform?.();
+  return isNative();
 };
 
 /**
@@ -80,11 +83,13 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
 };
 
 /**
- * Build a return URL that works in both web and native contexts
+ * Build a return URL that works in both web and native contexts.
+ * For web/email sharing, always uses the web origin (not custom schemes).
  */
 export const buildReturnUrl = (path: string): string => {
-  // Use origin for web, or the configured app URL scheme for native
-  const origin = window.location.origin;
+  // Always use web origin for shareable URLs (emails, portal links)
+  // Custom schemes (rugboost://) are only for deep link handling within the app
+  const origin = import.meta.env.VITE_APP_URL || window.location.origin;
   return `${origin}${path.startsWith('/') ? path : `/${path}`}`;
 };
 

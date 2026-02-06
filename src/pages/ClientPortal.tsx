@@ -446,8 +446,9 @@ const ClientPortal = () => {
       }
 
       // Call edge function to create Stripe checkout session
-      // Build mobile-safe URLs (full page navigation, not popups)
-      const baseUrl = window.location.origin;
+      // Build platform-aware URLs (web uses origin, native uses web URL for Stripe redirect)
+      // Note: Stripe redirects must use web URLs, not custom schemes
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
       const successUrl = `${baseUrl}/client/payment-success?session_id={CHECKOUT_SESSION_ID}&token=${accessToken}`;
       const cancelUrl = `${baseUrl}/client/payment-cancelled?token=${accessToken}&job=${job?.id}`;
       

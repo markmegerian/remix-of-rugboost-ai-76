@@ -202,7 +202,9 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
       let clientPortalStatus: ClientPortalStatus | null = null;
 
       if (portalResult.data) {
-        clientPortalLink = `${window.location.origin}/client/${portalResult.data.access_token}`;
+        // Portal links use web URL for email sharing (not custom schemes)
+        const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+        clientPortalLink = `${baseUrl}/client/${portalResult.data.access_token}`;
         
         // Check for service selections
         const { data: selections } = await supabase

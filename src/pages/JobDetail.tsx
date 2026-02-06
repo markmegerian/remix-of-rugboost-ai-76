@@ -232,7 +232,7 @@ const JobDetail = () => {
     setResendingInvite(true);
     try {
       const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-      const portalUrl = `${baseUrl}/client/${clientPortalStatus.accessToken}`;
+      const portalUrl = `${baseUrl}/client/${clientPortalStatus.accessToken}`; // Portal links always use web URL for email sharing
       
       const { error: inviteError } = await supabase.functions.invoke('invite-client', {
         body: {
