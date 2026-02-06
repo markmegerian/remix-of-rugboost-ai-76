@@ -23,6 +23,9 @@ const AccountSettings = lazy(() => import("./pages/AccountSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
+const BlogPage = lazy(() => import("./pages/BlogPage"));
+const BlogPostPage = lazy(() => import("./pages/BlogPage").then(m => ({ default: m.BlogPostPage })));
+const BlogAdmin = lazy(() => import("./pages/BlogAdmin"));
 
 // Client Portal Pages
 const ClientAuth = lazy(() => import("./pages/ClientAuth"));
@@ -76,6 +79,9 @@ const App = () => (
                   <Routes>
                    <Route path="/" element={<Index />} />
                    <Route path="/landing" element={<LandingPage />} />
+                   <Route path="/blog" element={<BlogPage />} />
+                   <Route path="/blog/:slug" element={<BlogPostPage />} />
+                   <Route path="/blog-admin" element={<BlogAdmin />} />
                    <Route path="/auth" element={<Auth />} />
                    <Route path="/reset-password" element={<ResetPassword />} />
                    <Route path="/dashboard" element={<Dashboard />} />

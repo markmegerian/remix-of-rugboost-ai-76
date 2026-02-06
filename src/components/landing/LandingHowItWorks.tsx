@@ -1,4 +1,6 @@
 import { Camera, Sparkles, FileCheck, ArrowRight } from 'lucide-react';
+import { useScrollAnimation, useStaggeredAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 const steps = [
   {
@@ -22,10 +24,20 @@ const steps = [
 ];
 
 export default function LandingHowItWorks() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
+  const { ref: stepsRef, isVisible: stepsVisible, getDelay } = useStaggeredAnimation(steps.length, 150);
+  const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation();
+
   return (
     <section id="how-it-works" className="py-16 md:py-24 bg-gradient-to-b from-muted/30 to-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
+        <div 
+          ref={headerRef}
+          className={cn(
+            "text-center mb-16 transition-all duration-700 ease-out",
+            headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Three Steps to Transform Your Workflow
           </h2>
@@ -34,9 +46,16 @@ export default function LandingHowItWorks() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
+        <div ref={stepsRef} className="grid md:grid-cols-3 gap-8 lg:gap-12">
           {steps.map((step, index) => (
-            <div key={step.number} className="relative">
+            <div 
+              key={step.number} 
+              className={cn(
+                "relative transition-all duration-700 ease-out",
+                stepsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              )}
+              style={stepsVisible ? getDelay(index) : {}}
+            >
               {/* Connector line */}
               {index < steps.length - 1 && (
                 <div className="hidden md:block absolute top-12 left-full w-full h-0.5 bg-gradient-to-r from-primary/30 to-transparent z-0" />
@@ -65,7 +84,13 @@ export default function LandingHowItWorks() {
         </div>
 
         {/* Bottom CTA */}
-        <div className="mt-16 text-center">
+        <div 
+          ref={ctaRef}
+          className={cn(
+            "mt-16 text-center transition-all duration-700 ease-out",
+            ctaVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
           <p className="text-lg text-muted-foreground mb-4">
             Ready to modernize your rug business?
           </p>

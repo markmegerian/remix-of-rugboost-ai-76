@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 const footerLinks = {
   Product: [
@@ -24,6 +26,9 @@ const footerLinks = {
 };
 
 export default function LandingFooter() {
+  const { ref: ctaRef, isVisible: ctaVisible } = useScrollAnimation();
+  const { ref: linksRef, isVisible: linksVisible } = useScrollAnimation();
+
   const scrollToSection = (href: string) => {
     if (href.startsWith('#')) {
       const element = document.querySelector(href);
@@ -37,7 +42,13 @@ export default function LandingFooter() {
     <footer className="bg-foreground text-background">
       {/* CTA Section */}
       <div className="border-b border-background/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <div 
+          ref={ctaRef}
+          className={cn(
+            "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center transition-all duration-700 ease-out",
+            ctaVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">
             Ready to Transform Your Rug Business?
           </h2>
@@ -54,7 +65,13 @@ export default function LandingFooter() {
       </div>
 
       {/* Links Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div 
+        ref={linksRef}
+        className={cn(
+          "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 transition-all duration-700 ease-out delay-200",
+          linksVisible ? "opacity-100" : "opacity-0"
+        )}
+      >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
