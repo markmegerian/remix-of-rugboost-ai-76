@@ -212,7 +212,9 @@ export type Database = {
       client_job_access: {
         Row: {
           access_token: string
+          auth_user_id: string | null
           client_id: string | null
+          company_id: string | null
           consumed_at: string | null
           created_at: string | null
           email_error: string | null
@@ -226,7 +228,9 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          auth_user_id?: string | null
           client_id?: string | null
+          company_id?: string | null
           consumed_at?: string | null
           created_at?: string | null
           email_error?: string | null
@@ -240,7 +244,9 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          auth_user_id?: string | null
           client_id?: string | null
+          company_id?: string | null
           consumed_at?: string | null
           created_at?: string | null
           email_error?: string | null
@@ -258,6 +264,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_job_access_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -1222,6 +1235,7 @@ export type Database = {
           auth_user_id: string
           client_id: string
           client_name: string
+          company_id: string
           invited_email: string
           job_id: string
           job_number: string

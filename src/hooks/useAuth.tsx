@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Ensure user has profile (for OAuth signups where triggers may not fire)
   // Only assign staff role if user has NO existing roles (true new internal user)
+  // CRITICAL: Never assign 'staff' role if 'client' role exists
   const ensureUserSetup = async (userId: string, userEmail: string, fullName?: string) => {
     try {
       // Check if user already has any roles
@@ -54,25 +55,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .select('role')
         .eq('user_id', userId);
 
-      // Only assign staff role if user has ZERO roles (true new internal user)
-      // This prevents clients from being auto-assigned staff role
-      if (!rolesError && (!existingRoles || existingRoles.length === 0)) {
-        await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'staff' as AppRole });
+      if (rolesError) {
+        console.error('Error checking roles:', rolesError);
+        return;
       }
 
-      // Ensure profile exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const roles = existingRoles || [];
+      const hasAnyRole = roles.length > 0;
+      const hasClientRole = roles.some(r => r.role === 'client');
+      const hasStaffRole = roles.some(r => r.role === 'staff');
 
-      if (!existingProfile) {
-        await supabase
+      // SECURITY: Never assign staff role if:
+      // 1. User already has 'client' role (client must never become staff)
+      // 2. User already has any roles (prevents role accumulation)
+      if (hasClientRole || hasAnyRole) {
+        // User is a client or already has roles - do NOT assign staff
+        console.log('User has existing roles, skipping staff assignment');
+      } else if (!hasStaffRole) {
+        // Only assign staff if user has ZERO roles (true new internal user)
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: 'staff' as AppRole });
+        
+        if (insertError && insertError.code !== '23505') {
+          console.error('Error inserting staff role:', insertError);
+        }
+      }
+
+      // Ensure profile exists (only for staff/internal users, not clients)
+      if (!hasClientRole) {
+        const { data: existingProfile } = await supabase
           .from('profiles')
-          .insert({ user_id: userId, full_name: fullName || userEmail?.split('@')[0] || 'User' });
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          await supabase
+            .from('profiles')
+            .insert({ user_id: userId, full_name: fullName || userEmail?.split('@')[0] || 'User' });
+        }
       }
     } catch (err) {
       console.error('Error ensuring user setup:', err);

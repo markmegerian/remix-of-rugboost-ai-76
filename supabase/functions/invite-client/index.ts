@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
 
     const { email, fullName, jobId, accessToken, jobNumber, portalUrl } = await req.json() as InviteRequest;
 
-    if (!email || !accessToken) {
+    if (!email || !accessToken || !jobId) {
       return new Response(
-        JSON.stringify({ error: 'Email and access token are required' }),
+        JSON.stringify({ error: 'Email, access token, and job ID are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -70,32 +70,56 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] Invite client request from IP: ${clientIp.substring(0, 10)}***`);
     console.log(`[${requestId}] Inviting: ${normalizedEmail.substring(0, 3)}*** for job ${jobId.substring(0, 8)}***`);
 
+    // CRITICAL: Get the job's company_id for tenant isolation
+    const { data: jobData, error: jobError } = await supabaseAdmin
+      .from('jobs')
+      .select('company_id, user_id')
+      .eq('id', jobId)
+      .single();
+
+    if (jobError || !jobData) {
+      console.error(`[${requestId}] Job not found:`, jobError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Job not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const companyId = jobData.company_id;
+    if (!companyId) {
+      console.error(`[${requestId}] Job has no company_id - tenant isolation required`);
+      return new Response(
+        JSON.stringify({ error: 'Job must belong to a company' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[${requestId}] Company context: ${companyId.substring(0, 8)}***`);
+
     let authUserId: string | null = null;
     let isNewUser = false;
     let clientId: string | null = null;
 
     // Create the auth user at invite time with a random password
     // The client will set their own password when they access the portal
-    // This ensures we have a deterministic auth_user_id stored with the invite
-    const tempPassword = crypto.randomUUID() + crypto.randomUUID(); // Strong random password
+    const tempPassword = crypto.randomUUID() + crypto.randomUUID();
     
     // Try to create the user - if they already exist, we'll get an error
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: normalizedEmail,
       password: tempPassword,
-      email_confirm: true, // Pre-confirm so they don't need email verification
+      email_confirm: true,
       user_metadata: {
         full_name: fullName,
-        needs_password_setup: true, // Flag that password needs to be set
+        needs_password_setup: true,
       },
     });
 
     if (createError) {
-      // Check if user already exists
       if (createError.message?.includes('already been registered') || 
           createError.message?.includes('already exists') ||
           createError.message?.includes('duplicate')) {
-        // User exists - get their ID by email using getUserByEmail (no list needed)
+        // User exists - get their ID by email
         const { data: existingUserData, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
         
         if (getUserError || !existingUserData?.user) {
@@ -120,44 +144,50 @@ Deno.serve(async (req) => {
       throw new Error('Failed to create or find auth user');
     }
 
-    // Store the auth_user_id on the access token record
+    // Store auth_user_id AND company_id on the access token record
     const { error: updateAccessError } = await supabaseAdmin
       .from('client_job_access')
-      .update({ auth_user_id: authUserId })
+      .update({ 
+        auth_user_id: authUserId,
+        company_id: companyId, // CRITICAL: Store company context
+      })
       .eq('access_token', accessToken);
 
     if (updateAccessError) {
-      console.error(`[${requestId}] Error updating access token with auth_user_id:`, updateAccessError.message);
-      // Don't throw - the invite can still work, just won't have the optimization
+      console.error(`[${requestId}] Error updating access token:`, updateAccessError.message);
     } else {
-      console.log(`[${requestId}] Stored auth_user_id on access token`);
+      console.log(`[${requestId}] Stored auth_user_id and company_id on access token`);
     }
 
-    // Check if client account exists
+    // Check if client account exists for this company
     const { data: existingClient } = await supabaseAdmin
       .from('client_accounts')
       .select('id')
       .eq('user_id', authUserId)
+      .eq('company_id', companyId) // CRITICAL: Company-scoped lookup
       .maybeSingle();
 
     if (existingClient) {
       clientId = existingClient.id;
       console.log(`[${requestId}] Using existing client account: ${existingClient.id.substring(0, 8)}***`);
     } else {
-      // Create client account
+      // Create client account with company_id
       const { data: newClient, error: clientError } = await supabaseAdmin
         .from('client_accounts')
         .insert({
           user_id: authUserId,
           email: normalizedEmail,
           full_name: fullName,
+          company_id: companyId, // CRITICAL: Tenant isolation
         })
         .select('id')
         .single();
 
       if (clientError) {
-        console.error(`[${requestId}] Error creating client account:`, clientError.message);
-        // Don't throw - user can still set up account later
+        // May fail if client exists for different company - that's OK
+        if (clientError.code !== '23505') {
+          console.error(`[${requestId}] Error creating client account:`, clientError.message);
+        }
       } else {
         clientId = newClient.id;
         console.log(`[${requestId}] Created new client account: ${newClient.id.substring(0, 8)}***`);
@@ -178,7 +208,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Ensure client role exists (never staff)
+    // Ensure client role exists (ONLY 'client', never 'staff')
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({ user_id: authUserId, role: 'client' });
@@ -189,28 +219,32 @@ Deno.serve(async (req) => {
       console.log(`[${requestId}] Client role ensured`);
     }
 
-    // Variable to track email status
+    // Email sending logic
     let emailSentSuccessfully = false;
     let emailErrorMessage: string | null = null;
-
-    // Get job owner's profile for branding
-    const { data: job } = await supabaseAdmin
-      .from('jobs')
-      .select('user_id')
-      .eq('id', jobId)
-      .single();
 
     let businessName = 'Rug Cleaning Service';
     let businessPhone = '';
     let businessEmail = '';
     let customTemplate = null;
 
-    if (job?.user_id) {
-      // Get branding
+    // Get branding from company_branding or profiles
+    const { data: brandingData } = await supabaseAdmin
+      .from('company_branding')
+      .select('business_name, business_phone, business_email')
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    if (brandingData) {
+      businessName = brandingData.business_name || businessName;
+      businessPhone = brandingData.business_phone || '';
+      businessEmail = brandingData.business_email || '';
+    } else {
+      // Fallback to profiles
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('business_name, business_phone, business_email')
-        .eq('user_id', job.user_id)
+        .eq('user_id', jobData.user_id)
         .single();
 
       if (profile) {
@@ -218,18 +252,18 @@ Deno.serve(async (req) => {
         businessPhone = profile.business_phone || '';
         businessEmail = profile.business_email || '';
       }
+    }
 
-      // Check for custom email template
-      const { data: template } = await supabaseAdmin
-        .from('email_templates')
-        .select('subject, body')
-        .eq('user_id', job.user_id)
-        .eq('template_type', 'client_invite')
-        .single();
+    // Check for custom email template (company-scoped)
+    const { data: template } = await supabaseAdmin
+      .from('email_templates')
+      .select('subject, body')
+      .eq('company_id', companyId)
+      .eq('template_type', 'client_invite')
+      .maybeSingle();
 
-      if (template) {
-        customTemplate = template;
-      }
+    if (template) {
+      customTemplate = template;
     }
 
     // Send invite email
@@ -252,11 +286,9 @@ Deno.serve(async (req) => {
         let emailBody: string;
 
         if (customTemplate) {
-          // Use custom template
           emailSubject = replaceTemplateVariables(customTemplate.subject, templateVariables);
           emailBody = replaceTemplateVariables(customTemplate.body, templateVariables);
         } else {
-          // Use default template
           emailSubject = `Your Rug Inspection Estimate is Ready - ${businessName}`;
           emailBody = `Dear ${fullName || 'Valued Customer'},
 
@@ -274,7 +306,6 @@ Best regards,
 ${businessName}`;
         }
 
-        // Convert plain text to HTML
         const emailHtml = `
           <!DOCTYPE html>
           <html>
@@ -334,18 +365,14 @@ ${businessName}`;
       emailErrorMessage = 'Email not configured (missing RESEND_API_KEY or portalUrl)';
     }
 
-    // Update client_job_access with email status
-    const { error: updateError } = await supabaseAdmin
+    // Update email status
+    await supabaseAdmin
       .from('client_job_access')
       .update({
         email_sent_at: emailSentSuccessfully ? new Date().toISOString() : null,
         email_error: emailErrorMessage,
       })
       .eq('access_token', accessToken);
-
-    if (updateError) {
-      console.error(`[${requestId}] Error updating email status:`, updateError.message);
-    }
 
     console.log(`[${requestId}] Invite completed - Email sent: ${emailSentSuccessfully}, New user: ${isNewUser}`);
     return new Response(
@@ -354,6 +381,7 @@ ${businessName}`;
         userId: authUserId,
         clientId,
         isNewUser,
+        companyId, // Return for verification
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

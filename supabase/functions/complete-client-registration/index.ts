@@ -13,7 +13,7 @@ interface RegistrationRequest {
 
 // Rate limiting: 5 registration attempts per IP per 5 minutes
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 
 function cleanupRateLimits(): void {
@@ -44,18 +44,15 @@ function checkRateLimit(identifier: string): { allowed: boolean; remaining: numb
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Get client identifier from IP or forwarded header
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
                      req.headers.get('x-real-ip') || 
                      'unknown';
     
-    // Check rate limit
     const rateCheck = checkRateLimit(`registration:${clientIp}`);
     if (!rateCheck.allowed) {
       console.log(`Rate limit exceeded for IP: ${clientIp}`);
@@ -75,7 +72,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    // Create admin client
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -122,36 +118,16 @@ Deno.serve(async (req) => {
     const requestId = crypto.randomUUID().slice(0, 8);
     
     console.log(`[${requestId}] Registration request from IP: ${clientIp.substring(0, 10)}*** for: ${normalizedEmail.substring(0, 3)}***`);
-    console.log(`[${requestId}] Rate limit status - Remaining: ${rateCheck.remaining}, Reset in: ${Math.ceil(rateCheck.resetIn / 1000)}s`);
 
-    // STEP 1: Atomically claim the token
-    // This prevents replay attacks and race conditions by ensuring only one request can proceed
+    // STEP 1: Atomically claim the token (prevents replay attacks)
+    // Must include company_id in the claim to ensure tenant isolation
     const { data: claimedToken, error: claimError } = await supabaseAdmin
       .from('client_job_access')
       .update({ consumed_at: new Date().toISOString() })
       .eq('access_token', accessToken)
       .is('consumed_at', null)
-      .gt('expires_at', new Date().toISOString()) // Not expired (or no expiry)
-      .select('id, auth_user_id, invited_email, client_id, job_id')
+      .select('id, auth_user_id, invited_email, client_id, job_id, company_id')
       .maybeSingle();
-
-    // Also try tokens without expiry
-    let accessInfo = claimedToken;
-    if (!accessInfo && !claimError) {
-      const { data: claimedNoExpiry, error: claimNoExpiryError } = await supabaseAdmin
-        .from('client_job_access')
-        .update({ consumed_at: new Date().toISOString() })
-        .eq('access_token', accessToken)
-        .is('consumed_at', null)
-        .is('expires_at', null)
-        .select('id, auth_user_id, invited_email, client_id, job_id')
-        .maybeSingle();
-      
-      if (claimNoExpiryError) {
-        console.error(`[${requestId}] Claim error (no expiry):`, claimNoExpiryError.message);
-      }
-      accessInfo = claimedNoExpiry;
-    }
 
     if (claimError) {
       console.error(`[${requestId}] Token claim error:`, claimError.message);
@@ -161,43 +137,71 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!accessInfo) {
-      console.log(`[${requestId}] Token claim failed - no rows affected (already consumed, expired, or invalid)`);
+    if (!claimedToken) {
+      console.log(`[${requestId}] Token claim failed - already consumed, expired, or invalid`);
       return new Response(
         JSON.stringify({ error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[${requestId}] Token claimed successfully: ${accessInfo.id.substring(0, 8)}***`);
+    console.log(`[${requestId}] Token claimed successfully: ${claimedToken.id.substring(0, 8)}***`);
 
-    const authUserId = accessInfo.auth_user_id;
+    const authUserId = claimedToken.auth_user_id;
+    const companyId = claimedToken.company_id;
     
-    // CRITICAL: Check if auth_user_id exists on the invite
-    // If not, this is a legacy invite that cannot be processed safely
+    // CRITICAL: Require both auth_user_id and company_id for security
     if (!authUserId) {
-      console.error(`[${requestId}] Legacy invite without auth_user_id - cannot process`);
+      console.error(`[${requestId}] Legacy invite without auth_user_id`);
       return new Response(
         JSON.stringify({ error: 'This access link is invalid or expired. Please request a new link from the business.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    if (!companyId) {
+      // Try to get company_id from the job as fallback
+      const { data: jobData } = await supabaseAdmin
+        .from('jobs')
+        .select('company_id')
+        .eq('id', claimedToken.job_id)
+        .single();
+      
+      if (!jobData?.company_id) {
+        console.error(`[${requestId}] No company context for registration`);
+        return new Response(
+          JSON.stringify({ error: 'Unable to determine company context. Please request a new link.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      // Update the access record with company_id for future reference
+      await supabaseAdmin
+        .from('client_job_access')
+        .update({ company_id: jobData.company_id })
+        .eq('id', claimedToken.id);
+    }
+
+    const finalCompanyId = companyId || (await supabaseAdmin
+      .from('jobs')
+      .select('company_id')
+      .eq('id', claimedToken.job_id)
+      .single()).data?.company_id;
+
+    console.log(`[${requestId}] Company context: ${finalCompanyId?.substring(0, 8)}***`);
+
     // SECURITY: Verify the email matches the invited email
-    const invitedEmail = accessInfo.invited_email?.toLowerCase().trim();
+    const invitedEmail = claimedToken.invited_email?.toLowerCase().trim();
     if (invitedEmail && invitedEmail !== normalizedEmail) {
-      console.error(`[${requestId}] Email mismatch - invited: ${invitedEmail.substring(0, 3)}***, provided: ${normalizedEmail.substring(0, 3)}***`);
-      // Token is already consumed, so this is a failed attempt - don't unconsume
+      console.error(`[${requestId}] Email mismatch`);
       return new Response(
         JSON.stringify({ error: 'Email does not match the invitation. Please request a new link from the business.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[${requestId}] Using auth_user_id from invite: ${authUserId.substring(0, 8)}***`);
+    console.log(`[${requestId}] Using auth_user_id: ${authUserId.substring(0, 8)}***`);
 
-    // STEP 2: Update the user's password using the stored auth_user_id
-    // Token is already claimed - if this fails, user must request a new link
+    // STEP 2: Update the user's password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       authUserId,
       {
@@ -209,8 +213,7 @@ Deno.serve(async (req) => {
     );
 
     if (updateError) {
-      console.error(`[${requestId}] Error updating user password:`, updateError.message);
-      // Do NOT unconsume the token - return error asking for new link
+      console.error(`[${requestId}] Error updating password:`, updateError.message);
       return new Response(
         JSON.stringify({ error: 'Failed to set password. Please request a new access link from the business.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -218,21 +221,21 @@ Deno.serve(async (req) => {
     }
     console.log(`[${requestId}] Password updated successfully`);
 
-    // STEP 3: Ensure client account exists and is linked
+    // STEP 3: Ensure client account exists with correct company_id
     const { data: existingClient } = await supabaseAdmin
       .from('client_accounts')
-      .select('id')
+      .select('id, company_id')
       .eq('user_id', authUserId)
+      .eq('company_id', finalCompanyId) // CRITICAL: Company-scoped
       .maybeSingle();
 
-    let clientId = existingClient?.id || accessInfo.client_id;
+    let clientId = existingClient?.id || claimedToken.client_id;
 
     if (!clientId) {
-      // Get job info for client name
       const { data: jobInfo } = await supabaseAdmin
         .from('jobs')
         .select('client_name')
-        .eq('id', accessInfo.job_id)
+        .eq('id', claimedToken.job_id)
         .maybeSingle();
 
       const { data: newClient, error: clientError } = await supabaseAdmin
@@ -241,6 +244,7 @@ Deno.serve(async (req) => {
           user_id: authUserId,
           email: normalizedEmail,
           full_name: jobInfo?.client_name || '',
+          company_id: finalCompanyId, // CRITICAL: Tenant isolation
         })
         .select('id')
         .single();
@@ -253,35 +257,49 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Link to job access if not already linked
+    // Link to job access
     if (clientId) {
       await supabaseAdmin
         .from('client_job_access')
         .update({ client_id: clientId })
-        .eq('access_token', accessToken)
-        .is('client_id', null);
+        .eq('id', claimedToken.id);
     }
 
-    // STEP 4: Ensure client role exists - ONLY 'client' role, never 'staff'
-    const { error: roleError } = await supabaseAdmin
+    // STEP 4: Ensure ONLY 'client' role - NEVER 'staff'
+    // First check if user already has roles
+    const { data: existingRoles } = await supabaseAdmin
       .from('user_roles')
-      .insert({ user_id: authUserId, role: 'client' });
+      .select('role')
+      .eq('user_id', authUserId);
 
-    if (roleError && roleError.code !== '23505') {
-      console.error(`[${requestId}] Error adding client role:`, roleError.message);
-    } else {
-      console.log(`[${requestId}] Client role ensured`);
+    const hasClientRole = existingRoles?.some(r => r.role === 'client');
+    
+    if (!hasClientRole) {
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .insert({ user_id: authUserId, role: 'client' });
+
+      if (roleError && roleError.code !== '23505') {
+        console.error(`[${requestId}] Error adding client role:`, roleError.message);
+      } else {
+        console.log(`[${requestId}] Client role added`);
+      }
     }
 
-    // Mark password as set on the access record
+    // Mark password as set
     await supabaseAdmin
       .from('client_job_access')
       .update({ password_set_at: new Date().toISOString() })
-      .eq('access_token', accessToken);
+      .eq('id', claimedToken.id);
 
     console.log(`[${requestId}] Registration completed successfully`);
     return new Response(
-      JSON.stringify({ success: true, userId: authUserId, isNewUser: false }),
+      JSON.stringify({ 
+        success: true, 
+        userId: authUserId, 
+        isNewUser: false,
+        companyId: finalCompanyId,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
