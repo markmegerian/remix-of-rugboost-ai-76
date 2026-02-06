@@ -22,6 +22,7 @@ const JobDetail = lazy(() => import("./pages/JobDetail"));
 const AccountSettings = lazy(() => import("./pages/AccountSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Analytics = lazy(() => import("./pages/Analytics"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 // Client Portal Pages
 const ClientAuth = lazy(() => import("./pages/ClientAuth"));
@@ -74,6 +75,7 @@ const App = () => (
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                    <Route path="/" element={<Index />} />
+                   <Route path="/landing" element={<LandingPage />} />
                    <Route path="/auth" element={<Auth />} />
                    <Route path="/reset-password" element={<ResetPassword />} />
                    <Route path="/dashboard" element={<Dashboard />} />
