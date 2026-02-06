@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Save, X, Eye } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Edit, Save, X, Eye, Image, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +25,7 @@ export default function BlogAdmin() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPosts(getBlogPosts());
@@ -65,7 +66,23 @@ export default function BlogAdmin() {
       featured: false,
       metaTitle: '',
       metaDescription: '',
+      ogImage: '',
+      coverImage: '',
     });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingPost) return;
+
+    // For standalone deployment, convert to data URL
+    // In production with storage, you'd upload to a CDN instead
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setEditingPost({ ...editingPost, coverImage: dataUrl });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCancel = () => {
@@ -123,6 +140,67 @@ export default function BlogAdmin() {
                       onChange={e => setEditingPost({...editingPost, slug: e.target.value})}
                       placeholder="url-slug"
                     />
+                  </div>
+                </div>
+
+                {/* Cover Image Upload */}
+                <div className="space-y-2">
+                  <Label>Cover Image</Label>
+                  <div className="flex gap-4 items-start">
+                    {/* Preview */}
+                    <div className="w-32 h-20 rounded-lg border border-border overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+                      {editingPost.coverImage ? (
+                        <img 
+                          src={editingPost.coverImage} 
+                          alt="Cover preview" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Image className="h-8 w-8 text-muted-foreground/50" />
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 space-y-2">
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="gap-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Upload Image
+                        </Button>
+                        {editingPost.coverImage && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingPost({ ...editingPost, coverImage: '' })}
+                            className="text-destructive"
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                      <Input
+                        placeholder="Or paste image URL..."
+                        value={editingPost.coverImage?.startsWith('data:') ? '' : editingPost.coverImage || ''}
+                        onChange={e => setEditingPost({ ...editingPost, coverImage: e.target.value })}
+                        className="text-sm"
+                      />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Upload an image or paste a URL. Recommended size: 1200×630px for social sharing.
+                      </p>
+                    </div>
                   </div>
                 </div>
 

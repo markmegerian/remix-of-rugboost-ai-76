@@ -19,6 +19,7 @@ export interface BlogPost {
   metaTitle?: string;
   metaDescription?: string;
   ogImage?: string;
+  coverImage?: string;
 }
 
 // Default blog posts for initial content
@@ -107,10 +108,20 @@ export default function LandingBlog() {
               )}
               style={postsVisible ? getDelay(index) : {}}
             >
-              {/* Placeholder image */}
-              <div className="aspect-[16/9] bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
-                <span className="text-4xl opacity-30">📰</span>
-              </div>
+              {/* Cover image */}
+              {post.coverImage ? (
+                <div className="aspect-[16/9] overflow-hidden">
+                  <img 
+                    src={post.coverImage} 
+                    alt={post.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ) : (
+                <div className="aspect-[16/9] bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                  <span className="text-4xl opacity-30">📰</span>
+                </div>
+              )}
 
               <div className="p-6">
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
