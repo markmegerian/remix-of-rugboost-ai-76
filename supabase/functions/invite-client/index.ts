@@ -271,7 +271,7 @@ Deno.serve(async (req) => {
     if (resendApiKey && portalUrl) {
       try {
         const resend = new Resend(resendApiKey);
-        const fromEmail = Deno.env.get('FROM_EMAIL') || 'onboarding@resend.dev';
+        const fromEmail = Deno.env.get('FROM_EMAIL') || 'noreply@app.rugboost.com';
 
         const templateVariables: Record<string, string> = {
           client_name: fullName || 'Valued Customer',

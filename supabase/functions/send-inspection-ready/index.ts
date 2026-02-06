@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
     }
 
     const resend = new Resend(resendApiKey);
-    const fromEmail = Deno.env.get('FROM_EMAIL') || 'onboarding@resend.dev';
+    const fromEmail = Deno.env.get('FROM_EMAIL') || 'noreply@app.rugboost.com';
 
     const subject = `Your Inspection Report is Ready - Job #${jobNumber}`;
     

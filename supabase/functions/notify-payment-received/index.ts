@@ -31,9 +31,12 @@ serve(async (req) => {
 
     const formattedAmount = (amount / 100).toFixed(2);
 
+    const fromEmail = Deno.env.get("FROM_EMAIL") || "noreply@app.rugboost.com";
+    
     const emailResponse = await resend.emails.send({
-      from: `${businessName || "RugBoost"} <onboarding@resend.dev>`,
+      from: `${businessName || "RugBoost"} <${fromEmail}>`,
       to: [to],
+      replyTo: "support@rugboost.com",
       subject: `🎉 Payment Received - Job #${jobNumber}`,
       html: `
         <!DOCTYPE html>
