@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2, Lightbulb, Lock, AlertTriangle, Shield, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2, Lightbulb, Lock, AlertTriangle, Shield, AlertCircle, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import TeachAIDialog from './TeachAIDialog';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import UnsavedChangesDialog from './UnsavedChangesDialog';
 import { categorizeService, SERVICE_CATEGORIES, canStaffEditService, type ServiceCategory } from '@/lib/serviceCategories';
 import { LockedIndicator } from '@/components/LifecycleErrorState';
 import { LIFECYCLE_ERRORS } from '@/lib/lifecycleStateMachine';
+import AddStaffServiceModal, { type StaffAddedService } from './AddStaffServiceModal';
 import {
   Select,
   SelectContent,
@@ -23,6 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export interface ServiceItem {
   id: string;
@@ -31,6 +39,12 @@ export interface ServiceItem {
   quantity: number;
   unitPrice: number;
   priority: 'high' | 'medium' | 'low';
+  // Staff addition tracking
+  source?: 'ai' | 'staff';
+  addedBy?: string;
+  addedByName?: string;
+  addedAt?: string;
+  reasonNote?: string;
 }
 
 interface EstimateReviewProps {
@@ -73,12 +87,14 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   isLocked = false,
 }) => {
   const { user } = useAuth();
+  const { isAdmin } = useAdminAuth();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showTeachAI, setShowTeachAI] = useState(false);
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [isAdminOverride, setIsAdminOverride] = useState(false);
+  const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [pendingFeedback, setPendingFeedback] = useState<{
     originalService: string;
     originalPrice: number;
@@ -311,21 +327,35 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
     setHasModifications(true);
   };
 
+  // Handler for adding staff services via modal
+  const handleAddStaffService = (newService: StaffAddedService) => {
+    if (isLocked) {
+      toast.error(LIFECYCLE_ERRORS.JOB_LOCKED);
+      return;
+    }
+    
+    // Convert to ServiceItem with staff tracking
+    const serviceItem: ServiceItem = {
+      ...newService,
+      source: 'staff',
+      addedBy: user?.id,
+      addedByName: user?.email || undefined,
+      addedAt: new Date().toISOString(),
+    };
+    
+    setServices(prev => [...prev, serviceItem]);
+    setHasModifications(true);
+    toast.success(`Added: ${newService.name}`);
+  };
+
+  // Legacy handler for admin quick-add (kept for backward compatibility)
   const handleAddService = () => {
     if (isLocked) {
       toast.error(LIFECYCLE_ERRORS.JOB_LOCKED);
       return;
     }
-    const newService: ServiceItem = {
-      id: crypto.randomUUID(),
-      name: 'New Service',
-      quantity: 1,
-      unitPrice: 0,
-      priority: 'medium',
-    };
-    setServices(prev => [...prev, newService]);
-    setEditingId(newService.id);
-    setHasModifications(true);
+    // Staff/admin now uses the modal for proper tracking
+    setShowAddServiceModal(true);
   };
 
   const handleRemoveService = (id: string) => {
@@ -502,11 +532,37 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                 Services are categorized by necessity based on expert assessment
               </CardDescription>
             </div>
-            {isAdminOverride && (
-              <Button variant="outline" size="sm" onClick={handleAddService} className="gap-1">
-                <Plus className="h-4 w-4" />
-                Add Service
-              </Button>
+            {/* Add Service button - available to staff/admin when not locked */}
+            {!isLocked ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleAddService} className="gap-1">
+                      <Plus className="h-4 w-4" />
+                      Add Service
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Add a service that AI may have missed
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button variant="outline" size="sm" disabled className="gap-1">
+                        <Lock className="h-4 w-4" />
+                        Locked
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Estimate is locked after payment
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </CardHeader>
@@ -582,13 +638,13 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           {/* Category Icon */}
                           {categorizeService(service.name) === 'required' && (
                             <Lock className="h-4 w-4 text-destructive flex-shrink-0" />
                           )}
                           {categorizeService(service.name) === 'recommended' && (
-                            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
                           )}
                           {categorizeService(service.name) === 'preventative' && (
                             <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -600,6 +656,30 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                             {categorizeService(service.name) === 'required' ? 'Required' : 
                              categorizeService(service.name) === 'recommended' ? 'Recommended' : 'Preventative'}
                           </Badge>
+                          {/* Staff-added badge */}
+                          {service.source === 'staff' && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-[10px] gap-1 border-primary/50 text-primary">
+                                    <UserPlus className="h-3 w-3" />
+                                    Staff Added
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="font-medium">Added by staff</p>
+                                  {service.reasonNote && (
+                                    <p className="text-xs text-muted-foreground mt-1">{service.reasonNote}</p>
+                                  )}
+                                  {service.addedAt && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {new Date(service.addedAt).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           <span className="font-medium">{service.name}</span>
                         </div>
                         <div className="flex items-center gap-4">
@@ -744,6 +824,17 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         open={isBlocked}
         onConfirm={confirmNavigation}
         onCancel={cancelNavigation}
+      />
+
+      {/* Add Staff Service Modal */}
+      <AddStaffServiceModal
+        open={showAddServiceModal}
+        onOpenChange={setShowAddServiceModal}
+        onAdd={handleAddStaffService}
+        availableServices={availableServices}
+        isAdmin={isAdmin}
+        userId={user?.id || ''}
+        userName={user?.email || undefined}
       />
     </div>
   );
