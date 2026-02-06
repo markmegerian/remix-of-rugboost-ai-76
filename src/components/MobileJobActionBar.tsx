@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { ChevronRight, Plus, Sparkles, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatusGatedButton from '@/components/StatusGatedButton';
@@ -26,7 +26,7 @@ interface MobileJobActionBarProps {
  * Shows the most relevant action based on current job state.
  * Designed for one-thumb operation.
  */
-const MobileJobActionBar: React.FC<MobileJobActionBarProps> = ({
+const MobileJobActionBarComponent: React.FC<MobileJobActionBarProps> = ({
   actions,
   rugsCount,
   hasUnanalyzedRugs,
@@ -140,5 +140,8 @@ const MobileJobActionBar: React.FC<MobileJobActionBarProps> = ({
     </div>
   );
 };
+
+const MobileJobActionBar = memo(MobileJobActionBarComponent);
+MobileJobActionBar.displayName = 'MobileJobActionBar';
 
 export default MobileJobActionBar;

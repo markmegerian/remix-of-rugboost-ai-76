@@ -861,5 +861,6 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
 
 // Memoize the component to prevent unnecessary re-renders
 const AnalysisReport = memo(AnalysisReportComponent);
+AnalysisReport.displayName = 'AnalysisReport';
 
 export default AnalysisReport;

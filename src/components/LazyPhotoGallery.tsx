@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { ImageIcon, ZoomIn, ChevronDown, Loader2 } from 'lucide-react';
 import RugPhoto from '@/components/RugPhoto';
 import { batchSignUrls } from '@/hooks/useSignedUrls';
@@ -23,7 +23,7 @@ interface LazyPhotoGalleryProps {
   onOpenLightbox: (photos: string[], startIndex: number, annotations?: PhotoAnnotations[] | null) => void;
 }
 
-const LazyPhotoGallery: React.FC<LazyPhotoGalleryProps> = ({
+const LazyPhotoGalleryComponent: React.FC<LazyPhotoGalleryProps> = ({
   photoUrls,
   rugNumber,
   initialCount = 3,
@@ -153,6 +153,9 @@ const LazyPhotoGallery: React.FC<LazyPhotoGalleryProps> = ({
     </div>
   );
 };
+
+const LazyPhotoGallery = memo(LazyPhotoGalleryComponent);
+LazyPhotoGallery.displayName = 'LazyPhotoGallery';
 
 export default LazyPhotoGallery;
 export type { PhotoAnnotations, ImageAnnotation };

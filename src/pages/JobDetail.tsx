@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
@@ -28,11 +28,7 @@ import { generatePDF, generateJobPDF, generateJobPDFBase64, BusinessBranding, Up
 import RugForm from '@/components/RugForm';
 import JobForm from '@/components/JobForm';
 import EditRugDialog from '@/components/EditRugDialog';
-import AnalysisReport from '@/components/AnalysisReport';
-import EmailPreviewDialog from '@/components/EmailPreviewDialog';
-import EstimateReview from '@/components/EstimateReview';
 import AnalysisProgress, { AnalysisStage } from '@/components/AnalysisProgress';
-import { ModelComparisonDialog } from '@/components/ModelComparisonDialog';
 import ClientPortalStatus from '@/components/ClientPortalStatus';
 import ServiceCompletionCard from '@/components/ServiceCompletionCard';
 import PaymentTracking from '@/components/PaymentTracking';
@@ -49,6 +45,19 @@ import MobileJobActionBar from '@/components/MobileJobActionBar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import EditClientInfoDialog from '@/components/EditClientInfoDialog';
 import ExpertEstimateCard from '@/components/ExpertEstimateCard';
+
+// Lazy load heavy dialogs for code splitting
+const AnalysisReport = lazy(() => import('@/components/AnalysisReport'));
+const EstimateReview = lazy(() => import('@/components/EstimateReview'));
+const EmailPreviewDialog = lazy(() => import('@/components/EmailPreviewDialog'));
+const ModelComparisonDialog = lazy(() => import('@/components/ModelComparisonDialog').then(mod => ({ default: mod.ModelComparisonDialog })));
+
+// Loading fallback for lazy dialogs
+const DialogLoadingFallback = () => (
+  <div className="flex items-center justify-center p-12">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
 
 interface ClientPortalStatusData {
   accessToken: string;
@@ -907,49 +916,51 @@ const JobDetail = () => {
         <main className="container mx-auto px-4 py-8">
           <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} currentPage={`${selectedRug.rug_number} – Expert Estimate`} />
           <div className="mx-auto max-w-3xl">
-            <EstimateReview
-              report={selectedRug.analysis_report || ''}
-              rugInfo={{
-                rugNumber: selectedRug.rug_number,
-                rugType: selectedRug.rug_type,
-                dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
-                squareFootage,
-              }}
-              inspectionId={selectedRug.id}
-              jobId={jobId || ''}
-              availableServices={servicePrices}
-              existingApprovedEstimate={approvedEstimates.find(ae => ae.inspection_id === selectedRug.id) || null}
-              onBack={() => {
-                setShowEstimateReview(false);
-                setShowReport(true);
-              }}
-              onApprove={(services, totalCost) => {
-                // Update local state with new approved estimate
-                setLocalApprovedEstimates(prev => {
-                  const existing = prev.find(ae => ae.inspection_id === selectedRug.id);
-                  if (existing) {
-                    return prev.map(ae => 
-                      ae.inspection_id === selectedRug.id 
-                        ? { ...ae, services, total_amount: totalCost }
-                        : ae
-                    );
-                  } else {
-                    return [...prev, {
-                      id: crypto.randomUUID(),
-                      inspection_id: selectedRug.id,
-                      services,
-                      total_amount: totalCost
-                    }];
-                  }
-                });
-                // Update rug's estimate_approved flag locally
-                setLocalRugs(prev => prev.map(r => 
-                  r.id === selectedRug.id ? { ...r, estimate_approved: true } : r
-                ));
-                setShowEstimateReview(false);
-                setShowReport(false);
-              }}
-            />
+            <Suspense fallback={<DialogLoadingFallback />}>
+              <EstimateReview
+                report={selectedRug.analysis_report || ''}
+                rugInfo={{
+                  rugNumber: selectedRug.rug_number,
+                  rugType: selectedRug.rug_type,
+                  dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
+                  squareFootage,
+                }}
+                inspectionId={selectedRug.id}
+                jobId={jobId || ''}
+                availableServices={servicePrices}
+                existingApprovedEstimate={approvedEstimates.find(ae => ae.inspection_id === selectedRug.id) || null}
+                onBack={() => {
+                  setShowEstimateReview(false);
+                  setShowReport(true);
+                }}
+                onApprove={(services, totalCost) => {
+                  // Update local state with new approved estimate
+                  setLocalApprovedEstimates(prev => {
+                    const existing = prev.find(ae => ae.inspection_id === selectedRug.id);
+                    if (existing) {
+                      return prev.map(ae => 
+                        ae.inspection_id === selectedRug.id 
+                          ? { ...ae, services, total_amount: totalCost }
+                          : ae
+                      );
+                    } else {
+                      return [...prev, {
+                        id: crypto.randomUUID(),
+                        inspection_id: selectedRug.id,
+                        services,
+                        total_amount: totalCost
+                      }];
+                    }
+                  });
+                  // Update rug's estimate_approved flag locally
+                  setLocalRugs(prev => prev.map(r => 
+                    r.id === selectedRug.id ? { ...r, estimate_approved: true } : r
+                  ));
+                  setShowEstimateReview(false);
+                  setShowReport(false);
+                }}
+              />
+            </Suspense>
           </div>
         </main>
       </div>
@@ -977,50 +988,52 @@ const JobDetail = () => {
         <main className="container mx-auto px-4 py-8">
           <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} currentPage={`${selectedRug.rug_number} – Analysis Report`} />
           <div className="mx-auto max-w-3xl">
-            <AnalysisReport
-              report={selectedRug.analysis_report || ''}
-              rugInfo={{
-                clientName: job.client_name,
-                rugNumber: selectedRug.rug_number,
-                rugType: selectedRug.rug_type,
-                dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
-              }}
-              photoUrls={selectedRug.photo_urls || []}
-              imageAnnotations={
-                imageAnnotations.length > 0 
-                  ? imageAnnotations 
-                  : (Array.isArray(selectedRug.image_annotations) ? selectedRug.image_annotations : [])
-              }
-              approvedEstimate={approvedEstimates.find(ae => ae.inspection_id === selectedRug.id) || null}
-              onNewInspection={() => setShowReport(false)}
-              onReviewEstimate={() => {
-                setShowReport(false);
-                setShowEstimateReview(true);
-              }}
-              onReanalyze={() => handleReanalyzeRug(selectedRug)}
-              isReanalyzing={reanalyzingRugId === selectedRug.id}
-              onAnnotationsChange={async (newAnnotations) => {
-                try {
-                  const { error } = await supabase
-                    .from('inspections')
-                    .update({ image_annotations: newAnnotations as unknown as Json })
-                    .eq('id', selectedRug.id);
-                  
-                  if (error) throw error;
-                  
-                  setImageAnnotations(newAnnotations);
-                  // Update the rug in local state
-                  setLocalRugs(prev => prev.map(r => 
-                    r.id === selectedRug.id 
-                      ? { ...r, image_annotations: newAnnotations as unknown as Json }
-                      : r
-                  ));
-                } catch (error) {
-                  console.error('Failed to save annotations:', error);
-                  toast.error('Failed to save markers');
+            <Suspense fallback={<DialogLoadingFallback />}>
+              <AnalysisReport
+                report={selectedRug.analysis_report || ''}
+                rugInfo={{
+                  clientName: job.client_name,
+                  rugNumber: selectedRug.rug_number,
+                  rugType: selectedRug.rug_type,
+                  dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
+                }}
+                photoUrls={selectedRug.photo_urls || []}
+                imageAnnotations={
+                  imageAnnotations.length > 0 
+                    ? imageAnnotations 
+                    : (Array.isArray(selectedRug.image_annotations) ? selectedRug.image_annotations : [])
                 }
-              }}
-            />
+                approvedEstimate={approvedEstimates.find(ae => ae.inspection_id === selectedRug.id) || null}
+                onNewInspection={() => setShowReport(false)}
+                onReviewEstimate={() => {
+                  setShowReport(false);
+                  setShowEstimateReview(true);
+                }}
+                onReanalyze={() => handleReanalyzeRug(selectedRug)}
+                isReanalyzing={reanalyzingRugId === selectedRug.id}
+                onAnnotationsChange={async (newAnnotations) => {
+                  try {
+                    const { error } = await supabase
+                      .from('inspections')
+                      .update({ image_annotations: newAnnotations as unknown as Json })
+                      .eq('id', selectedRug.id);
+                    
+                    if (error) throw error;
+                    
+                    setImageAnnotations(newAnnotations);
+                    // Update the rug in local state
+                    setLocalRugs(prev => prev.map(r => 
+                      r.id === selectedRug.id 
+                        ? { ...r, image_annotations: newAnnotations as unknown as Json }
+                        : r
+                    ));
+                  } catch (error) {
+                    console.error('Failed to save annotations:', error);
+                    toast.error('Failed to save markers');
+                  }
+                }}
+              />
+            </Suspense>
           </div>
         </main>
       </div>
@@ -1571,53 +1584,57 @@ const JobDetail = () => {
       />
 
       {/* Email Preview Dialog */}
-      {job.client_email && (
-        <EmailPreviewDialog
-          open={showEmailPreview}
-          onOpenChange={setShowEmailPreview}
-          onSend={handleSendEmail}
-          clientName={job.client_name}
-          clientEmail={job.client_email}
-          jobNumber={job.job_number}
-          rugDetails={rugs.filter(r => r.analysis_report).map(rug => ({
-            rugNumber: rug.rug_number,
-            rugType: rug.rug_type,
-            dimensions: rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
-          }))}
-          businessName={branding?.business_name || undefined}
-          isSending={sendingEmail}
-        />
+      {job.client_email && showEmailPreview && (
+        <Suspense fallback={null}>
+          <EmailPreviewDialog
+            open={showEmailPreview}
+            onOpenChange={setShowEmailPreview}
+            onSend={handleSendEmail}
+            clientName={job.client_name}
+            clientEmail={job.client_email}
+            jobNumber={job.job_number}
+            rugDetails={rugs.filter(r => r.analysis_report).map(rug => ({
+              rugNumber: rug.rug_number,
+              rugType: rug.rug_type,
+              dimensions: rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
+            }))}
+            businessName={branding?.business_name || undefined}
+            isSending={sendingEmail}
+          />
+        </Suspense>
       )}
       
       {/* Model Comparison Dialog */}
-      {compareRug && job && (
-        <ModelComparisonDialog
-          open={showCompareDialog}
-          onOpenChange={setShowCompareDialog}
-          rug={compareRug}
-          clientName={job.client_name}
-          userId={user?.id}
-          onSelectModel={async (model, report, annotations) => {
-            try {
-              // Save the selected analysis to the database
-              const { error } = await supabase
-                .from('inspections')
-                .update({ 
-                  analysis_report: report,
-                  image_annotations: annotations
-                })
-                .eq('id', compareRug.id);
+      {compareRug && job && showCompareDialog && (
+        <Suspense fallback={null}>
+          <ModelComparisonDialog
+            open={showCompareDialog}
+            onOpenChange={setShowCompareDialog}
+            rug={compareRug}
+            clientName={job.client_name}
+            userId={user?.id}
+            onSelectModel={async (model, report, annotations) => {
+              try {
+                // Save the selected analysis to the database
+                const { error } = await supabase
+                  .from('inspections')
+                  .update({ 
+                    analysis_report: report,
+                    image_annotations: annotations
+                  })
+                  .eq('id', compareRug.id);
 
-              if (error) throw error;
-              
-              toast.success(`Analysis saved for ${compareRug.rug_number}`);
-              fetchJobDetails();
-            } catch (error) {
-              console.error('Failed to save analysis:', error);
-              toast.error('Failed to save analysis');
-            }
-          }}
-        />
+                if (error) throw error;
+                
+                toast.success(`Analysis saved for ${compareRug.rug_number}`);
+                fetchJobDetails();
+              } catch (error) {
+                console.error('Failed to save analysis:', error);
+                toast.error('Failed to save analysis');
+              }
+            }}
+          />
+        </Suspense>
       )}
       
       {/* Add Rug Dialog - Moved outside for mobile access */}

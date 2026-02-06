@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,16 +35,12 @@ interface ServicePricingProps {
   userId: string;
 }
 
-const ServicePricing = ({ userId }: ServicePricingProps) => {
+const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchPrices();
-  }, [userId]);
-
-  const fetchPrices = async () => {
+  const fetchPrices = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("service_prices")
@@ -69,14 +65,18 @@ const ServicePricing = ({ userId }: ServicePricingProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
-  const handlePriceChange = (serviceName: string, value: string) => {
+  useEffect(() => {
+    fetchPrices();
+  }, [fetchPrices]);
+
+  const handlePriceChange = useCallback((serviceName: string, value: string) => {
     const numericValue = parseFloat(value) || 0;
     setPrices((prev) => ({ ...prev, [serviceName]: numericValue }));
-  };
+  }, []);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setSaving(true);
     try {
       // Upsert all prices
@@ -99,7 +99,7 @@ const ServicePricing = ({ userId }: ServicePricingProps) => {
     } finally {
       setSaving(false);
     }
-  };
+  }, [prices, userId]);
 
   if (loading) {
     return (
@@ -161,5 +161,8 @@ const ServicePricing = ({ userId }: ServicePricingProps) => {
     </Card>
   );
 };
+
+const ServicePricing = memo(ServicePricingComponent);
+ServicePricing.displayName = 'ServicePricing';
 
 export default ServicePricing;
