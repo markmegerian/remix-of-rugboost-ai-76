@@ -56,7 +56,7 @@ function PassphraseGate({ onSuccess }: { onSuccess: () => void }) {
 
   // The passphrase is hashed client-side for basic obfuscation
   // In production, use proper server-side authentication
-  const EXPECTED_HASH = 'rugboost2024admin'; // Simple passphrase
+  const EXPECTED_HASH = 'RB$ecure#CMS2026!'; // Strong passphrase - change before production
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
