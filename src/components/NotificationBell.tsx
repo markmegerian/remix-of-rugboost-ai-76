@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Check, Trash2, X, DollarSign, Mail, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
@@ -35,84 +36,11 @@ const getNotificationIcon = (type: string) => {
   }
 };
 
-// Memoized notification item to prevent re-renders
-const NotificationItem = memo(({ 
-  notification, 
-  onMarkAsRead, 
-  onDelete 
-}: { 
-  notification: Notification;
-  onMarkAsRead: (id: string) => void;
-  onDelete: (id: string) => void;
-}) => (
-  <div
-    className={`p-4 hover:bg-muted/50 transition-colors ${
-      !notification.read ? 'bg-primary/5' : ''
-    }`}
-  >
-    <div className="flex gap-3">
-      <div className="flex-shrink-0 mt-0.5">
-        {getNotificationIcon(notification.type)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <p className={`text-sm font-medium ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
-            {notification.title}
-          </p>
-          <div className="flex gap-1 flex-shrink-0">
-            {!notification.read && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onMarkAsRead(notification.id)}
-              >
-                <Check className="h-3 w-3" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-              onClick={() => onDelete(notification.id)}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-          {notification.message}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-        </p>
-      </div>
-    </div>
-  </div>
-));
-NotificationItem.displayName = 'NotificationItem';
-
-const NotificationBell: React.FC = memo(() => {
+const NotificationBell: React.FC = () => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
-
-  const fetchNotifications = useCallback(async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (!error && data) {
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.read).length);
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -142,9 +70,25 @@ const NotificationBell: React.FC = memo(() => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchNotifications]);
+  }, [user]);
 
-  const markAsRead = useCallback(async (id: string) => {
+  const fetchNotifications = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (!error && data) {
+      setNotifications(data);
+      setUnreadCount(data.filter(n => !n.read).length);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -156,9 +100,9 @@ const NotificationBell: React.FC = memo(() => {
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
-  }, []);
+  };
 
-  const markAllAsRead = useCallback(async () => {
+  const markAllAsRead = async () => {
     if (!user) return;
 
     const { error } = await supabase
@@ -171,9 +115,9 @@ const NotificationBell: React.FC = memo(() => {
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     }
-  }, [user]);
+  };
 
-  const deleteNotification = useCallback(async (id: string) => {
+  const deleteNotification = async (id: string) => {
     const notification = notifications.find(n => n.id === id);
     
     const { error } = await supabase
@@ -187,9 +131,9 @@ const NotificationBell: React.FC = memo(() => {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
     }
-  }, [notifications]);
+  };
 
-  const clearAll = useCallback(async () => {
+  const clearAll = async () => {
     if (!user) return;
 
     const { error } = await supabase
@@ -201,7 +145,7 @@ const NotificationBell: React.FC = memo(() => {
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [user]);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -254,12 +198,51 @@ const NotificationBell: React.FC = memo(() => {
           ) : (
             <div className="divide-y">
               {notifications.map((notification) => (
-                <NotificationItem
+                <div
                   key={notification.id}
-                  notification={notification}
-                  onMarkAsRead={markAsRead}
-                  onDelete={deleteNotification}
-                />
+                  className={`p-4 hover:bg-muted/50 transition-colors ${
+                    !notification.read ? 'bg-primary/5' : ''
+                  }`}
+                >
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm font-medium ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {notification.title}
+                        </p>
+                        <div className="flex gap-1 flex-shrink-0">
+                          {!notification.read && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => markAsRead(notification.id)}
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteNotification(notification.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -267,8 +250,6 @@ const NotificationBell: React.FC = memo(() => {
       </PopoverContent>
     </Popover>
   );
-});
-
-NotificationBell.displayName = 'NotificationBell';
+};
 
 export default NotificationBell;

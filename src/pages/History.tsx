@@ -105,8 +105,7 @@ const History = () => {
       }));
     },
     enabled: !!user,
-    staleTime: 60000, // 1 minute - reduced network calls
-    gcTime: 300000, // 5 minutes in cache
+    staleTime: 30000,
   });
 
   const handleSignOut = async () => {

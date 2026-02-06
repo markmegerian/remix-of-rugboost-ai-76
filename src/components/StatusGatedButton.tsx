@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React from 'react';
 import { Lock } from 'lucide-react';
 import { Button, ButtonProps } from '@/components/ui/button';
 import {
@@ -21,18 +21,18 @@ interface StatusGatedButtonProps extends Omit<ButtonProps, 'disabled'> {
  * A button that respects job status restrictions.
  * When disabled by status, shows a tooltip explaining why.
  */
-const StatusGatedButton = forwardRef<HTMLButtonElement, StatusGatedButtonProps>(({
+const StatusGatedButton: React.FC<StatusGatedButtonProps> = ({
   actionState,
   children,
   showLockIcon = true,
   disabled = false,
   className,
   ...buttonProps
-}, ref) => {
+}) => {
   // If action is enabled and not otherwise disabled, render normal button
   if (actionState.enabled && !disabled) {
     return (
-      <Button ref={ref} className={className} {...buttonProps}>
+      <Button className={className} {...buttonProps}>
         {children}
       </Button>
     );
@@ -41,7 +41,7 @@ const StatusGatedButton = forwardRef<HTMLButtonElement, StatusGatedButtonProps>(
   // If disabled due to loading or other reason (but action is allowed)
   if (actionState.enabled && disabled) {
     return (
-      <Button ref={ref} className={className} disabled {...buttonProps}>
+      <Button className={className} disabled {...buttonProps}>
         {children}
       </Button>
     );
@@ -53,7 +53,6 @@ const StatusGatedButton = forwardRef<HTMLButtonElement, StatusGatedButtonProps>(
         <TooltipTrigger asChild>
           <span className="inline-block">
             <Button
-              ref={ref}
               className={cn(className, "pointer-events-none")}
               disabled
               {...buttonProps}
@@ -69,8 +68,6 @@ const StatusGatedButton = forwardRef<HTMLButtonElement, StatusGatedButtonProps>(
       </Tooltip>
     </TooltipProvider>
   );
-});
-
-StatusGatedButton.displayName = 'StatusGatedButton';
+};
 
 export default StatusGatedButton;

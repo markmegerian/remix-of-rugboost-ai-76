@@ -1,6 +1,6 @@
-import { useState, useCallback, memo } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X, Briefcase, Settings, LogOut, Users } from 'lucide-react';
+import { Menu, Shield, X, Briefcase, Settings, LogOut, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
@@ -11,26 +11,22 @@ interface MobileNavProps {
   onSignOut: () => void;
 }
 
-const MobileNav = memo(({ isAdmin = false, onSignOut }: MobileNavProps) => {
+const MobileNav = ({ isAdmin = false, onSignOut }: MobileNavProps) => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const handleNavigate = useCallback((path: string) => {
+  const handleNavigate = (path: string) => {
     navigate(path);
     setOpen(false);
-  }, [navigate]);
+  };
 
-  const handleSignOut = useCallback(() => {
+  const handleSignOut = () => {
     setOpen(false);
     onSignOut();
-  }, [onSignOut]);
-
-  const handleOpenChange = useCallback((value: boolean) => {
-    setOpen(value);
-  }, []);
+  };
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="sm:hidden">
           <Menu className="h-5 w-5" />
@@ -93,8 +89,6 @@ const MobileNav = memo(({ isAdmin = false, onSignOut }: MobileNavProps) => {
       </SheetContent>
     </Sheet>
   );
-});
-
-MobileNav.displayName = 'MobileNav';
+};
 
 export default MobileNav;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
@@ -28,7 +28,11 @@ import { generatePDF, generateJobPDF, generateJobPDFBase64, BusinessBranding, Up
 import RugForm from '@/components/RugForm';
 import JobForm from '@/components/JobForm';
 import EditRugDialog from '@/components/EditRugDialog';
+import AnalysisReport from '@/components/AnalysisReport';
+import EmailPreviewDialog from '@/components/EmailPreviewDialog';
+import EstimateReview from '@/components/EstimateReview';
 import AnalysisProgress, { AnalysisStage } from '@/components/AnalysisProgress';
+import { ModelComparisonDialog } from '@/components/ModelComparisonDialog';
 import ClientPortalStatus from '@/components/ClientPortalStatus';
 import ServiceCompletionCard from '@/components/ServiceCompletionCard';
 import PaymentTracking from '@/components/PaymentTracking';
@@ -45,19 +49,6 @@ import MobileJobActionBar from '@/components/MobileJobActionBar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import EditClientInfoDialog from '@/components/EditClientInfoDialog';
 import ExpertEstimateCard from '@/components/ExpertEstimateCard';
-
-// Lazy load heavy dialog components
-const AnalysisReport = lazy(() => import('@/components/AnalysisReport'));
-const EstimateReview = lazy(() => import('@/components/EstimateReview'));
-const EmailPreviewDialog = lazy(() => import('@/components/EmailPreviewDialog'));
-const ModelComparisonDialog = lazy(() => import('@/components/ModelComparisonDialog').then(m => ({ default: m.ModelComparisonDialog })));
-
-// Loading fallback for lazy components
-const DialogLoader = () => (
-  <div className="flex items-center justify-center p-8">
-    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-  </div>
-);
 
 interface ClientPortalStatusData {
   accessToken: string;
@@ -1579,58 +1570,54 @@ const JobDetail = () => {
         isLoading={savingRug}
       />
 
-      {/* Email Preview Dialog - Lazy loaded */}
-      {job.client_email && showEmailPreview && (
-        <Suspense fallback={<DialogLoader />}>
-          <EmailPreviewDialog
-            open={showEmailPreview}
-            onOpenChange={setShowEmailPreview}
-            onSend={handleSendEmail}
-            clientName={job.client_name}
-            clientEmail={job.client_email}
-            jobNumber={job.job_number}
-            rugDetails={rugs.filter(r => r.analysis_report).map(rug => ({
-              rugNumber: rug.rug_number,
-              rugType: rug.rug_type,
-              dimensions: rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
-            }))}
-            businessName={branding?.business_name || undefined}
-            isSending={sendingEmail}
-          />
-        </Suspense>
+      {/* Email Preview Dialog */}
+      {job.client_email && (
+        <EmailPreviewDialog
+          open={showEmailPreview}
+          onOpenChange={setShowEmailPreview}
+          onSend={handleSendEmail}
+          clientName={job.client_name}
+          clientEmail={job.client_email}
+          jobNumber={job.job_number}
+          rugDetails={rugs.filter(r => r.analysis_report).map(rug => ({
+            rugNumber: rug.rug_number,
+            rugType: rug.rug_type,
+            dimensions: rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
+          }))}
+          businessName={branding?.business_name || undefined}
+          isSending={sendingEmail}
+        />
       )}
       
-      {/* Model Comparison Dialog - Lazy loaded */}
-      {compareRug && job && showCompareDialog && (
-        <Suspense fallback={<DialogLoader />}>
-          <ModelComparisonDialog
-            open={showCompareDialog}
-            onOpenChange={setShowCompareDialog}
-            rug={compareRug}
-            clientName={job.client_name}
-            userId={user?.id}
-            onSelectModel={async (model, report, annotations) => {
-              try {
-                // Save the selected analysis to the database
-                const { error } = await supabase
-                  .from('inspections')
-                  .update({ 
-                    analysis_report: report,
-                    image_annotations: annotations
-                  })
-                  .eq('id', compareRug.id);
+      {/* Model Comparison Dialog */}
+      {compareRug && job && (
+        <ModelComparisonDialog
+          open={showCompareDialog}
+          onOpenChange={setShowCompareDialog}
+          rug={compareRug}
+          clientName={job.client_name}
+          userId={user?.id}
+          onSelectModel={async (model, report, annotations) => {
+            try {
+              // Save the selected analysis to the database
+              const { error } = await supabase
+                .from('inspections')
+                .update({ 
+                  analysis_report: report,
+                  image_annotations: annotations
+                })
+                .eq('id', compareRug.id);
 
-                if (error) throw error;
-                
-                toast.success(`Analysis saved for ${compareRug.rug_number}`);
-                fetchJobDetails();
-              } catch (error) {
-                console.error('Failed to save analysis:', error);
-                toast.error('Failed to save analysis');
-              }
-            }}
-          />
-        </Suspense>
+              if (error) throw error;
+              
+              toast.success(`Analysis saved for ${compareRug.rug_number}`);
+              fetchJobDetails();
+            } catch (error) {
+              console.error('Failed to save analysis:', error);
+              toast.error('Failed to save analysis');
+            }
+          }}
+        />
       )}
       
       {/* Add Rug Dialog - Moved outside for mobile access */}

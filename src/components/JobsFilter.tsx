@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React from 'react';
 import { Search, Calendar, Filter, DollarSign, User, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -37,14 +37,14 @@ const STATUS_OPTIONS = [
   { value: 'picked_up', label: 'Picked Up' },
   { value: 'ready_for_delivery', label: 'Ready for Delivery' },
   { value: 'delivered', label: 'Delivered' },
-] as const;
+];
 
 const PAYMENT_OPTIONS = [
   { value: 'all', label: 'All Payments' },
   { value: 'pending', label: 'Pending Payment' },
   { value: 'paid', label: 'Paid' },
   { value: 'overdue', label: 'Overdue' },
-] as const;
+];
 
 const DATE_OPTIONS = [
   { value: 'all', label: 'All Time' },
@@ -52,39 +52,20 @@ const DATE_OPTIONS = [
   { value: 'week', label: 'This Week' },
   { value: 'month', label: 'This Month' },
   { value: 'quarter', label: 'This Quarter' },
-] as const;
+];
 
-// Memoized filter badge component
-const FilterBadge = memo(({ 
-  label, 
-  value, 
-  onClear 
-}: { 
-  label: string; 
-  value: string; 
-  onClear: () => void;
-}) => (
-  <Badge variant="secondary" className="gap-1">
-    {label}: {value}
-    <button onClick={onClear} type="button" aria-label={`Clear ${label} filter`}>
-      <X className="h-3 w-3" />
-    </button>
-  </Badge>
-));
-FilterBadge.displayName = 'FilterBadge';
-
-const JobsFilter = memo(({ 
+const JobsFilter = ({ 
   filters, 
   onFiltersChange, 
   isAdmin = false,
   clients = [],
   activeFilterCount = 0,
 }: JobsFilterProps) => {
-  const updateFilter = useCallback(<K extends keyof JobFilters>(key: K, value: JobFilters[K]) => {
+  const updateFilter = <K extends keyof JobFilters>(key: K, value: JobFilters[K]) => {
     onFiltersChange({ ...filters, [key]: value });
-  }, [filters, onFiltersChange]);
+  };
 
-  const clearFilters = useCallback(() => {
+  const clearFilters = () => {
     onFiltersChange({
       search: '',
       status: 'all',
@@ -92,29 +73,9 @@ const JobsFilter = memo(({
       dateRange: 'all',
       client: 'all',
     });
-  }, [onFiltersChange]);
+  };
 
   const hasActiveFilters = activeFilterCount > 0;
-
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    updateFilter('search', e.target.value);
-  }, [updateFilter]);
-
-  const handleStatusChange = useCallback((value: string) => {
-    updateFilter('status', value);
-  }, [updateFilter]);
-
-  const handlePaymentChange = useCallback((value: string) => {
-    updateFilter('paymentStatus', value);
-  }, [updateFilter]);
-
-  const handleDateChange = useCallback((value: string) => {
-    updateFilter('dateRange', value);
-  }, [updateFilter]);
-
-  const handleClientChange = useCallback((value: string) => {
-    updateFilter('client', value);
-  }, [updateFilter]);
 
   return (
     <Card className="shadow-card">
@@ -127,7 +88,7 @@ const JobsFilter = memo(({
               <Input
                 placeholder="Search by client, job number, email..."
                 value={filters.search}
-                onChange={handleSearchChange}
+                onChange={(e) => updateFilter('search', e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -149,7 +110,7 @@ const JobsFilter = memo(({
             {/* Status Filter */}
             <Select 
               value={filters.status} 
-              onValueChange={handleStatusChange}
+              onValueChange={(value) => updateFilter('status', value)}
             >
               <SelectTrigger className="gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -167,7 +128,7 @@ const JobsFilter = memo(({
             {/* Payment Status Filter */}
             <Select 
               value={filters.paymentStatus} 
-              onValueChange={handlePaymentChange}
+              onValueChange={(value) => updateFilter('paymentStatus', value)}
             >
               <SelectTrigger className="gap-2">
                 <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -185,7 +146,7 @@ const JobsFilter = memo(({
             {/* Date Range Filter */}
             <Select 
               value={filters.dateRange} 
-              onValueChange={handleDateChange}
+              onValueChange={(value) => updateFilter('dateRange', value)}
             >
               <SelectTrigger className="gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -204,7 +165,7 @@ const JobsFilter = memo(({
             {(isAdmin || clients.length > 0) && (
               <Select 
                 value={filters.client} 
-                onValueChange={handleClientChange}
+                onValueChange={(value) => updateFilter('client', value)}
               >
                 <SelectTrigger className="gap-2">
                   <User className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -226,32 +187,36 @@ const JobsFilter = memo(({
           {hasActiveFilters && (
             <div className="flex flex-wrap gap-2">
               {filters.status !== 'all' && (
-                <FilterBadge
-                  label="Status"
-                  value={STATUS_OPTIONS.find(o => o.value === filters.status)?.label || filters.status}
-                  onClear={() => updateFilter('status', 'all')}
-                />
+                <Badge variant="secondary" className="gap-1">
+                  Status: {STATUS_OPTIONS.find(o => o.value === filters.status)?.label}
+                  <button onClick={() => updateFilter('status', 'all')}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
               )}
               {filters.paymentStatus !== 'all' && (
-                <FilterBadge
-                  label="Payment"
-                  value={PAYMENT_OPTIONS.find(o => o.value === filters.paymentStatus)?.label || filters.paymentStatus}
-                  onClear={() => updateFilter('paymentStatus', 'all')}
-                />
+                <Badge variant="secondary" className="gap-1">
+                  Payment: {PAYMENT_OPTIONS.find(o => o.value === filters.paymentStatus)?.label}
+                  <button onClick={() => updateFilter('paymentStatus', 'all')}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
               )}
               {filters.dateRange !== 'all' && (
-                <FilterBadge
-                  label="Date"
-                  value={DATE_OPTIONS.find(o => o.value === filters.dateRange)?.label || filters.dateRange}
-                  onClear={() => updateFilter('dateRange', 'all')}
-                />
+                <Badge variant="secondary" className="gap-1">
+                  Date: {DATE_OPTIONS.find(o => o.value === filters.dateRange)?.label}
+                  <button onClick={() => updateFilter('dateRange', 'all')}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
               )}
               {filters.client !== 'all' && (
-                <FilterBadge
-                  label="Client"
-                  value={filters.client}
-                  onClear={() => updateFilter('client', 'all')}
-                />
+                <Badge variant="secondary" className="gap-1">
+                  Client: {filters.client}
+                  <button onClick={() => updateFilter('client', 'all')}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
               )}
             </div>
           )}
@@ -259,8 +224,6 @@ const JobsFilter = memo(({
       </CardContent>
     </Card>
   );
-});
-
-JobsFilter.displayName = 'JobsFilter';
+};
 
 export default JobsFilter;

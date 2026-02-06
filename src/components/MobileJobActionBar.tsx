@@ -1,4 +1,4 @@
-import React, { forwardRef, memo } from 'react';
+import React from 'react';
 import { ChevronRight, Plus, Sparkles, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatusGatedButton from '@/components/StatusGatedButton';
@@ -26,7 +26,7 @@ interface MobileJobActionBarProps {
  * Shows the most relevant action based on current job state.
  * Designed for one-thumb operation.
  */
-const MobileJobActionBar = memo(forwardRef<HTMLDivElement, MobileJobActionBarProps>(({
+const MobileJobActionBar: React.FC<MobileJobActionBarProps> = ({
   actions,
   rugsCount,
   hasUnanalyzedRugs,
@@ -40,7 +40,7 @@ const MobileJobActionBar = memo(forwardRef<HTMLDivElement, MobileJobActionBarPro
   onAdvanceStatus,
   nextStatusLabel,
   className,
-}, ref) => {
+}) => {
   // Determine primary action based on job state
   const getPrimaryAction = () => {
     // 1. If no rugs, add rug is primary
@@ -101,15 +101,12 @@ const MobileJobActionBar = memo(forwardRef<HTMLDivElement, MobileJobActionBarPro
   const IconComponent = primaryAction.icon;
 
   return (
-    <div 
-      ref={ref}
-      className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 md:hidden",
-        "bg-background/95 backdrop-blur-md border-t border-border",
-        "px-4 py-3 pb-safe-bottom",
-        className
-      )}
-    >
+    <div className={cn(
+      "fixed bottom-0 left-0 right-0 z-40 md:hidden",
+      "bg-background/95 backdrop-blur-md border-t border-border",
+      "px-4 py-3 pb-safe-bottom",
+      className
+    )}>
       <div className="flex items-center gap-3">
         {/* Secondary: Add Rug (if not the primary action) */}
         {rugsCount > 0 && actions.addRug.enabled && (
@@ -142,8 +139,6 @@ const MobileJobActionBar = memo(forwardRef<HTMLDivElement, MobileJobActionBarPro
       </div>
     </div>
   );
-}));
-
-MobileJobActionBar.displayName = 'MobileJobActionBar';
+};
 
 export default MobileJobActionBar;

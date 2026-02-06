@@ -83,7 +83,6 @@ export interface BusinessBranding {
 }
 
 // Fetch all job detail data in parallel with tenant isolation
-// Optimized to reduce duplicate queries and improve caching
 export const useJobDetail = (jobId: string | undefined, userId: string | undefined) => {
   const { companyId, loading: companyLoading } = useCompany();
 
@@ -257,8 +256,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
       };
     },
     enabled: !!jobId && !!userId && !companyLoading,
-    staleTime: 60000, // 1 minute - increased for better caching
-    gcTime: 300000, // 5 minutes - keep in cache longer
+    staleTime: 30000,
   });
 };
 

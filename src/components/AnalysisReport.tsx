@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, memo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, memo } from 'react';
 import { FileText, DollarSign, Wrench, ArrowLeft, Download, ClipboardList, RefreshCw, ImageIcon, Plus, X, Edit2, Check, MousePointer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

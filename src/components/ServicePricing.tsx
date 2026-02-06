@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,12 +35,16 @@ interface ServicePricingProps {
   userId: string;
 }
 
-const ServicePricing = memo(({ userId }: ServicePricingProps) => {
+const ServicePricing = ({ userId }: ServicePricingProps) => {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const fetchPrices = useCallback(async () => {
+  useEffect(() => {
+    fetchPrices();
+  }, [userId]);
+
+  const fetchPrices = async () => {
     try {
       const { data, error } = await supabase
         .from("service_prices")
@@ -65,20 +69,14 @@ const ServicePricing = memo(({ userId }: ServicePricingProps) => {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  };
 
-  useEffect(() => {
-    fetchPrices();
-  }, [fetchPrices]);
+  const handlePriceChange = (serviceName: string, value: string) => {
+    const numericValue = parseFloat(value) || 0;
+    setPrices((prev) => ({ ...prev, [serviceName]: numericValue }));
+  };
 
-  const handlePriceChange = useCallback((serviceName: string, value: string) => {
-    setPrices((prev) => {
-      const numericValue = parseFloat(value) || 0;
-      return { ...prev, [serviceName]: numericValue };
-    });
-  }, []);
-
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     setSaving(true);
     try {
       // Upsert all prices
@@ -101,7 +99,7 @@ const ServicePricing = memo(({ userId }: ServicePricingProps) => {
     } finally {
       setSaving(false);
     }
-  }, [prices, userId]);
+  };
 
   if (loading) {
     return (
@@ -162,8 +160,6 @@ const ServicePricing = memo(({ userId }: ServicePricingProps) => {
       </CardContent>
     </Card>
   );
-});
-
-ServicePricing.displayName = 'ServicePricing';
+};
 
 export default ServicePricing;

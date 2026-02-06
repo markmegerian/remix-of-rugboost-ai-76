@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageOff } from 'lucide-react';
 import { useCachedSignedUrl } from '@/hooks/useSignedUrls';
@@ -13,20 +13,14 @@ interface RugPhotoProps {
 /**
  * RugPhoto component that displays rug photos using cached signed URLs.
  * Uses batch URL signing for improved performance.
- * Memoized to prevent unnecessary re-renders.
  */
-const RugPhoto: React.FC<RugPhotoProps> = memo(({
+const RugPhoto: React.FC<RugPhotoProps> = ({
   filePath,
   alt = 'Rug photo',
   className = 'w-full h-auto object-cover',
   loadingClassName = 'w-full h-32',
 }) => {
   const { signedUrl, loading, error } = useCachedSignedUrl(filePath);
-  const [imageError, setImageError] = useState(false);
-
-  const handleError = useCallback(() => {
-    setImageError(true);
-  }, []);
 
   if (loading && !signedUrl) {
     return (
@@ -34,7 +28,7 @@ const RugPhoto: React.FC<RugPhotoProps> = memo(({
     );
   }
 
-  if (error || !signedUrl || imageError) {
+  if (error || !signedUrl) {
     return (
       <div className={`flex items-center justify-center bg-muted/50 rounded-lg ${loadingClassName}`}>
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -51,12 +45,8 @@ const RugPhoto: React.FC<RugPhotoProps> = memo(({
       alt={alt}
       className={className}
       loading="lazy"
-      decoding="async"
-      onError={handleError}
     />
   );
-});
-
-RugPhoto.displayName = 'RugPhoto';
+};
 
 export default RugPhoto;
