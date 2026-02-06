@@ -188,7 +188,7 @@ const handler = async (req: Request): Promise<Response> => {
     const resend = new Resend(resendApiKey);
     
     // Get the verified from email address
-    const fromEmail = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
+    const fromEmail = Deno.env.get("FROM_EMAIL") || "noreply@app.rugboost.com";
 
     const fromName = businessName || "Rug Inspection Service";
     const rugSummaryHtml = rugDetails.map(r => 

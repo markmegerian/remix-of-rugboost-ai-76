@@ -57,7 +57,7 @@ serve(async (req) => {
     }
 
     const resend = new Resend(resendApiKey);
-    const fromEmail = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
+    const fromEmail = Deno.env.get("FROM_EMAIL") || "noreply@app.rugboost.com";
 
     const {
       clientEmail,
@@ -205,6 +205,7 @@ serve(async (req) => {
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: `${fromName} <${fromEmail}>`,
       to: [clientEmail],
+      replyTo: businessEmail || "support@rugboost.com",
       subject: `✓ Payment Confirmed - Job #${jobNumber}`,
       html: emailHtml,
       attachments,
