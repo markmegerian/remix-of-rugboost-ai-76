@@ -22,9 +22,10 @@ interface JobFormProps {
   isLoading: boolean;
   initialData?: Partial<JobFormData>;
   mode?: 'create' | 'edit';
+  disabled?: boolean;
 }
 
-const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mode = 'create' }) => {
+const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mode = 'create', disabled = false }) => {
   const [formData, setFormData] = useState<JobFormData>({
     jobNumber: initialData?.jobNumber || '',
     clientName: initialData?.clientName || '',
@@ -197,7 +198,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mod
 
       {/* Submit Button */}
       <div className="pt-4">
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full" disabled={isLoading || disabled}>
           {isLoading 
             ? (mode === 'edit' ? 'Saving...' : 'Creating Job...') 
             : (mode === 'edit' ? 'Save Changes' : 'Create Job')

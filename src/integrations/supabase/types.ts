@@ -329,36 +329,48 @@ export type Database = {
       }
       companies: {
         Row: {
+          billing_status: Database["public"]["Enums"]["billing_status"]
           created_at: string
           id: string
+          max_staff_users: number
           name: string
           payment_account_connected: boolean
+          plan_tier: Database["public"]["Enums"]["plan_tier"]
           settings: Json | null
           slug: string
           stripe_account_id: string | null
           subscription_status: string
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
+          billing_status?: Database["public"]["Enums"]["billing_status"]
           created_at?: string
           id?: string
+          max_staff_users?: number
           name: string
           payment_account_connected?: boolean
+          plan_tier?: Database["public"]["Enums"]["plan_tier"]
           settings?: Json | null
           slug: string
           stripe_account_id?: string | null
           subscription_status?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
+          billing_status?: Database["public"]["Enums"]["billing_status"]
           created_at?: string
           id?: string
+          max_staff_users?: number
           name?: string
           payment_account_connected?: boolean
+          plan_tier?: Database["public"]["Enums"]["plan_tier"]
           settings?: Json | null
           slug?: string
           stripe_account_id?: string | null
           subscription_status?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -411,6 +423,41 @@ export type Database = {
             foreignKeyName: "company_branding_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_enabled_services: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          service_name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          service_name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          service_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_enabled_services_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
@@ -1200,6 +1247,15 @@ export type Database = {
         Args: { check_job_id: string }
         Returns: boolean
       }
+      company_can_create_jobs: {
+        Args: { _company_id: string }
+        Returns: boolean
+      }
+      company_has_feature: {
+        Args: { _company_id: string; _feature: string }
+        Returns: boolean
+      }
+      company_max_staff: { Args: { _company_id: string }; Returns: number }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_role: {
         Args: { _user_id: string }
@@ -1246,7 +1302,9 @@ export type Database = {
     }
     Enums: {
       app_role: "staff" | "client" | "admin"
+      billing_status: "trialing" | "active" | "past_due" | "canceled"
       company_role: "company_admin" | "staff"
+      plan_tier: "starter" | "pro" | "enterprise"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1375,7 +1433,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["staff", "client", "admin"],
+      billing_status: ["trialing", "active", "past_due", "canceled"],
       company_role: ["company_admin", "staff"],
+      plan_tier: ["starter", "pro", "enterprise"],
     },
   },
 } as const

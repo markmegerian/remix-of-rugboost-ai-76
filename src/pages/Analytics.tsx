@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlanFeatures } from "@/hooks/usePlanFeatures";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, TrendingUp, Users, DollarSign, Briefcase, BarChart3, Target } from "lucide-react";
+import { ArrowLeft, TrendingUp, Users, DollarSign, Briefcase, BarChart3, Target, Sparkles } from "lucide-react";
 import { format, subDays, subMonths, endOfMonth, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from "date-fns";
 import rugboostLogo from "@/assets/rugboost-logo.svg";
 
@@ -35,8 +36,11 @@ type DateRange = "7d" | "30d" | "90d" | "12m";
 
 const Analytics = () => {
   const { user, loading: authLoading } = useAuth();
+  const { hasFeature, planName, getUpgradeMessage } = usePlanFeatures();
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<DateRange>("30d");
+  
+  const hasAnalytics = hasFeature('analytics_dashboard');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -302,7 +306,20 @@ const Analytics = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {isLoading ? (
+        {!hasAnalytics ? (
+          <Card className="border-dashed border-muted-foreground/30">
+            <CardContent className="py-12 text-center">
+              <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <h3 className="text-lg font-semibold mb-2">Analytics Dashboard</h3>
+              <p className="text-muted-foreground mb-4">
+                {getUpgradeMessage('analytics_dashboard')}
+              </p>
+              <p className="text-sm text-muted-foreground/70">
+                Current plan: {planName}
+              </p>
+            </CardContent>
+          </Card>
+        ) : isLoading ? (
           <AnalyticsSkeleton />
         ) : (
           <>

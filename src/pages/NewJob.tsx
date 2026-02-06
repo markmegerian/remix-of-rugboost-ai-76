@@ -4,12 +4,16 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import JobForm from '@/components/JobForm';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
+
 const NewJob = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { canCreateJobs, billingMessage } = usePlanFeatures();
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -28,6 +32,12 @@ const NewJob = () => {
     if (!user) {
       toast.error('Please sign in to create a job');
       navigate('/auth');
+      return;
+    }
+
+    // Server-side billing check
+    if (!canCreateJobs) {
+      toast.error('Your subscription does not allow creating new jobs');
       return;
     }
 
@@ -99,9 +109,22 @@ const NewJob = () => {
               </p>
             </div>
 
+            {/* Billing Block */}
+            {!canCreateJobs && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {billingMessage}. Please update your subscription to create new jobs.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Form Card */}
             <div className="rounded-2xl bg-card p-6 shadow-medium sm:p-8">
-              <JobForm onSubmit={handleCreateJob} isLoading={isCreating} />
+              <JobForm 
+                onSubmit={handleCreateJob} 
+                isLoading={isCreating} 
+                disabled={!canCreateJobs}
+              />
             </div>
           </div>
         </div>
