@@ -1,4 +1,6 @@
 import { Star } from 'lucide-react';
+import { useScrollAnimation, useStaggeredAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 const testimonials = [
   {
@@ -22,10 +24,19 @@ const testimonials = [
 ];
 
 export default function LandingTestimonials() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
+  const { ref: cardsRef, isVisible: cardsVisible, getDelay } = useStaggeredAnimation(testimonials.length, 150);
+
   return (
     <section className="py-16 md:py-24 bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
+        <div 
+          ref={headerRef}
+          className={cn(
+            "text-center mb-16 transition-all duration-700 ease-out",
+            headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Trusted by Rug Professionals
           </h2>
@@ -34,11 +45,15 @@ export default function LandingTestimonials() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div ref={cardsRef} className="grid md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
-              className="bg-card rounded-2xl p-6 border border-border shadow-card"
+              className={cn(
+                "bg-card rounded-2xl p-6 border border-border shadow-card transition-all duration-700 ease-out",
+                cardsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              )}
+              style={cardsVisible ? getDelay(index) : {}}
             >
               {/* Stars */}
               <div className="flex gap-1 mb-4">

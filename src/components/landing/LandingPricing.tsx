@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Check, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useScrollAnimation, useStaggeredAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
 
 const plans = [
   {
@@ -62,10 +64,19 @@ const plans = [
 ];
 
 export default function LandingPricing() {
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
+  const { ref: cardsRef, isVisible: cardsVisible, getDelay } = useStaggeredAnimation(plans.length, 150);
+
   return (
     <section id="pricing" className="py-16 md:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
+        <div 
+          ref={headerRef}
+          className={cn(
+            "text-center mb-16 transition-all duration-700 ease-out",
+            headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Simple, Transparent Pricing
           </h2>
@@ -74,15 +85,18 @@ export default function LandingPricing() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 lg:gap-6">
-          {plans.map((plan) => (
+        <div ref={cardsRef} className="grid md:grid-cols-3 gap-8 lg:gap-6">
+          {plans.map((plan, index) => (
             <Card
               key={plan.name}
-              className={`relative flex flex-col ${
+              className={cn(
+                "relative flex flex-col transition-all duration-700 ease-out",
                 plan.highlighted
                   ? 'border-primary shadow-lg ring-1 ring-primary/20 scale-[1.02]'
-                  : 'border-border shadow-card'
-              }`}
+                  : 'border-border shadow-card',
+                cardsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              )}
+              style={cardsVisible ? getDelay(index) : {}}
             >
               {plan.badge && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -125,7 +139,10 @@ export default function LandingPricing() {
           ))}
         </div>
 
-        <p className="mt-12 text-center text-sm text-muted-foreground">
+        <p className={cn(
+          "mt-12 text-center text-sm text-muted-foreground transition-all duration-700 delay-500",
+          cardsVisible ? "opacity-100" : "opacity-0"
+        )}>
           All prices in USD. Annual billing available with 2 months free.
         </p>
       </div>

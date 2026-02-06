@@ -3,14 +3,29 @@ import { ArrowRight, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DeviceFrame from '@/components/screenshots/DeviceFrame';
 import MockDashboard from '@/components/screenshots/MockDashboard';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { cn } from '@/lib/utils';
+import GradientMeshBackground from './GradientMeshBackground';
 
 export default function LandingHero() {
+  const { ref: textRef, isVisible: textVisible } = useScrollAnimation({ threshold: 0.2 });
+  const { ref: mockupRef, isVisible: mockupVisible } = useScrollAnimation({ threshold: 0.2 });
+
   return (
-    <section className="pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden relative">
+      {/* Gradient mesh background */}
+      <GradientMeshBackground />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Text Content */}
-          <div className="text-center lg:text-left">
+          <div 
+            ref={textRef}
+            className={cn(
+              "text-center lg:text-left transition-all duration-700 ease-out",
+              textVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            )}
+          >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -51,7 +66,13 @@ export default function LandingHero() {
           </div>
 
           {/* Device Mockup */}
-          <div className="relative flex justify-center lg:justify-end">
+          <div 
+            ref={mockupRef}
+            className={cn(
+              "relative flex justify-center lg:justify-end transition-all duration-700 ease-out delay-200",
+              mockupVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+            )}
+          >
             <div className="relative">
               {/* Glow effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 blur-3xl scale-150 opacity-50" />
