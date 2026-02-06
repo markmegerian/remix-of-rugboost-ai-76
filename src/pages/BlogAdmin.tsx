@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { getBlogPosts, saveBlogPosts, BlogPost } from '@/components/landing/LandingBlog';
 import LandingNavbar from '@/components/landing/LandingNavbar';
 import { Link } from 'react-router-dom';
+import RichTextEditor from '@/components/blog/RichTextEditor';
 
 function generateSlug(title: string): string {
   return title
@@ -216,14 +217,11 @@ export default function BlogAdmin() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="content">Content (HTML)</Label>
-                  <Textarea
-                    id="content"
-                    value={editingPost.content}
-                    onChange={e => setEditingPost({...editingPost, content: e.target.value})}
-                    placeholder="<p>Your article content here...</p>"
-                    rows={10}
-                    className="font-mono text-sm"
+                  <Label>Content</Label>
+                  <RichTextEditor
+                    content={editingPost.content}
+                    onChange={(content) => setEditingPost({...editingPost, content})}
+                    placeholder="Start writing your article..."
                   />
                 </div>
 
