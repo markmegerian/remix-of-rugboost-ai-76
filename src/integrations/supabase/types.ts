@@ -212,6 +212,7 @@ export type Database = {
       client_job_access: {
         Row: {
           access_token: string
+          access_token_hash: string | null
           auth_user_id: string | null
           client_id: string | null
           company_id: string | null
@@ -228,6 +229,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          access_token_hash?: string | null
           auth_user_id?: string | null
           client_id?: string | null
           company_id?: string | null
@@ -244,6 +246,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          access_token_hash?: string | null
           auth_user_id?: string | null
           client_id?: string | null
           company_id?: string | null
@@ -1217,6 +1220,33 @@ export type Database = {
         }
         Relationships: []
       }
+      token_validation_attempts: {
+        Row: {
+          attempt_count: number
+          blocked_until: string | null
+          first_attempt_at: string
+          id: string
+          identifier: string
+          last_attempt_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          blocked_until?: string | null
+          first_attempt_at?: string
+          id?: string
+          identifier: string
+          last_attempt_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          blocked_until?: string | null
+          first_attempt_at?: string
+          id?: string
+          identifier?: string
+          last_attempt_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1243,6 +1273,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_token_rate_limit: {
+        Args: {
+          _block_seconds?: number
+          _identifier: string
+          _max_attempts?: number
+          _window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          blocked_until_ts: string
+          remaining_attempts: number
+        }[]
+      }
+      cleanup_old_rate_limits: { Args: never; Returns: number }
       client_has_job_access: {
         Args: { check_job_id: string }
         Returns: boolean
@@ -1271,6 +1315,10 @@ export type Database = {
       is_company_admin: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
+      }
+      reset_token_rate_limit: {
+        Args: { _identifier: string }
+        Returns: undefined
       }
       update_client_access_tracking: {
         Args: {

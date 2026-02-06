@@ -61,6 +61,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Generate token hash for secure storage
+    const encoder = new TextEncoder();
+    const tokenBytes = encoder.encode(accessToken);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const accessTokenHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
     const normalizedEmail = email.toLowerCase().trim();
     const requestId = crypto.randomUUID().slice(0, 8);
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
@@ -144,19 +151,20 @@ Deno.serve(async (req) => {
       throw new Error('Failed to create or find auth user');
     }
 
-    // Store auth_user_id AND company_id on the access token record
+    // Store auth_user_id, company_id, AND token hash on the access token record
     const { error: updateAccessError } = await supabaseAdmin
       .from('client_job_access')
       .update({ 
         auth_user_id: authUserId,
         company_id: companyId, // CRITICAL: Store company context
+        access_token_hash: accessTokenHash, // SECURITY: Store hashed token
       })
       .eq('access_token', accessToken);
 
     if (updateAccessError) {
       console.error(`[${requestId}] Error updating access token:`, updateAccessError.message);
     } else {
-      console.log(`[${requestId}] Stored auth_user_id and company_id on access token`);
+      console.log(`[${requestId}] Stored auth_user_id, company_id, and token hash on access token`);
     }
 
     // Check if client account exists for this company

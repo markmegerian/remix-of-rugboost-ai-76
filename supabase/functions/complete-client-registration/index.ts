@@ -119,12 +119,19 @@ Deno.serve(async (req) => {
     
     console.log(`[${requestId}] Registration request from IP: ${clientIp.substring(0, 10)}*** for: ${normalizedEmail.substring(0, 3)}***`);
 
+    // Generate token hash for secure lookup
+    const encoder = new TextEncoder();
+    const tokenBytes = encoder.encode(accessToken);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const accessTokenHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
     // STEP 1: Atomically claim the token (prevents replay attacks)
-    // Must include company_id in the claim to ensure tenant isolation
+    // Look up by hash first, fall back to plain token for legacy records
     const { data: claimedToken, error: claimError } = await supabaseAdmin
       .from('client_job_access')
       .update({ consumed_at: new Date().toISOString() })
-      .eq('access_token', accessToken)
+      .or(`access_token_hash.eq.${accessTokenHash},and(access_token_hash.is.null,access_token.eq.${accessToken})`)
       .is('consumed_at', null)
       .select('id, auth_user_id, invited_email, client_id, job_id, company_id')
       .maybeSingle();
