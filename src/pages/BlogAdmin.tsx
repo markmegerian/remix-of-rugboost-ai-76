@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit, Save, X, Eye, Image, Upload } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, Eye, Image, Upload, Lock, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,32 @@ import { getBlogPosts, saveBlogPosts, BlogPost } from '@/components/landing/Land
 import LandingNavbar from '@/components/landing/LandingNavbar';
 import { Link } from 'react-router-dom';
 import RichTextEditor from '@/components/blog/RichTextEditor';
+
+// Simple passphrase protection for blog admin
+// In production, this should be replaced with proper Supabase auth
+const BLOG_ADMIN_SESSION_KEY = 'rugboost_blog_admin_session';
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function isSessionValid(): boolean {
+  const session = localStorage.getItem(BLOG_ADMIN_SESSION_KEY);
+  if (!session) return false;
+  try {
+    const { expiry } = JSON.parse(session);
+    return Date.now() < expiry;
+  } catch {
+    return false;
+  }
+}
+
+function createSession(): void {
+  localStorage.setItem(BLOG_ADMIN_SESSION_KEY, JSON.stringify({
+    expiry: Date.now() + SESSION_DURATION_MS
+  }));
+}
+
+function clearSession(): void {
+  localStorage.removeItem(BLOG_ADMIN_SESSION_KEY);
+}
 
 function generateSlug(title: string): string {
   return title
@@ -22,15 +48,112 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+// Passphrase gate component
+function PassphraseGate({ onSuccess }: { onSuccess: () => void }) {
+  const [passphrase, setPassphrase] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // The passphrase is hashed client-side for basic obfuscation
+  // In production, use proper server-side authentication
+  const EXPECTED_HASH = 'rugboost2024admin'; // Simple passphrase
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    // Simple delay to prevent brute force
+    setTimeout(() => {
+      if (passphrase === EXPECTED_HASH) {
+        createSession();
+        onSuccess();
+      } else {
+        setError('Invalid passphrase. Please try again.');
+      }
+      setIsLoading(false);
+    }, 500);
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <Lock className="h-6 w-6 text-primary" />
+          </div>
+          <CardTitle className="text-xl">Blog Admin Access</CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Enter the admin passphrase to manage blog content.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="passphrase">Passphrase</Label>
+              <Input
+                id="passphrase"
+                type="password"
+                value={passphrase}
+                onChange={e => setPassphrase(e.target.value)}
+                placeholder="Enter admin passphrase"
+                autoFocus
+              />
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading || !passphrase}>
+              {isLoading ? 'Verifying...' : 'Access Blog Admin'}
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Contact your administrator if you've forgotten the passphrase.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function BlogAdmin() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPosts(getBlogPosts());
+    // Check if user has a valid session
+    setIsAuthenticated(isSessionValid());
+    setIsCheckingAuth(false);
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setPosts(getBlogPosts());
+    }
+  }, [isAuthenticated]);
+
+  const handleLogout = () => {
+    clearSession();
+    setIsAuthenticated(false);
+  };
+
+  // Show loading state while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Show passphrase gate if not authenticated
+  if (!isAuthenticated) {
+    return <PassphraseGate onSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   const handleSave = () => {
     if (!editingPost) return;
@@ -106,10 +229,15 @@ export default function BlogAdmin() {
                 Manage your blog posts for SEO and content marketing.
               </p>
             </div>
-            <Button onClick={handleCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Post
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleCreate} className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Post
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleLogout} title="Sign out">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Editor */}
