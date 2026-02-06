@@ -161,12 +161,12 @@ const ClientHistory = () => {
 
       setJobs(jobsWithDetails);
       
-      // Preload all photo URLs BEFORE showing content for instant display
-      const allPhotoPaths = jobsWithDetails.flatMap(job => 
-        job.rugs.flatMap(rug => rug.photo_urls || [])
+      // Preload only first 3 photos per rug for faster initial load
+      const initialPhotoPaths = jobsWithDetails.flatMap(job => 
+        job.rugs.flatMap(rug => (rug.photo_urls || []).slice(0, 3))
       );
-      if (allPhotoPaths.length > 0) {
-        await batchSignUrls(allPhotoPaths);
+      if (initialPhotoPaths.length > 0) {
+        await batchSignUrls(initialPhotoPaths);
       }
     } catch (error) {
       console.error('Error fetching client history:', error);
