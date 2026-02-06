@@ -66,7 +66,8 @@ export const useJobs = () => {
         inspections: undefined, // Remove the nested object
       })) as Job[];
     },
-    staleTime: 30000, // 30 seconds
+    staleTime: 60000, // 1 minute - reduced network calls
+    gcTime: 300000, // 5 minutes in cache
     enabled: !companyLoading, // Wait for company context
   });
 };

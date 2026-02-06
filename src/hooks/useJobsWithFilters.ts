@@ -1,10 +1,19 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isThisWeek, isThisMonth, isToday, parseISO, subDays } from 'date-fns';
 import { useCompany } from './useCompany';
 import { tenantQueryKeys } from '@/lib/tenantQueries';
 import type { JobFilters } from '@/components/JobsFilter';
+
+// Pre-compute date boundaries outside component for performance
+const getDateBoundaries = () => {
+  const now = new Date();
+  return {
+    threeMonthsAgo: subDays(now, 90),
+    thirtyDaysAgo: subDays(now, 30),
+  };
+};
 
 export interface JobWithDetails {
   id: string;
@@ -81,7 +90,8 @@ export const useJobsWithFilters = (filters: JobFilters) => {
         ),
       }));
     },
-    staleTime: 30000,
+    staleTime: 60000, // 1 minute - reduced network calls
+    gcTime: 300000, // 5 minutes in cache  
     enabled: !companyLoading, // Wait for company context to load
   });
 

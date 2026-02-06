@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronRight, Building2 } from 'lucide-react';
@@ -31,8 +32,62 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-export const BusinessTable = ({ businesses, loading }: BusinessTableProps) => {
+// Memoized table row component
+const BusinessRow = memo(({ 
+  business, 
+  onClick 
+}: { 
+  business: Business; 
+  onClick: () => void;
+}) => (
+  <TableRow
+    className="cursor-pointer hover:bg-muted/50"
+    onClick={onClick}
+  >
+    <TableCell>
+      <div className="font-medium">
+        {business.business_name || business.full_name || 'Unnamed Business'}
+      </div>
+    </TableCell>
+    <TableCell>
+      <div className="text-sm text-muted-foreground">
+        {business.business_email || '—'}
+      </div>
+    </TableCell>
+    <TableCell>
+      {format(new Date(business.created_at), 'MMM d, yyyy')}
+    </TableCell>
+    <TableCell className="text-right">
+      <Badge variant="secondary">{business.jobCount}</Badge>
+    </TableCell>
+    <TableCell className="text-right font-medium">
+      {formatCurrency(business.totalRevenue)}
+    </TableCell>
+    <TableCell className="text-right">
+      {business.outstandingBalance > 0 ? (
+        <Badge variant="outline" className="border-amber-500 text-amber-600">
+          {formatCurrency(business.outstandingBalance)}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )}
+    </TableCell>
+    <TableCell className="text-right">
+      <Button variant="ghost" size="sm" className="gap-1">
+        View
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </TableCell>
+  </TableRow>
+));
+BusinessRow.displayName = 'BusinessRow';
+
+export const BusinessTable = memo(({ businesses, loading }: BusinessTableProps) => {
   const navigate = useNavigate();
+
+  const handleRowClick = useCallback((userId: string) => {
+    navigate(`/admin/users/${userId}`);
+  }, [navigate]);
 
   if (loading) {
     return (
@@ -67,49 +122,16 @@ export const BusinessTable = ({ businesses, loading }: BusinessTableProps) => {
         </TableHeader>
         <TableBody>
           {businesses.map((business) => (
-            <TableRow
+            <BusinessRow
               key={business.id}
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => navigate(`/admin/users/${business.user_id}`)}
-            >
-              <TableCell>
-                <div className="font-medium">
-                  {business.business_name || business.full_name || 'Unnamed Business'}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="text-sm text-muted-foreground">
-                  {business.business_email || '—'}
-                </div>
-              </TableCell>
-              <TableCell>
-                {format(new Date(business.created_at), 'MMM d, yyyy')}
-              </TableCell>
-              <TableCell className="text-right">
-                <Badge variant="secondary">{business.jobCount}</Badge>
-              </TableCell>
-              <TableCell className="text-right font-medium">
-                {formatCurrency(business.totalRevenue)}
-              </TableCell>
-              <TableCell className="text-right">
-                {business.outstandingBalance > 0 ? (
-                  <Badge variant="outline" className="border-amber-500 text-amber-600">
-                    {formatCurrency(business.outstandingBalance)}
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <Button variant="ghost" size="sm" className="gap-1">
-                  View
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
+              business={business}
+              onClick={() => handleRowClick(business.user_id)}
+            />
           ))}
         </TableBody>
       </Table>
     </div>
   );
-};
+});
+
+BusinessTable.displayName = 'BusinessTable';
