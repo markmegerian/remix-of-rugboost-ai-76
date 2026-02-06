@@ -277,7 +277,7 @@ Use the provided service pricing to calculate costs. Calculate costs based on sq
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
