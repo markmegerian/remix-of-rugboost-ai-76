@@ -248,3 +248,80 @@
 .ProseMirror a {
   @apply text-primary underline;
 }
+
+/* Code Block Syntax Highlighting */
+.ProseMirror pre.hljs {
+  @apply bg-[#1e1e1e] text-[#d4d4d4] p-4 rounded-lg my-4 overflow-x-auto;
+}
+
+.ProseMirror pre.hljs code {
+  @apply bg-transparent p-0 text-inherit;
+}
+
+/* Syntax highlighting colors */
+.hljs-comment,
+.hljs-quote { color: #6a9955; }
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class { color: #569cd6; }
+
+.hljs-string,
+.hljs-bullet,
+.hljs-subst { color: #ce9178; }
+
+.hljs-number,
+.hljs-literal,
+.hljs-type,
+.hljs-built_in,
+.hljs-builtin-name { color: #b5cea8; }
+
+.hljs-keyword,
+.hljs-selector-tag { color: #c586c0; }
+
+.hljs-attr,
+.hljs-symbol,
+.hljs-meta,
+.hljs-selector-attr,
+.hljs-selector-pseudo { color: #9cdcfe; }
+
+.hljs-title,
+.hljs-section { color: #dcdcaa; }
+
+.hljs-addition { color: #b5cea8; }
+.hljs-deletion { color: #ce9178; }
+
+/* Table Styles */
+.ProseMirror .blog-table {
+  @apply border-collapse w-full my-4;
+}
+
+.ProseMirror table {
+  @apply border-collapse w-full my-4;
+}
+
+.ProseMirror th,
+.ProseMirror td {
+  @apply border border-border p-2 text-left min-w-[100px];
+}
+
+.ProseMirror th {
+  @apply bg-muted font-semibold;
+}
+
+.ProseMirror tr:hover td {
+  @apply bg-muted/50;
+}
+
+/* Table cell selection */
+.ProseMirror .selectedCell {
+  @apply bg-primary/10;
+}
+
+/* Column resize handle */
+.ProseMirror .column-resize-handle {
+  @apply bg-primary w-1 absolute right-0 top-0 bottom-0 cursor-col-resize;
+}
