@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { queryKeys } from '@/lib/queryKeys';
+import { batchSignUrls } from '@/hooks/useSignedUrls';
 
 export interface JobDetail {
   id: string;
@@ -206,9 +207,17 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         serviceCompletions = completionsData || [];
       }
 
+      // Preload all photo URLs in a single batch request for faster rendering
+      const rugs = (rugsResult.data || []) as Rug[];
+      const allPhotoPaths = rugs.flatMap(rug => rug.photo_urls || []);
+      if (allPhotoPaths.length > 0) {
+        // Fire and forget - don't await, let it cache in background
+        batchSignUrls(allPhotoPaths).catch(console.error);
+      }
+
       return {
         job: jobResult.data as JobDetail,
-        rugs: (rugsResult.data || []) as Rug[],
+        rugs,
         branding: brandingResult.data as BusinessBranding | null,
         servicePrices,
         upsellServices,
