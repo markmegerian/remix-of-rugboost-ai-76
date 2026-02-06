@@ -268,11 +268,13 @@ const ClientPortal = () => {
 
       setRugs(processedRugs);
       
-      // Preload all photo URLs in a single batch request BEFORE showing content
-      // This ensures photos appear instantly when the page renders
-      const allPhotoPaths = processedRugs.flatMap(rug => rug.photo_urls || []);
-      if (allPhotoPaths.length > 0) {
-        await batchSignUrls(allPhotoPaths);
+      // Preload only first 3 photos per rug for faster initial load
+      // Additional photos load on-demand when user clicks to view more
+      const initialPhotoPaths = processedRugs.flatMap(rug => 
+        (rug.photo_urls || []).slice(0, 3)
+      );
+      if (initialPhotoPaths.length > 0) {
+        await batchSignUrls(initialPhotoPaths);
       }
     } catch (error) {
       console.error('Error loading portal data:', error);

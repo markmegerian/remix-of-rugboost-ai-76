@@ -25,6 +25,7 @@ import {
   getServiceDeclineConsequence
  } from '@/lib/serviceCategories';
  import RugPhoto from '@/components/RugPhoto';
+ import LazyPhotoGallery from '@/components/LazyPhotoGallery';
  
 // Check if service is significant value (threshold: $100)
 function isSignificantValue(service: Service): boolean {
@@ -39,6 +40,7 @@ function isSignificantValue(service: Service): boolean {
    priority?: string;
   adjustedTotal: number; // Final price after risk/severity adjustments
   pricingFactors?: string[]; // Internal tags (not shown to clients)
+  rugNumber?: string; // Which rug this service belongs to
  }
  
  interface RugData {
@@ -124,8 +126,10 @@ function generateConditionSummary(services: Service[]): string {
   const [lightboxImages, setLightboxImages] = useState<string[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
    
-   // Aggregate services across all rugs
-   const allServices = rugs.flatMap(r => r.services);
+   // Aggregate services across all rugs, adding rug identification
+   const allServices = rugs.flatMap(r => 
+     r.services.map(s => ({ ...s, rugNumber: r.rug_number }))
+   );
    const allGrouped = groupServicesByCategory(allServices);
    
   const requiredTotal = calculateCategoryTotal(allGrouped.required, true);
@@ -306,36 +310,14 @@ function generateConditionSummary(services: Service[]): string {
                     </p>
                   </div>
 
-                   {/* Photos */}
+                   {/* Photos - Lazy Loading */}
                    {rug.photo_urls && rug.photo_urls.length > 0 && (
-                     <div className="space-y-2">
-                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                         <ImageIcon className="h-3 w-3" />
-                         <span>{rug.photo_urls.length} inspection photo{rug.photo_urls.length !== 1 ? 's' : ''}</span>
-                       </div>
-                       <div className="flex gap-2 overflow-x-auto pb-2">
-                         {rug.photo_urls.map((url, idx) => (
-                           <button
-                             key={idx}
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               openLightbox(rug.photo_urls!, idx);
-                             }}
-                             className="relative group flex-shrink-0"
-                           >
-                             <RugPhoto
-                               filePath={url}
-                               alt={`${rug.rug_number} photo ${idx + 1}`}
-                               className="w-20 h-20 object-cover rounded-lg border transition-opacity group-hover:opacity-80"
-                               loadingClassName="w-20 h-20"
-                             />
-                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                               <ZoomIn className="h-5 w-5 text-white drop-shadow-lg" />
-                             </div>
-                           </button>
-                         ))}
-                         </div>
-                     </div>
+                     <LazyPhotoGallery
+                       photoUrls={rug.photo_urls}
+                       rugNumber={rug.rug_number}
+                       initialCount={3}
+                       onOpenLightbox={openLightbox}
+                     />
                    )}
                    
                    {/* View Report Toggle */}
@@ -388,6 +370,11 @@ function generateConditionSummary(services: Service[]): string {
                   <Lock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{service.name}</p>
+                    {rugs.length > 1 && service.rugNumber && (
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {service.rugNumber}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       ${(service.quantity * service.unitPrice).toFixed(2)}
                     </p>
@@ -418,7 +405,8 @@ function generateConditionSummary(services: Service[]): string {
                   isDeclined={declinedServices.has(service.id)}
                   onDecline={() => handleDeclineService(service)}
                   onRestore={() => restoreService(service.id)}
-                   isSignificant={isSignificantValue(service)}
+                  isSignificant={isSignificantValue(service)}
+                  showRugLabel={rugs.length > 1}
                 />
               ))}
             </div>
@@ -449,7 +437,8 @@ function generateConditionSummary(services: Service[]): string {
                   isDeclined={declinedServices.has(service.id)}
                   onDecline={() => handleDeclineService(service)}
                   onRestore={() => restoreService(service.id)}
-                   isSignificant={true}
+                  isSignificant={true}
+                  showRugLabel={rugs.length > 1}
                 />
               ))}
             </div>
@@ -482,7 +471,8 @@ function generateConditionSummary(services: Service[]): string {
                   isDeclined={declinedServices.has(service.id)}
                   onDecline={() => handleDeclineService(service)}
                   onRestore={() => restoreService(service.id)}
-                   isSignificant={isSignificantValue(service)}
+                  isSignificant={isSignificantValue(service)}
+                  showRugLabel={rugs.length > 1}
                 />
               ))}
             </div>
@@ -738,6 +728,7 @@ interface ServiceLineItemProps {
   onDecline: () => void;
   onRestore: () => void;
   isSignificant: boolean;
+  showRugLabel?: boolean; // Show rug number when there are multiple rugs
 }
 
 const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
@@ -747,15 +738,23 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
   onDecline,
   onRestore,
   isSignificant,
+  showRugLabel = false,
 }) => {
   const cost = service.adjustedTotal;
   
   if (isDeclined) {
     return (
       <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 opacity-60">
-        <div className="flex items-center gap-2">
-          <X className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground line-through">{service.name}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <X className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground line-through">{service.name}</span>
+          </div>
+          {showRugLabel && service.rugNumber && (
+            <p className="text-[10px] text-muted-foreground ml-6 mt-0.5">
+              {service.rugNumber}
+            </p>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -780,7 +779,7 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
     }`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Check className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="text-sm font-medium">{service.name}</span>
             {category === 'high_cost' && (
@@ -794,6 +793,11 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
               </span>
             )}
           </div>
+          {showRugLabel && service.rugNumber && (
+            <p className="text-[10px] text-muted-foreground ml-6 mt-0.5 font-medium">
+              {service.rugNumber}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground ml-6">
             ${cost.toFixed(2)}
           </p>
