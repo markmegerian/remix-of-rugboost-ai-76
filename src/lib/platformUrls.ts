@@ -77,10 +77,11 @@ export const getAuthRedirectUrl = (path: string): string => {
 };
 
 /**
- * Get the signup email redirect URL (Capacitor-safe)
+ * Get the signup email redirect URL (Capacitor-safe).
+ * Uses /auth-callback route which handles email verification tokens.
  */
 export const getSignupRedirectUrl = (): string => {
-  return getAuthRedirectUrl('/');
+  return getAuthRedirectUrl('/auth-callback');
 };
 
 /**

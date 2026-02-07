@@ -1,18 +1,17 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+import { getCorsHeaders, handleCorsPrelight, corsJsonResponse } from '../_shared/cors.ts';
 
 interface ValidateTokenRequest {
   token: string;
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return handleCorsPrelight(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -33,10 +32,12 @@ Deno.serve(async (req) => {
     const { token } = await req.json() as ValidateTokenRequest;
 
     if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Token is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ error: 'Token is required' }, 400, req);
+    }
+
+    // Input validation: token format check
+    if (typeof token !== 'string' || token.length < 20 || token.length > 100) {
+      return corsJsonResponse({ error: 'Invalid token format' }, 400, req);
     }
 
     const requestId = crypto.randomUUID().slice(0, 8);
@@ -83,39 +84,30 @@ Deno.serve(async (req) => {
 
     if (tokenError || !tokenData) {
       console.log(`[${requestId}] Token validation failed: ${tokenError?.message || 'Not found'}`);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid or expired access link',
-          valid: false,
-        }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ 
+        error: 'Invalid or expired access link',
+        valid: false,
+      }, 404, req);
     }
 
     console.log(`[${requestId}] Token validated successfully for job: ${tokenData.job_id?.substring(0, 8)}***`);
 
-    return new Response(
-      JSON.stringify({
-        valid: true,
-        accessId: tokenData.access_id,
-        jobId: tokenData.job_id,
-        invitedEmail: tokenData.invited_email,
-        clientId: tokenData.client_id,
-        staffUserId: tokenData.staff_user_id,
-        jobNumber: tokenData.job_number,
-        clientName: tokenData.client_name,
-        jobStatus: tokenData.job_status,
-        authUserId: tokenData.auth_user_id,
-        companyId: tokenData.company_id,
-        remainingAttempts: rateCheck?.remaining_attempts ?? null,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return corsJsonResponse({
+      valid: true,
+      accessId: tokenData.access_id,
+      jobId: tokenData.job_id,
+      invitedEmail: tokenData.invited_email,
+      clientId: tokenData.client_id,
+      staffUserId: tokenData.staff_user_id,
+      jobNumber: tokenData.job_number,
+      clientName: tokenData.client_name,
+      jobStatus: tokenData.job_status,
+      authUserId: tokenData.auth_user_id,
+      companyId: tokenData.company_id,
+      remainingAttempts: rateCheck?.remaining_attempts ?? null,
+    }, 200, req);
   } catch (error: unknown) {
     console.error('Token validation error:', error instanceof Error ? error.message : 'Unknown error');
-    return new Response(
-      JSON.stringify({ error: 'Validation failed', valid: false }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return corsJsonResponse({ error: 'Validation failed', valid: false }, 500, req);
   }
 });
