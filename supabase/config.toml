@@ -1,16 +1,86 @@
 project_id = "bidzwlbpdnlncqhpiyqk"
 
+# ==============================================================================
+# Edge Function JWT Verification Configuration
+# ==============================================================================
+# 
+# verify_jwt = false: JWT verification is handled in function code using getClaims()
+# This is the recommended approach as it provides more control and better error messages.
+#
+# Functions marked as "PUBLIC" are intentionally accessible without authentication.
+# All other functions validate JWTs in their code before processing requests.
+# ==============================================================================
+
+# -----------------------------------------------------------------------------
+# PUBLIC ENDPOINTS (No authentication required)
+# These functions must remain public for specific use cases:
+# -----------------------------------------------------------------------------
+
+# PUBLIC: Called from client portal invite emails before user has an account
+# Rate-limited and validates tokens server-side to prevent abuse
 [functions.invite-client]
 verify_jwt = false
 
-[functions.generate-inspection-pdf]
+# PUBLIC: Client registration flow - users don't have a valid JWT yet
+# Protected by: access token validation, rate limiting, email verification
+[functions.complete-client-registration]
 verify_jwt = false
 
-[functions.send-inspection-ready]
-verify_jwt = false
-
+# PUBLIC: Token validation for client portal access links
+# Protected by: SHA-256 token hashing, database-level rate limiting (10 attempts/5min)
 [functions.validate-token]
 verify_jwt = false
 
-[functions.complete-client-registration]
+# PUBLIC: Stripe webhook callbacks and payment verification
+# Protected by: Stripe session ID validation, only processes valid Stripe sessions
+[functions.verify-payment]
+verify_jwt = false
+
+# -----------------------------------------------------------------------------
+# AUTHENTICATED ENDPOINTS (JWT validated in function code)
+# These functions verify authentication using getClaims() in their handlers
+# -----------------------------------------------------------------------------
+
+# Authenticated: Generates inspection PDFs - validates JWT in code
+[functions.generate-inspection-pdf]
+verify_jwt = false
+
+# Authenticated: Sends inspection ready notifications - validates JWT in code  
+[functions.send-inspection-ready]
+verify_jwt = false
+
+# Authenticated: AI rug analysis - validates JWT and applies rate limiting
+[functions.analyze-rug]
+verify_jwt = false
+
+# Authenticated: Creates Stripe checkout sessions - validates JWT and user access
+[functions.create-checkout-session]
+verify_jwt = false
+
+# Authenticated: Deletes user account - validates JWT ownership
+[functions.delete-user-account]
+verify_jwt = false
+
+# Authenticated: Sends inspection report emails - validates JWT and rate limits
+[functions.send-report-email]
+verify_jwt = false
+
+# Authenticated: Handles financial data encryption/decryption - validates JWT + role
+[functions.financial-data]
+verify_jwt = false
+
+# Authenticated: Generates invoice PDFs - called from verify-payment (internal)
+[functions.generate-invoice-pdf]
+verify_jwt = false
+
+# Authenticated: Sends client confirmation emails - called from verify-payment (internal)
+[functions.send-client-confirmation]
+verify_jwt = false
+
+# Authenticated: Sends payment received notifications - called from verify-payment (internal)
+[functions.notify-payment-received]
+verify_jwt = false
+
+# Authenticated: Sends payout notifications - admin workflow
+[functions.notify-payout]
 verify_jwt = false

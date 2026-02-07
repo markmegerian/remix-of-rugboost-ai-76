@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders, handleCorsPrelight, corsJsonResponse } from '../_shared/cors.ts';
 
 // Rate limiting: 10 verification requests per minute per session ID
 // This prevents brute-force attempts to guess session IDs
@@ -60,8 +56,10 @@ function getClientIdentifier(req: Request, sessionId?: string): string {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCorsPrelight(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const { sessionId } = await req.json();
@@ -139,19 +137,13 @@ serve(async (req) => {
 
     if (paymentLookupError || !existingPayment) {
       console.error("Payment record not found for session:", sessionId);
-      return new Response(
-        JSON.stringify({ error: "Payment record not found", success: false }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return corsJsonResponse({ error: "Payment record not found", success: false }, 404, req);
     }
 
     // If payment is already completed, return success without reprocessing
     if (existingPayment.status === 'completed') {
       console.log("Payment already processed:", sessionId);
-      return new Response(
-        JSON.stringify({ success: true, amount: session.amount_total, alreadyProcessed: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return corsJsonResponse({ success: true, amount: session.amount_total, alreadyProcessed: true }, 200, req);
     }
 
     if (session.payment_status === "paid") {
@@ -327,41 +319,23 @@ serve(async (req) => {
           }
         }
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            amount: session.amount_total,
-            jobNumber: job?.job_number || "",
-            clientName: job?.client_name || "",
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          }
-        );
+        return corsJsonResponse({
+          success: true,
+          amount: session.amount_total,
+          jobNumber: job?.job_number || "",
+          clientName: job?.client_name || "",
+        }, 200, req);
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: session.payment_status === "paid",
-        amount: session.amount_total,
-        status: session.payment_status,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
+    return corsJsonResponse({
+      success: session.payment_status === "paid",
+      amount: session.amount_total,
+      status: session.payment_status,
+    }, 200, req);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error verifying payment:", errorMessage);
-    return new Response(
-      JSON.stringify({ error: errorMessage, success: false }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+    return corsJsonResponse({ error: errorMessage, success: false }, 500, req);
   }
 });

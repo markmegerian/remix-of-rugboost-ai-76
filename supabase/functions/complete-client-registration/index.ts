@@ -1,9 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, handleCorsPrelight, corsJsonResponse } from '../_shared/cors.ts';
 
 interface RegistrationRequest {
   accessToken: string;
@@ -45,8 +41,10 @@ function checkRateLimit(identifier: string): { allowed: boolean; remaining: numb
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return handleCorsPrelight(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
@@ -82,36 +80,30 @@ Deno.serve(async (req) => {
     const { accessToken, email, password } = await req.json() as RegistrationRequest;
 
     if (!accessToken || !email || !password) {
-      return new Response(
-        JSON.stringify({ error: 'Access token, email, and password are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ error: 'Access token, email, and password are required' }, 400, req);
+    }
+
+    // Input validation
+    if (typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 100) {
+      return corsJsonResponse({ error: 'Invalid access token format' }, 400, req);
+    }
+
+    if (typeof email !== 'string' || !email.includes('@') || email.length > 255) {
+      return corsJsonResponse({ error: 'Invalid email format' }, 400, req);
     }
 
     // Validate password strength
     if (password.length < 8) {
-      return new Response(
-        JSON.stringify({ error: 'Password must be at least 8 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ error: 'Password must be at least 8 characters' }, 400, req);
     }
     if (!/[A-Z]/.test(password)) {
-      return new Response(
-        JSON.stringify({ error: 'Password must contain an uppercase letter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ error: 'Password must contain an uppercase letter' }, 400, req);
     }
     if (!/[a-z]/.test(password)) {
-      return new Response(
-        JSON.stringify({ error: 'Password must contain a lowercase letter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ error: 'Password must contain a lowercase letter' }, 400, req);
     }
     if (!/[0-9]/.test(password)) {
-      return new Response(
-        JSON.stringify({ error: 'Password must contain a number' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return corsJsonResponse({ error: 'Password must contain a number' }, 400, req);
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -138,17 +130,19 @@ Deno.serve(async (req) => {
 
     if (claimError) {
       console.error(`[${requestId}] Token claim error:`, claimError.message);
-      return new Response(
-        JSON.stringify({ error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return corsJsonResponse(
+        { error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' },
+        400,
+        req
       );
     }
 
     if (!claimedToken) {
       console.log(`[${requestId}] Token claim failed - already consumed, expired, or invalid`);
-      return new Response(
-        JSON.stringify({ error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return corsJsonResponse(
+        { error: 'This access link is invalid, expired, or already used. Please request a new link from the business.' },
+        400,
+        req
       );
     }
 
@@ -160,12 +154,14 @@ Deno.serve(async (req) => {
     // CRITICAL: Require both auth_user_id and company_id for security
     if (!authUserId) {
       console.error(`[${requestId}] Legacy invite without auth_user_id`);
-      return new Response(
-        JSON.stringify({ error: 'This access link is invalid or expired. Please request a new link from the business.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return corsJsonResponse(
+        { error: 'This access link is invalid or expired. Please request a new link from the business.' },
+        400,
+        req
       );
     }
 
+    let finalCompanyId = companyId;
     if (!companyId) {
       // Try to get company_id from the job as fallback
       const { data: jobData } = await supabaseAdmin
@@ -176,23 +172,19 @@ Deno.serve(async (req) => {
       
       if (!jobData?.company_id) {
         console.error(`[${requestId}] No company context for registration`);
-        return new Response(
-          JSON.stringify({ error: 'Unable to determine company context. Please request a new link.' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        return corsJsonResponse(
+          { error: 'Unable to determine company context. Please request a new link.' },
+          400,
+          req
         );
       }
+      finalCompanyId = jobData.company_id;
       // Update the access record with company_id for future reference
       await supabaseAdmin
         .from('client_job_access')
-        .update({ company_id: jobData.company_id })
+        .update({ company_id: finalCompanyId })
         .eq('id', claimedToken.id);
     }
-
-    const finalCompanyId = companyId || (await supabaseAdmin
-      .from('jobs')
-      .select('company_id')
-      .eq('id', claimedToken.job_id)
-      .single()).data?.company_id;
 
     console.log(`[${requestId}] Company context: ${finalCompanyId?.substring(0, 8)}***`);
 
@@ -200,9 +192,10 @@ Deno.serve(async (req) => {
     const invitedEmail = claimedToken.invited_email?.toLowerCase().trim();
     if (invitedEmail && invitedEmail !== normalizedEmail) {
       console.error(`[${requestId}] Email mismatch`);
-      return new Response(
-        JSON.stringify({ error: 'Email does not match the invitation. Please request a new link from the business.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return corsJsonResponse(
+        { error: 'Email does not match the invitation. Please request a new link from the business.' },
+        403,
+        req
       );
     }
 
@@ -221,9 +214,10 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error(`[${requestId}] Error updating password:`, updateError.message);
-      return new Response(
-        JSON.stringify({ error: 'Failed to set password. Please request a new access link from the business.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return corsJsonResponse(
+        { error: 'Failed to set password. Please request a new access link from the business.' },
+        500,
+        req
       );
     }
     console.log(`[${requestId}] Password updated successfully`);
@@ -300,21 +294,15 @@ Deno.serve(async (req) => {
       .eq('id', claimedToken.id);
 
     console.log(`[${requestId}] Registration completed successfully`);
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        userId: authUserId, 
-        isNewUser: false,
-        companyId: finalCompanyId,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return corsJsonResponse({ 
+      success: true, 
+      userId: authUserId, 
+      isNewUser: false,
+      companyId: finalCompanyId,
+    }, 200, req);
   } catch (error: unknown) {
     console.error('Registration error:', error instanceof Error ? error.message : 'Unknown error');
     const errorMessage = error instanceof Error ? error.message : 'Failed to complete registration';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return corsJsonResponse({ error: errorMessage }, 500, req);
   }
 });
