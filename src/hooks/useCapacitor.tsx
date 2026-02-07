@@ -257,4 +257,26 @@ export function useCapacitor(): UseCapacitorReturn {
 // Re-export types for convenience
 export { ImpactStyle, NotificationType } from '@capacitor/haptics';
 export { Style as StatusBarStyle } from '@capacitor/status-bar';
+
+/**
+ * Utility to check if running on iOS
+ */
+export const isIOS = (): boolean => {
+  try {
+    return Capacitor.getPlatform() === 'ios';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Utility to check if running on Android
+ */
+export const isAndroid = (): boolean => {
+  try {
+    return Capacitor.getPlatform() === 'android';
+  } catch {
+    return false;
+  }
+};
 export { CameraResultType, CameraSource } from '@capacitor/camera';

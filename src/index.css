@@ -77,6 +77,13 @@
     @apply border-border;
   }
 
+  html {
+    /* Prevent iOS text size adjustment */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'DM Sans', system-ui, sans-serif;
@@ -87,8 +94,10 @@
     padding-right: env(safe-area-inset-right);
     /* Prevent overscroll bounce on iOS */
     overscroll-behavior: none;
-    /* Smooth scrolling */
+    /* Smooth scrolling for iOS */
     -webkit-overflow-scrolling: touch;
+    /* Prevent pull-to-refresh on Android Chrome */
+    overscroll-behavior-y: contain;
   }
 
   /* Safe area aware sticky headers */
@@ -115,6 +124,22 @@
   /* Touch-friendly tap targets */
   button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Keyboard avoidance - input focus handling */
+  input:focus, textarea:focus, select:focus {
+    /* Ensure focused inputs are visible above keyboard */
+    scroll-margin-bottom: 20vh;
+  }
+
+  /* Prevent zoom on input focus on iOS (requires 16px+ font) */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  /* Modal/dialog backdrop - prevent scroll behind */
+  [data-state="open"][role="dialog"] {
+    overscroll-behavior: contain;
   }
 }
 
@@ -176,5 +201,33 @@
 
   .min-h-screen-safe {
     min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  /* Bottom safe area for fixed action bars */
+  .pb-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+
+  /* Full height accounting for safe areas - for full-screen layouts */
+  .h-screen-safe {
+    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  /* Margin variants for safe areas */
+  .mb-safe-bottom {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mt-safe-top {
+    margin-top: env(safe-area-inset-top);
+  }
+
+  /* Native app feel - hide scrollbars but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
