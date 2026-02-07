@@ -43,6 +43,7 @@ const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const ScreenshotGenerator = lazy(() => import("./pages/ScreenshotGenerator"));
 const AdminAuditLog = lazy(() => import("./pages/admin/AdminAuditLog"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 
 // Legal Pages
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -76,6 +77,7 @@ const App = () => (
                    <Route path="/" element={<Index />} />
                    <Route path="/auth" element={<Auth />} />
                    <Route path="/reset-password" element={<ResetPassword />} />
+                   <Route path="/auth-callback" element={<AuthCallback />} />
                    <Route path="/dashboard" element={<Dashboard />} />
                    <Route path="/jobs/new" element={<NewJob />} />
                    <Route path="/jobs/:jobId" element={<JobDetail />} />
