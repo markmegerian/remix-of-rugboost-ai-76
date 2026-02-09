@@ -111,6 +111,18 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  h2 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   /* Disable text selection on native app UI elements */
