@@ -99,7 +99,7 @@ interface PdfRequest {
   businessEmail?: string;
   businessPhone?: string;
   businessAddress?: string;
-  logoUrl?: string;
+  logoPath?: string; // Storage path for logo
   rugs: RugDetail[];
   totalAmount: number;
   createdAt: string;
@@ -239,7 +239,7 @@ class PremiumPdfRenderer {
   // HEADER SECTION
   // -------------------------------------------------------------------------
   
-  drawHeader(request: PdfRequest) {
+  async drawHeader(request: PdfRequest, logoBase64: string | null) {
     const headerHeight = 55;
     
     // Navy header background with subtle gradient effect
@@ -250,11 +250,33 @@ class PremiumPdfRenderer {
     setColor(this.doc, PALETTE.gold, 'fill');
     this.doc.rect(0, headerHeight - 3, this.pageWidth, 3, 'F');
     
-    // Business name
-    this.doc.setFontSize(TYPE.hero);
+    // Logo or business name
+    const textStartX = this.margin;
+    let logoWidth = 0;
+    
+    if (logoBase64) {
+      try {
+        // Add logo - maintain aspect ratio, max height 25mm
+        const logoMaxHeight = 25;
+        const logoMaxWidth = 40;
+        
+        // Add the logo image
+        this.doc.addImage(logoBase64, 'PNG', this.margin, 10, logoMaxWidth, logoMaxHeight);
+        logoWidth = logoMaxWidth + 8;
+        
+        console.log('[PDF] Logo added to header');
+      } catch (e) {
+        console.error('[PDF] Failed to add logo:', e);
+        logoWidth = 0;
+      }
+    }
+    
+    // Business name (offset if logo present)
+    const nameX = textStartX + logoWidth;
+    this.doc.setFontSize(logoBase64 ? TYPE.h1 : TYPE.hero);
     this.doc.setFont('helvetica', 'bold');
     setColor(this.doc, PALETTE.white, 'text');
-    this.doc.text(request.businessName || 'Professional Rug Care', this.margin, 22);
+    this.doc.text(request.businessName || 'Professional Rug Care', nameX, logoBase64 ? 20 : 22);
     
     // Report type subtitle
     this.doc.setFontSize(TYPE.h2);
@@ -263,18 +285,18 @@ class PremiumPdfRenderer {
     const reportType = request.type === 'invoice' 
       ? 'Payment Receipt' 
       : 'Expert Inspection Report';
-    this.doc.text(reportType, this.margin, 32);
+    this.doc.text(reportType, nameX, logoBase64 ? 28 : 32);
     
     // Contact info
     this.doc.setFontSize(TYPE.caption);
     setColor(this.doc, { r: 180, g: 190, b: 200 }, 'text');
-    let contactY = 42;
+    let contactY = logoBase64 ? 36 : 42;
     if (request.businessPhone) {
-      this.doc.text(request.businessPhone, this.margin, contactY);
+      this.doc.text(request.businessPhone, nameX, contactY);
       contactY += 4;
     }
     if (request.businessEmail) {
-      this.doc.text(request.businessEmail, this.margin, contactY);
+      this.doc.text(request.businessEmail, nameX, contactY);
     }
     
     // Report info badge (right side)
@@ -720,7 +742,7 @@ class PremiumPdfRenderer {
   // MAIN GENERATION METHOD
   // -------------------------------------------------------------------------
   
-  async generate(request: PdfRequest): Promise<string> {
+  async generate(request: PdfRequest, logoBase64: string | null): Promise<string> {
     console.log(`[Premium PDF] Generating ${request.type} for job ${request.jobNumber}`);
     
     // Generate QR code for portal link
@@ -729,8 +751,8 @@ class PremiumPdfRenderer {
       qrCode = await generateQRCode(request.portalUrl);
     }
     
-    // Draw header
-    this.drawHeader(request);
+    // Draw header with logo
+    await this.drawHeader(request, logoBase64);
     
     // Draw client info with QR
     this.drawClientInfo(request, qrCode);
@@ -804,9 +826,27 @@ serve(async (req) => {
     const request: PdfRequest = await req.json();
     console.log(`[Premium PDF] Request received for ${request.type}:`, request.jobNumber);
 
+    // Fetch logo if logoPath provided
+    let logoBase64: string | null = null;
+    if (request.logoPath) {
+      try {
+        // Create signed URL for logo
+        const { data: signedUrlData, error: signError } = await supabase.storage
+          .from('rug-photos')
+          .createSignedUrl(request.logoPath, 60);
+        
+        if (!signError && signedUrlData?.signedUrl) {
+          logoBase64 = await fetchImageAsBase64(signedUrlData.signedUrl);
+          console.log('[Premium PDF] Logo fetched successfully');
+        }
+      } catch (e) {
+        console.error('[Premium PDF] Failed to fetch logo:', e);
+      }
+    }
+
     // Generate PDF
     const renderer = new PremiumPdfRenderer();
-    const pdfBase64 = await renderer.generate(request);
+    const pdfBase64 = await renderer.generate(request, logoBase64);
 
     const filename = request.type === 'invoice'
       ? `Invoice_${request.jobNumber}.pdf`
