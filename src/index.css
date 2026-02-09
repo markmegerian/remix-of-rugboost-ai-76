@@ -113,16 +113,19 @@
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.02em;
+    text-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
   }
 
   h1 {
     font-weight: 700;
     letter-spacing: -0.03em;
+    text-shadow: 0 2px 4px hsl(var(--foreground) / 0.06);
   }
 
   h2 {
     font-weight: 700;
     letter-spacing: -0.025em;
+    text-shadow: 0 1px 3px hsl(var(--foreground) / 0.05);
   }
 
   /* Disable text selection on native app UI elements */
