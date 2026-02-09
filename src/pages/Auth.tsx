@@ -193,7 +193,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
           <div className="flex items-center gap-3">
             <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground">
+              <h1 className="font-display text-xl font-bold text-gradient">
                 RugBoost
               </h1>
               <p className="text-xs text-muted-foreground">
