@@ -71,6 +71,8 @@ interface BusinessBranding {
   business_name: string | null;
   business_phone: string | null;
   business_email: string | null;
+  business_address?: string | null;
+  logo_path?: string | null;
 }
 
 const ClientPortal = () => {
@@ -250,10 +252,10 @@ const ClientPortal = () => {
       };
       setJob(jobData);
 
-      // Fetch branding
+      // Fetch branding including logo
       const { data: brandingData } = await supabase
         .from('profiles')
-        .select('business_name, business_phone, business_email')
+        .select('business_name, business_phone, business_email, business_address, logo_path')
         .eq('user_id', (accessData.jobs as any).user_id)
         .single();
 

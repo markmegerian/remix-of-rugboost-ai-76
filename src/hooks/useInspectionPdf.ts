@@ -38,7 +38,7 @@ interface BusinessBranding {
   business_phone: string | null;
   business_email: string | null;
   business_address?: string | null;
-  logo_url?: string | null;
+  logo_path?: string | null;
 }
 
 interface GeneratePdfParams {
@@ -202,7 +202,7 @@ export function useInspectionPdf() {
           businessEmail: params.branding?.business_email,
           businessPhone: params.branding?.business_phone,
           businessAddress: params.branding?.business_address,
-          logoUrl: params.branding?.logo_url,
+          logoPath: params.branding?.logo_path,
           rugs: rugDetails,
           totalAmount: params.totalAmount,
           createdAt: params.createdAt,
