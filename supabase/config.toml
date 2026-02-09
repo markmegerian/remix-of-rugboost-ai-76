@@ -84,3 +84,7 @@ verify_jwt = false
 # Authenticated: Sends payout notifications - admin workflow
 [functions.notify-payout]
 verify_jwt = false
+
+# Authenticated: Premium PDF generation with photos and QR codes
+[functions.generate-premium-pdf]
+verify_jwt = false

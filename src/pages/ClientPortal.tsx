@@ -623,6 +623,7 @@ const ClientPortal = () => {
               variant="outline" 
               size="sm" 
               onClick={() => generateAndDownload({
+                type: 'inspection',
                 jobId: job.id,
                 jobNumber: job.job_number,
                 clientName: job.client_name,
