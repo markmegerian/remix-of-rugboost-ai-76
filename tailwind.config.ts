@@ -13,48 +13,46 @@ export default {
   		}
   	},
   	extend: {
-  		fontFamily: {
-  			display: [
-  				'DM Serif Display"',
-  				'Georgia',
-  				'serif'
-  			],
-  			body: [
-  				'DM Sans"',
-  				'system-ui',
-  				'sans-serif'
-  			],
-  			sans: [
-  				'Inter',
-  				'ui-sans-serif',
-  				'system-ui',
-  				'sans-serif',
-  				'Apple Color Emoji',
-  				'Segoe UI Emoji',
-  				'Segoe UI Symbol',
-  				'Noto Color Emoji'
-  			],
-  			serif: [
-  				'Source Serif Pro',
-  				'ui-serif',
-  				'Georgia',
-  				'Cambria',
-  				'Times New Roman',
-  				'Times',
-  				'serif'
-  			],
-  			mono: [
-  				'SF Mono',
-  				'ui-monospace',
-  				'SFMono-Regular',
-  				'Menlo',
-  				'Monaco',
-  				'Consolas',
-  				'Liberation Mono',
-  				'Courier New',
-  				'monospace'
-  			]
-  		},
+		fontFamily: {
+			display: [
+				'Inter',
+				'ui-sans-serif',
+				'system-ui',
+				'sans-serif'
+			],
+			body: [
+				'Inter',
+				'ui-sans-serif',
+				'system-ui',
+				'sans-serif'
+			],
+			sans: [
+				'Inter',
+				'ui-sans-serif',
+				'system-ui',
+				'sans-serif',
+				'Apple Color Emoji',
+				'Segoe UI Emoji',
+				'Segoe UI Symbol',
+				'Noto Color Emoji'
+			],
+			serif: [
+				'Inter',
+				'ui-sans-serif',
+				'system-ui',
+				'sans-serif'
+			],
+			mono: [
+				'ui-monospace',
+				'SFMono-Regular',
+				'Menlo',
+				'Monaco',
+				'Consolas',
+				'Liberation Mono',
+				'Courier New',
+				'monospace'
+			]
+		},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
