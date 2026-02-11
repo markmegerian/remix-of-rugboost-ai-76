@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, Link } from 'react-router-dom';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, Building2 } from 'lucide-react';
@@ -36,7 +36,7 @@ const NoCompanyState = () => (
       </CardHeader>
       <CardContent className="space-y-4">
         <Button className="w-full" asChild>
-          <a href="/company/setup">Create Company</a>
+          <Link to="/company/setup">Create Company</Link>
         </Button>
         <p className="text-xs text-center text-muted-foreground">
           If you were invited to join a company, please check your email for the invitation link.
@@ -58,21 +58,13 @@ const NotCompanyAdminState = () => (
       </CardHeader>
       <CardContent>
         <Button className="w-full" variant="outline" asChild>
-          <a href="/dashboard">Return to Dashboard</a>
+          <Link to="/dashboard">Return to Dashboard</Link>
         </Button>
       </CardContent>
     </Card>
   </div>
 );
 
-/**
- * CompanyGuard - Route protection for company-scoped pages
- * 
- * Ensures user has:
- * 1. Valid authentication
- * 2. Company membership
- * 3. Optionally: Company admin role
- */
 export const CompanyGuard: React.FC<CompanyGuardProps> = ({
   children,
   requireCompanyAdmin = false,
@@ -81,27 +73,22 @@ export const CompanyGuard: React.FC<CompanyGuardProps> = ({
   const { user, loading: authLoading, isClient } = useAuth();
   const { hasCompany, isCompanyAdmin, loading: companyLoading } = useCompany();
 
-  // Still loading
   if (authLoading || companyLoading) {
     return fallback || <LoadingState />;
   }
 
-  // Not authenticated
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Client users don't need company access
   if (isClient) {
     return <Navigate to="/client/dashboard" replace />;
   }
 
-  // No company membership
   if (!hasCompany) {
     return <NoCompanyState />;
   }
 
-  // Requires company admin but user is not
   if (requireCompanyAdmin && !isCompanyAdmin) {
     return <NotCompanyAdminState />;
   }
@@ -109,9 +96,6 @@ export const CompanyGuard: React.FC<CompanyGuardProps> = ({
   return children ? <>{children}</> : <Outlet />;
 };
 
-/**
- * CompanyAdminGuard - Shorthand for requireCompanyAdmin
- */
 export const CompanyAdminGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <CompanyGuard requireCompanyAdmin>{children}</CompanyGuard>
 );
