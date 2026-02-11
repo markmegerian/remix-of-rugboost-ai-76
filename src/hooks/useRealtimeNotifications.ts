@@ -23,7 +23,7 @@ export const useRealtimeNotifications = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'jobs',
-          filter: `user_id=eq.${user.id}`,
+          ...(companyId ? { filter: `company_id=eq.${companyId}` } : { filter: `user_id=eq.${user.id}` }),
         },
         (payload) => {
           const oldStatus = payload.old?.status;

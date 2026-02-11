@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { compressImage } from '@/lib/imageCompression';
 
 interface UploadProgress {
   total: number;
@@ -45,11 +46,13 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
   }, []);
 
   const uploadSinglePhoto = async (photo: File, userId: string): Promise<string> => {
+    // Compress image before upload to save bandwidth
+    const compressedPhoto = await compressImage(photo);
     const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
 
     const { data, error: uploadError } = await supabase.storage
       .from(bucket)
-      .upload(fileName, photo, {
+      .upload(fileName, compressedPhoto, {
         cacheControl: '3600',
         upsert: false,
       });

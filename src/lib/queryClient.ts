@@ -5,7 +5,7 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 30, // 30 seconds - data is fresh for 30s
       gcTime: 1000 * 60 * 5, // 5 minutes - keep in cache for 5 min after becoming inactive
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false, // Disabled globally to prevent burst of API calls on Capacitor foreground
       retry: 1,
       refetchOnMount: true,
     },
