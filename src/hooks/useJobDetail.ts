@@ -87,7 +87,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
   const { companyId, loading: companyLoading } = useCompany();
 
   return useQuery({
-    queryKey: queryKeys.jobs.detail(jobId || ''),
+    queryKey: queryKeys.jobs.detail(companyId, jobId || ''),
     queryFn: async () => {
       if (!jobId || !userId) throw new Error('Missing jobId or userId');
 
@@ -101,21 +101,16 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         paymentsResult,
         portalResult,
       ] = await Promise.all([
-        // Job details - RLS enforces company scope
         supabase
           .from('jobs')
           .select('*, company_id')
           .eq('id', jobId)
           .maybeSingle(),
-        
-        // Rugs - RLS enforces company scope via job_id
         supabase
           .from('inspections')
           .select('*, company_id')
           .eq('job_id', jobId)
           .order('created_at', { ascending: true }),
-        
-        // Branding - company-scoped if available, fallback to user profile
         companyId 
           ? supabase
               .from('company_branding')
@@ -127,8 +122,6 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
               .select('business_name, business_address, business_phone, business_email, logo_path')
               .eq('user_id', userId)
               .maybeSingle(),
-        
-        // Service prices - company-scoped if available
         companyId
           ? supabase
               .from('company_service_prices')
@@ -138,21 +131,15 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
               .from('service_prices')
               .select('service_name, unit_price, is_additional')
               .eq('user_id', userId),
-        
-        // Approved estimates - RLS enforces company scope via job_id
         supabase
           .from('approved_estimates')
           .select('id, inspection_id, services, total_amount')
           .eq('job_id', jobId),
-        
-        // Payments - RLS enforces company scope via job_id
         supabase
           .from('payments')
           .select('*')
           .eq('job_id', jobId)
           .order('created_at', { ascending: false }),
-        
-        // Client portal access - RLS enforces company scope
         supabase
           .from('client_job_access')
           .select(`
@@ -169,11 +156,9 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
           .maybeSingle(),
       ]);
 
-      // Check for errors
       if (jobResult.error) throw jobResult.error;
       if (!jobResult.data) throw new Error('Job not found');
 
-      // Validate tenant access (RLS should handle this, but double-check)
       const job = jobResult.data as JobDetail;
       if (companyId && job.company_id) {
         const tenantCheck = validateTenantAccess(job.company_id, companyId);
@@ -182,7 +167,6 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         }
       }
 
-      // Process service prices
       const servicePrices: ServicePrice[] = (pricesResult.data || [])
         .filter(p => !p.is_additional)
         .map(p => ({ name: p.service_name, unitPrice: p.unit_price }));
@@ -191,22 +175,18 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         .filter(p => p.is_additional)
         .map(p => ({ name: p.service_name, unitPrice: p.unit_price }));
 
-      // Process approved estimates
       const approvedEstimates: ApprovedEstimate[] = (estimatesResult.data || []).map(ae => ({
         ...ae,
         services: Array.isArray(ae.services) ? ae.services : []
       }));
 
-      // Process client portal status
       let clientPortalLink: string | null = null;
       let clientPortalStatus: ClientPortalStatus | null = null;
 
       if (portalResult.data) {
-        // Portal links use web URL for email sharing (not custom schemes)
         const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
         clientPortalLink = `${baseUrl}/client/${portalResult.data.access_token}`;
         
-        // Check for service selections
         const { data: selections } = await supabase
           .from('client_service_selections')
           .select('id, created_at')
@@ -225,7 +205,6 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         };
       }
 
-      // Fetch service completions
       let serviceCompletions: { service_id: string; completed_at: string }[] = [];
       if (approvedEstimates.length > 0) {
         const estimateIds = approvedEstimates.map(e => e.id);
@@ -236,8 +215,6 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         serviceCompletions = completionsData || [];
       }
 
-      // Preload all photo URLs in a single batch request BEFORE returning
-      // This ensures photos appear instantly when the page renders
       const rugs = (rugsResult.data || []) as Rug[];
       const allPhotoPaths = rugs.flatMap(rug => rug.photo_urls || []);
       if (allPhotoPaths.length > 0) {
@@ -265,8 +242,9 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
 // Hook to invalidate job detail cache
 export const useInvalidateJobDetail = () => {
   const queryClient = useQueryClient();
+  const { companyId } = useCompany();
   
   return (jobId: string) => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(jobId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(companyId, jobId) });
   };
 };

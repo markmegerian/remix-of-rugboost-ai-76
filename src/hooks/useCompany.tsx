@@ -1,4 +1,5 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import type { PlanTier, BillingStatus } from '@/lib/planFeatures';
@@ -42,6 +43,12 @@ interface CompanyMembership {
   created_at: string;
 }
 
+interface CompanyData {
+  company: Company | null;
+  branding: CompanyBranding | null;
+  membership: CompanyMembership | null;
+}
+
 interface CompanyContextType {
   company: Company | null;
   companyId: string | null;
@@ -58,27 +65,20 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading, isStaff, isAdmin } = useAuth();
-  const [company, setCompany] = useState<Company | null>(null);
-  const [branding, setBranding] = useState<CompanyBranding | null>(null);
-  const [membership, setMembership] = useState<CompanyMembership | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchCompanyData = async () => {
-    if (!user) {
-      setCompany(null);
-      setBranding(null);
-      setMembership(null);
-      setLoading(false);
-      return;
-    }
+  const { data: companyData, isLoading } = useQuery<CompanyData>({
+    queryKey: ['company', user?.id],
+    queryFn: async (): Promise<CompanyData> => {
+      if (!user) {
+        return { company: null, branding: null, membership: null };
+      }
 
-    // Only fetch company data for staff/admin users
-    if (!isStaff && !isAdmin) {
-      setLoading(false);
-      return;
-    }
+      // Only fetch company data for staff/admin users
+      if (!isStaff && !isAdmin) {
+        return { company: null, branding: null, membership: null };
+      }
 
-    try {
       // Fetch user's company membership
       const { data: membershipData, error: membershipError } = await supabase
         .from('company_memberships')
@@ -88,63 +88,61 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
 
       if (membershipError) {
         console.error('Error fetching company membership:', membershipError);
-        setLoading(false);
-        return;
+        return { company: null, branding: null, membership: null };
       }
 
       if (!membershipData) {
-        // User has no company yet
-        setMembership(null);
-        setCompany(null);
-        setBranding(null);
-        setLoading(false);
-        return;
+        return { company: null, branding: null, membership: null };
       }
 
-      setMembership(membershipData as CompanyMembership);
+      const membership = membershipData as CompanyMembership;
 
-      // Fetch company details
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', membershipData.company_id)
-        .single();
+      // Fetch company and branding in parallel
+      const [companyResult, brandingResult] = await Promise.all([
+        supabase
+          .from('companies')
+          .select('*')
+          .eq('id', membership.company_id)
+          .single(),
+        supabase
+          .from('company_branding')
+          .select('*')
+          .eq('company_id', membership.company_id)
+          .maybeSingle(),
+      ]);
 
-      if (companyError) {
-        console.error('Error fetching company:', companyError);
-      } else {
-        setCompany(companyData as Company);
+      if (companyResult.error) {
+        console.error('Error fetching company:', companyResult.error);
       }
 
-      // Fetch branding
-      const { data: brandingData, error: brandingError } = await supabase
-        .from('company_branding')
-        .select('*')
-        .eq('company_id', membershipData.company_id)
-        .maybeSingle();
-
-      if (brandingError) {
-        console.error('Error fetching branding:', brandingError);
-      } else {
-        setBranding(brandingData as CompanyBranding | null);
+      if (brandingResult.error) {
+        console.error('Error fetching branding:', brandingResult.error);
       }
-    } catch (err) {
-      console.error('Error in fetchCompanyData:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    if (!authLoading) {
-      fetchCompanyData();
-    }
-  }, [user, authLoading, isStaff, isAdmin]);
+      return {
+        company: (companyResult.data as Company) ?? null,
+        branding: (brandingResult.data as CompanyBranding) ?? null,
+        membership,
+      };
+    },
+    enabled: !!user && !authLoading && (isStaff || isAdmin),
+    staleTime: 1000 * 60 * 10, // 10 min stale time — company data rarely changes
+    gcTime: 1000 * 60 * 30,    // Keep in cache for 30 min
+  });
+
+  const company = companyData?.company ?? null;
+  const branding = companyData?.branding ?? null;
+  const membership = companyData?.membership ?? null;
+  const loading = isLoading || authLoading;
 
   const companyId = membership?.company_id || null;
   const companyRole = membership?.role || null;
   const isCompanyAdmin = companyRole === 'company_admin';
   const hasCompany = !!companyId;
+
+  const refetchCompany = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['company', user?.id] });
+  }, [queryClient, user?.id]);
 
   return (
     <CompanyContext.Provider
@@ -154,10 +152,10 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
         companyRole,
         branding,
         membership,
-        loading: loading || authLoading,
+        loading,
         isCompanyAdmin,
         hasCompany,
-        refetchCompany: fetchCompanyData,
+        refetchCompany,
       }}
     >
       {children}

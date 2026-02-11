@@ -1,48 +1,28 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { getCorsHeaders, handleCorsPrelight } from '../_shared/cors.ts';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed redirect domains for Stripe checkout
+const ALLOWED_REDIRECT_DOMAINS = [
+  'localhost',
+  'rugboost.com',
+  'www.rugboost.com',
+  'rug-scan-report.lovable.app',
+];
 
-// Rate limiting: 5 checkout requests per minute per user
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 5;
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const ALLOWED_REDIRECT_PATTERNS = [
+  /^[a-z0-9-]+\.lovableproject\.com$/,
+  /^[a-z0-9-]+\.lovable\.app$/,
+];
 
-function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const userLimit = rateLimitStore.get(userId);
-
-  // Clean up expired entries periodically
-  if (rateLimitStore.size > 1000) {
-    for (const [key, value] of rateLimitStore.entries()) {
-      if (now > value.resetTime) {
-        rateLimitStore.delete(key);
-      }
-    }
+function isAllowedRedirectUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (ALLOWED_REDIRECT_DOMAINS.includes(parsed.hostname)) return true;
+    return ALLOWED_REDIRECT_PATTERNS.some(pattern => pattern.test(parsed.hostname));
+  } catch {
+    return false;
   }
-
-  if (!userLimit || now > userLimit.resetTime) {
-    // First request or window expired - reset counter
-    rateLimitStore.set(userId, {
-      count: 1,
-      resetTime: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return { allowed: true };
-  }
-
-  if (userLimit.count >= RATE_LIMIT_MAX_REQUESTS) {
-    // Rate limit exceeded
-    const retryAfter = Math.ceil((userLimit.resetTime - now) / 1000);
-    return { allowed: false, retryAfter };
-  }
-
-  // Increment counter
-  userLimit.count++;
-  return { allowed: true };
 }
 
 interface CheckoutRequest {
@@ -63,17 +43,18 @@ interface CheckoutRequest {
   cancelUrl: string;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCorsPrelight(req);
   }
 
+  const corsHeaders = getCorsHeaders(req);
+
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
     // Get authenticated user - REQUIRED for authorization
     const authHeader = req.headers.get("Authorization");
@@ -97,28 +78,36 @@ serve(async (req) => {
       );
     }
 
-    // RATE LIMITING: Check if user has exceeded checkout attempts
-    const rateLimitResult = checkRateLimit(userId);
-    if (!rateLimitResult.allowed) {
-      console.warn(`Rate limit exceeded for user ${userId}`);
+    // Database-backed rate limiting
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { data: allowed } = await supabaseAdmin.rpc('check_rate_limit', {
+      p_identifier: userId,
+      p_action: 'create_checkout',
+      p_max_requests: 5,
+      p_window_minutes: 1,
+    });
+
+    if (!allowed) {
       return new Response(
-        JSON.stringify({ 
-          error: "Too many checkout attempts. Please try again later.",
-          retryAfter: rateLimitResult.retryAfter
-        }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            "Content-Type": "application/json",
-            "Retry-After": String(rateLimitResult.retryAfter)
-          } 
-        }
+        JSON.stringify({ error: "Too many checkout attempts. Please try again later." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const body: CheckoutRequest = await req.json();
     const { jobId, clientJobAccessId, selectedServices, totalAmount, customerEmail, successUrl, cancelUrl } = body;
+
+    // Validate redirect URLs
+    if (!isAllowedRedirectUrl(successUrl) || !isAllowedRedirectUrl(cancelUrl)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid redirect URL" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Generate request ID for logging
     const requestId = crypto.randomUUID().slice(0, 8);
@@ -135,14 +124,7 @@ serve(async (req) => {
       throw new Error("Missing required fields: jobId, clientJobAccessId, selectedServices, totalAmount");
     }
 
-    // Use service role client for authorization checks (bypasses RLS for server-side validation)
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     // SECURITY: Verify the authenticated user has access to this job
-    // Get user's client account
     const { data: clientAccount, error: clientError } = await supabaseAdmin
       .from('client_accounts')
       .select('id')
@@ -203,7 +185,7 @@ serve(async (req) => {
               name: `${service.name}`,
               description: `${rug.rugNumber} - ${service.name}`,
             },
-            unit_amount: Math.round(service.unitPrice * 100), // Convert to cents
+            unit_amount: Math.round(service.unitPrice * 100),
           },
           quantity: service.quantity,
         });
@@ -231,7 +213,6 @@ serve(async (req) => {
       },
     });
 
-    // Get client account ID for payment record (already have clientAccount from auth check above)
     const clientId = clientAccount?.id || null;
 
     // Check for existing pending payment for this job and delete it

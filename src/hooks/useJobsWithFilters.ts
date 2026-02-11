@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isThisWeek, isThisMonth, isToday, parseISO, subDays } from 'date-fns';
 import { useCompany } from './useCompany';
-import { tenantQueryKeys } from '@/lib/tenantQueries';
+import { queryKeys } from '@/lib/queryKeys';
 import type { JobFilters } from '@/components/JobsFilter';
 
 export interface JobWithDetails {
@@ -39,7 +39,7 @@ export const useJobsWithFilters = (filters: JobFilters) => {
   
   // Fetch all jobs with related data - scoped to company
   const { data: jobs = [], isLoading, isError, refetch } = useQuery({
-    queryKey: [...tenantQueryKeys.jobs.list(companyId), 'with-details'],
+    queryKey: [...queryKeys.jobs.list(companyId), 'with-details'],
     queryFn: async (): Promise<JobWithDetails[]> => {
       let query = supabase
         .from('jobs')
