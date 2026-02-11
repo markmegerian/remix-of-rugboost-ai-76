@@ -3,56 +3,6 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { getCorsHeaders, handleCorsPrelight, corsJsonResponse } from '../_shared/cors.ts';
 
-// Rate limiting: 10 verification requests per minute per session ID
-// This prevents brute-force attempts to guess session IDs
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 10;
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-
-function checkRateLimit(identifier: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const limit = rateLimitStore.get(identifier);
-
-  // Clean up expired entries periodically
-  if (rateLimitStore.size > 1000) {
-    for (const [key, value] of rateLimitStore.entries()) {
-      if (now > value.resetTime) {
-        rateLimitStore.delete(key);
-      }
-    }
-  }
-
-  if (!limit || now > limit.resetTime) {
-    // First request or window expired - reset counter
-    rateLimitStore.set(identifier, {
-      count: 1,
-      resetTime: now + RATE_LIMIT_WINDOW_MS,
-    });
-    return { allowed: true };
-  }
-
-  if (limit.count >= RATE_LIMIT_MAX_REQUESTS) {
-    // Rate limit exceeded
-    const retryAfter = Math.ceil((limit.resetTime - now) / 1000);
-    return { allowed: false, retryAfter };
-  }
-
-  // Increment counter
-  limit.count++;
-  return { allowed: true };
-}
-
-// Get client IP for rate limiting (fallback to session prefix if no IP)
-function getClientIdentifier(req: Request, sessionId?: string): string {
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  const realIp = req.headers.get("x-real-ip");
-  const ip = forwardedFor?.split(",")[0]?.trim() || realIp || "unknown";
-  
-  // Combine IP with session prefix for more precise rate limiting
-  const sessionPrefix = sessionId?.substring(0, 20) || "no-session";
-  return `${ip}:${sessionPrefix}`;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -83,26 +33,32 @@ serve(async (req) => {
     
     console.log(`[${requestId}] Verify payment request from IP: ${clientIp.substring(0, 10)}*** Session: ${sessionId.substring(0, 15)}***`);
 
-    // RATE LIMITING: Check if client has exceeded verification attempts
-    const clientIdentifier = getClientIdentifier(req, sessionId);
-    const rateLimitResult = checkRateLimit(clientIdentifier);
-    if (!rateLimitResult.allowed) {
-      console.warn(`[${requestId}] Rate limit exceeded for client ${clientIdentifier.substring(0, 15)}***`);
-      return new Response(
-        JSON.stringify({ 
-          error: "Too many verification attempts. Please try again later.",
-          success: false,
-          retryAfter: rateLimitResult.retryAfter
-        }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            "Content-Type": "application/json",
-            "Retry-After": String(rateLimitResult.retryAfter)
-          } 
-        }
-      );
+    // Create admin client for database operations
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Database-backed rate limiting
+    const sessionPrefix = sessionId.substring(0, 20);
+    const rateLimitIdentifier = `${clientIp}:${sessionPrefix}`;
+    const { data: rateLimitAllowed, error: rlError } = await supabaseAdmin.rpc('check_rate_limit', {
+      p_identifier: rateLimitIdentifier,
+      p_action: 'verify_payment',
+      p_max_requests: 10,
+      p_window_minutes: 1,
+    });
+
+    if (rlError) {
+      console.error(`[${requestId}] Rate limit check error:`, rlError);
+    }
+
+    if (!rateLimitAllowed) {
+      console.warn(`[${requestId}] Rate limit exceeded for client ${rateLimitIdentifier.substring(0, 15)}***`);
+      return corsJsonResponse(req, {
+        error: "Too many verification attempts. Please try again later.",
+        success: false,
+      }, 429);
     }
 
     // Initialize Stripe
@@ -111,24 +67,13 @@ serve(async (req) => {
     });
 
     // Retrieve the checkout session from Stripe
-    // This is secure because:
-    // 1. Only valid Stripe session IDs will return data
-    // 2. Stripe validates the session belongs to our account
-    // 3. We only process if the payment_status is "paid"
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["payment_intent"],
     });
 
     console.log("Verifying session:", sessionId, "Status:", session.payment_status);
 
-    // Create admin client for database updates
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     // SECURITY: Verify this session exists in our payments table
-    // This ensures the session was created by our system
     const { data: existingPayment, error: paymentLookupError } = await supabaseAdmin
       .from('payments')
       .select('id, job_id, status')
@@ -137,13 +82,13 @@ serve(async (req) => {
 
     if (paymentLookupError || !existingPayment) {
       console.error("Payment record not found for session:", sessionId);
-      return corsJsonResponse({ error: "Payment record not found", success: false }, 404, req);
+      return corsJsonResponse(req, { error: "Payment record not found", success: false }, 404);
     }
 
     // If payment is already completed, return success without reprocessing
     if (existingPayment.status === 'completed') {
       console.log("Payment already processed:", sessionId);
-      return corsJsonResponse({ success: true, amount: session.amount_total, alreadyProcessed: true }, 200, req);
+      return corsJsonResponse(req, { success: true, amount: session.amount_total, alreadyProcessed: true }, 200);
     }
 
     if (session.payment_status === "paid") {
@@ -270,7 +215,6 @@ serve(async (req) => {
         // Generate invoice PDF and send confirmation email to client
         if (job?.client_email) {
           try {
-            // Generate invoice PDF
             let pdfBase64: string | undefined;
             try {
               const { data: pdfData, error: pdfError } = await supabaseAdmin.functions.invoke("generate-invoice-pdf", {
@@ -298,7 +242,6 @@ serve(async (req) => {
               console.log("Invoice PDF generation failed:", pdfGenError);
             }
 
-            // Send confirmation email with PDF attachment
             await supabaseAdmin.functions.invoke("send-client-confirmation", {
               body: {
                 clientEmail: job.client_email,
@@ -319,23 +262,23 @@ serve(async (req) => {
           }
         }
 
-        return corsJsonResponse({
+        return corsJsonResponse(req, {
           success: true,
           amount: session.amount_total,
           jobNumber: job?.job_number || "",
           clientName: job?.client_name || "",
-        }, 200, req);
+        }, 200);
       }
     }
 
-    return corsJsonResponse({
+    return corsJsonResponse(req, {
       success: session.payment_status === "paid",
       amount: session.amount_total,
       status: session.payment_status,
-    }, 200, req);
+    }, 200);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error verifying payment:", errorMessage);
-    return corsJsonResponse({ error: errorMessage, success: false }, 500, req);
+    return corsJsonResponse(req, { error: errorMessage, success: false }, 500);
   }
 });

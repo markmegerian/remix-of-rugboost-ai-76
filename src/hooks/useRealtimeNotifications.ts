@@ -59,13 +59,19 @@ export const useRealtimeNotifications = () => {
           table: 'payments',
         },
         async (payload) => {
+          // Only process if we have a company context
+          if (!companyId) return;
+
           const { data: job } = await supabase
             .from('jobs')
-            .select('job_number, user_id')
+            .select('job_number, company_id')
             .eq('id', payload.new?.job_id)
             .single();
 
-          if (job?.user_id === user.id && payload.new?.status === 'completed') {
+          // Scope to current company — ignore payments from other tenants
+          if (job?.company_id !== companyId) return;
+
+          if (payload.new?.status === 'completed') {
             const amount = new Intl.NumberFormat('en-US', {
               style: 'currency',
               currency: 'USD',
@@ -82,6 +88,7 @@ export const useRealtimeNotifications = () => {
       .subscribe();
 
     // Subscribe to notifications table
+    // Notifications are user-specific (not company-scoped) since they target individual users
     const notificationsChannel = supabase
       .channel('notifications-changes')
       .on(

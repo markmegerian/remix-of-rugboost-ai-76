@@ -3,65 +3,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
-// Rate limiting configuration
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = 5; // Max 5 emails per minute per user
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-
-// Clean up old rate limit entries periodically
-function cleanupRateLimits() {
-  const now = Date.now();
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetTime) {
-      rateLimitMap.delete(key);
-    }
-  }
-}
-
-// Check rate limit for a user
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetIn: number } {
-  cleanupRateLimits();
-  const now = Date.now();
-  const userLimit = rateLimitMap.get(userId);
-  
-  if (!userLimit || now > userLimit.resetTime) {
-    rateLimitMap.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetIn: RATE_LIMIT_WINDOW_MS };
-  }
-  
-  if (userLimit.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, remaining: 0, resetIn: userLimit.resetTime - now };
-  }
-  
-  userLimit.count++;
-  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - userLimit.count, resetIn: userLimit.resetTime - now };
-}
-
 // Sanitize string input - remove potential injection characters
 function sanitizeString(input: string): string {
   return input
-    .replace(/[<>{}[\]\\]/g, '') // Remove potentially dangerous characters
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/data:/gi, '') // Remove data: protocol  
-    .replace(/on\w+=/gi, '') // Remove event handlers
+    .replace(/[<>{}[\]\\]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/data:/gi, '')
+    .replace(/on\w+=/gi, '')
     .trim();
 }
 
 // Validate base64 string (basic check)
 function isValidBase64(str: string): boolean {
-  if (!str || str.length === 0) return true; // Optional field
-  // Check if string only contains valid base64 characters
+  if (!str || str.length === 0) return true;
   return /^[A-Za-z0-9+/=]+$/.test(str);
 }
 
-// CORS headers - allow all origins for mobile browser compatibility
+// CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Input validation schema with stricter constraints and sanitization
+// Input validation schema
 const EmailRequestSchema = z.object({
   to: z.string().email().max(255),
   clientName: z.string().min(1).max(200).transform(sanitizeString),
@@ -90,8 +55,6 @@ function escapeHtml(text: string): string {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  
-  
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -127,24 +90,28 @@ const handler = async (req: Request): Promise<Response> => {
     const authenticatedUserId = claimsData.claims.sub as string;
     console.log("Authenticated user:", authenticatedUserId);
 
-    // Check rate limit
-    const rateLimit = checkRateLimit(authenticatedUserId);
-    if (!rateLimit.allowed) {
+    // Database-backed rate limiting
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { data: rateLimitAllowed, error: rlError } = await supabaseAdmin.rpc('check_rate_limit', {
+      p_identifier: authenticatedUserId,
+      p_action: 'send_report_email',
+      p_max_requests: 5,
+      p_window_minutes: 1,
+    });
+
+    if (rlError) {
+      console.error("Rate limit check error:", rlError);
+    }
+
+    if (!rateLimitAllowed) {
       console.warn("Rate limit exceeded for user:", authenticatedUserId);
       return new Response(
-        JSON.stringify({ 
-          error: 'Rate limit exceeded. Please try again later.',
-          resetIn: Math.ceil(rateLimit.resetIn / 1000)
-        }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            "Content-Type": "application/json",
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000))
-          } 
-        }
+        JSON.stringify({ error: 'Rate limit exceeded. Please wait before sending more emails.' }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -187,9 +154,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const resend = new Resend(resendApiKey);
     
-    // Get the verified from email address
     const fromEmail = Deno.env.get("FROM_EMAIL") || "noreply@app.rugboost.com";
-
     const fromName = businessName || "Rug Inspection Service";
     const rugSummaryHtml = rugDetails.map(r => 
       `<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">${escapeHtml(r.rugNumber)}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${escapeHtml(r.rugType)}</td><td style="padding:12px;border-bottom:1px solid #e5e7eb">${escapeHtml(r.dimensions)}</td></tr>`
@@ -201,13 +166,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     const emailHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;font-family:'Segoe UI',sans-serif;background:#f3f4f6"><div style="max-width:600px;margin:0 auto;padding:40px 20px"><div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px 16px 0 0;padding:40px 30px;text-align:center"><h1 style="color:white;margin:0;font-size:28px">${escapeHtml(fromName)}</h1><p style="color:rgba(255,255,255,0.9);margin:10px 0 0;font-size:16px">Rug Inspection Report</p></div><div style="background:white;padding:40px 30px;border-radius:0 0 16px 16px">${messageHtml}<div style="margin:30px 0"><h2 style="color:#1f2937;font-size:18px;margin:0 0 15px;border-bottom:2px solid #3b82f6;padding-bottom:10px">Rug Summary</h2><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:#f9fafb"><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Rug #</th><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Type</th><th style="padding:12px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb">Dimensions</th></tr></thead><tbody>${rugSummaryHtml}</tbody></table></div>${pdfBase64 ? '<div style="background:#eff6ff;border-radius:12px;padding:20px;margin:30px 0;text-align:center"><p style="color:#1e40af;margin:0">📎 <strong>Detailed PDF report attached</strong></p></div>' : ''}<p style="color:#374151;font-size:16px;margin:30px 0 0">If you have questions, please contact us.</p><p style="color:#374151;font-size:16px;margin:20px 0 0">Best regards,<br><strong>${escapeHtml(fromName)}</strong></p></div><div style="text-align:center;padding:30px 20px"><p style="color:#6b7280;font-size:14px;margin:0">${escapeHtml(businessPhone || '')}${businessPhone && businessEmail ? ' • ' : ''}${escapeHtml(businessEmail || '')}</p></div></div></body></html>`;
 
-    // Prepare attachments for Resend
     const attachments = pdfBase64 ? [{
       filename: `Inspection_Report_Job_${jobNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`,
       content: pdfBase64,
     }] : [];
 
-    // Send email using Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: `${fromName} <${fromEmail}>`,
       to: [to],
@@ -226,14 +189,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully! ID:", emailData?.id);
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        emailId: emailData?.id,
-        rateLimit: {
-          remaining: rateLimit.remaining,
-          resetIn: Math.ceil(rateLimit.resetIn / 1000)
-        }
-      }), 
+      JSON.stringify({ success: true, emailId: emailData?.id }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: any) {
