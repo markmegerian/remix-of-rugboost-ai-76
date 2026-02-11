@@ -11,9 +11,18 @@ import { DeepLinkHandler } from "@/hooks/useDeepLinking";
 import { queryClient } from "@/lib/queryClient";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
-import GlobalSearch from "@/components/GlobalSearch";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { CompanyGuard } from "@/components/CompanyGuard";
+
+// Skeleton fallbacks for per-route Suspense
+import DashboardSkeleton from "@/components/skeletons/DashboardSkeleton";
+import JobDetailSkeleton from "@/components/skeletons/JobDetailSkeleton";
+import AnalyticsSkeleton from "@/components/skeletons/AnalyticsSkeleton";
+import HistorySkeleton from "@/components/skeletons/HistorySkeleton";
+import JobListSkeleton from "@/components/skeletons/JobListSkeleton";
+
+// Lazy-load GlobalSearch (Cmd+K dialog — not needed on initial render)
+const GlobalSearch = lazy(() => import("@/components/GlobalSearch"));
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -53,6 +62,9 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const Support = lazy(() => import("./pages/Support"));
 const CompanySetup = lazy(() => import("./pages/CompanySetup"));
 
+// History page
+const History = lazy(() => import("./pages/History"));
+
 // Loading fallback component - iOS safe area aware
 const PageLoader = () => (
   <div className="min-h-screen-safe flex items-center justify-center safe-y">
@@ -73,7 +85,10 @@ const App = () => (
               <BrowserRouter>
                 {/* Deep link handler for Capacitor native apps */}
                 <DeepLinkHandler />
-                <GlobalSearch />
+                {/* GlobalSearch is lazy-loaded since it's a Cmd+K dialog */}
+                <Suspense fallback={null}>
+                  <GlobalSearch />
+                </Suspense>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                    {/* ===== PUBLIC ROUTES — no guard ===== */}
@@ -100,12 +115,37 @@ const App = () => (
                    {/* ===== STAFF ROUTES — require authentication + staff role ===== */}
                    <Route element={<ProtectedRoute requiredRole="staff" />}>
                      <Route element={<CompanyGuard />}>
-                       <Route path="/dashboard" element={<Dashboard />} />
-                       <Route path="/jobs/new" element={<NewJob />} />
-                       <Route path="/jobs/:jobId" element={<JobDetail />} />
-                       <Route path="/job/:jobId" element={<JobDetail />} />
+                       <Route path="/dashboard" element={
+                         <Suspense fallback={<DashboardSkeleton />}>
+                           <Dashboard />
+                         </Suspense>
+                       } />
+                       <Route path="/jobs/new" element={
+                         <Suspense fallback={<JobListSkeleton />}>
+                           <NewJob />
+                         </Suspense>
+                       } />
+                       <Route path="/jobs/:jobId" element={
+                         <Suspense fallback={<JobDetailSkeleton />}>
+                           <JobDetail />
+                         </Suspense>
+                       } />
+                       <Route path="/job/:jobId" element={
+                         <Suspense fallback={<JobDetailSkeleton />}>
+                           <JobDetail />
+                         </Suspense>
+                       } />
                        <Route path="/settings" element={<AccountSettings />} />
-                       <Route path="/analytics" element={<Analytics />} />
+                       <Route path="/analytics" element={
+                         <Suspense fallback={<AnalyticsSkeleton />}>
+                           <Analytics />
+                         </Suspense>
+                       } />
+                       <Route path="/history" element={
+                         <Suspense fallback={<HistorySkeleton />}>
+                           <History />
+                         </Suspense>
+                       } />
                      </Route>
                      <Route path="/company/setup" element={<CompanySetup />} />
                    </Route>

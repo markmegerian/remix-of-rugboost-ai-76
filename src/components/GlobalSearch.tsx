@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/command';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
 
 interface SearchResult {
   id: string;
@@ -27,6 +28,7 @@ const GlobalSearch: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { companyId } = useCompany();
 
   // Keyboard shortcut handler
   useEffect(() => {
@@ -41,9 +43,9 @@ const GlobalSearch: React.FC = () => {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  // Search function
+  // Search function — scoped by company_id for tenant isolation
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.length < 2 || !user) {
+    if (!searchQuery || searchQuery.length < 2 || !user || !companyId) {
       setResults([]);
       return;
     }
@@ -53,11 +55,11 @@ const GlobalSearch: React.FC = () => {
       const searchResults: SearchResult[] = [];
       const searchTerm = `%${searchQuery}%`;
 
-      // Search jobs
+      // Search jobs — scoped by company_id
       const { data: jobs } = await supabase
         .from('jobs')
         .select('id, job_number, client_name, status')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .or(`job_number.ilike.${searchTerm},client_name.ilike.${searchTerm}`)
         .limit(5);
 
@@ -73,11 +75,11 @@ const GlobalSearch: React.FC = () => {
         });
       }
 
-      // Search inspections (rugs)
+      // Search inspections (rugs) — scoped by company_id
       const { data: inspections } = await supabase
         .from('inspections')
         .select('id, rug_number, rug_type, job_id')
-        .eq('user_id', user.id)
+        .eq('company_id', companyId)
         .or(`rug_number.ilike.${searchTerm},rug_type.ilike.${searchTerm}`)
         .limit(5);
 
@@ -99,7 +101,7 @@ const GlobalSearch: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, companyId]);
 
   // Debounced search
   useEffect(() => {
