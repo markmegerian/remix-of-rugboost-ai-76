@@ -50,6 +50,33 @@ Deno.serve(async (req) => {
       },
     });
 
+    // ── AUTH CHECK: Verify the caller is authenticated and authorized ──
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return corsJsonResponse({ error: 'Missing authorization header' }, 401, req);
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAdmin.auth.getUser(token);
+
+    if (claimsError || !claimsData?.user) {
+      return corsJsonResponse({ error: 'Unauthorized' }, 401, req);
+    }
+
+    const callingUserId = claimsData.user.id;
+
+    // Verify the caller has staff or admin role
+    const { data: callerRoles } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', callingUserId)
+      .in('role', ['staff', 'admin']);
+
+    if (!callerRoles || callerRoles.length === 0) {
+      return corsJsonResponse({ error: 'Insufficient permissions' }, 403, req);
+    }
+    // ── END AUTH CHECK ──
+
     const { email, fullName, jobId, accessToken, jobNumber, portalUrl } = await req.json() as InviteRequest;
 
     if (!email || !accessToken || !jobId) {

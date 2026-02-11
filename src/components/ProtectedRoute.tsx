@@ -1,13 +1,12 @@
-import React, { useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
 type AppRole = 'staff' | 'client' | 'admin';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requiredRoles?: AppRole[];
+  requiredRole?: AppRole;
   redirectTo?: string;
 }
 
@@ -20,52 +19,29 @@ const PageLoader = () => (
   </div>
 );
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredRoles = [],
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  requiredRole,
   redirectTo = '/auth'
 }) => {
   const { user, loading, roles } = useAuth();
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate(redirectTo);
-    }
-  }, [user, loading, navigate, redirectTo]);
-
-  // Show loading state
   if (loading) {
     return <PageLoader />;
   }
 
-  // No user - handled by useEffect redirect
   if (!user) {
-    return null;
+    return <Navigate to={redirectTo} replace />;
   }
 
-  // Check role requirements
-  if (requiredRoles.length > 0 && !requiredRoles.some(r => roles.includes(r))) {
-    // User doesn't have required role - redirect to appropriate page
+  if (requiredRole && !roles.includes(requiredRole)) {
+    // Authenticated but wrong role — redirect appropriately
+    if (roles.includes('client')) {
+      return <Navigate to="/client/dashboard" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <>{children}</>;
+  return <Outlet />;
 };
-
-// Admin-only route
-export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ProtectedRoute requiredRoles={['admin']}>{children}</ProtectedRoute>
-);
-
-// Staff-only route
-export const StaffRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ProtectedRoute requiredRoles={['staff', 'admin']}>{children}</ProtectedRoute>
-);
-
-// Client-only route
-export const ClientRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ProtectedRoute requiredRoles={['client']} redirectTo="/client/auth">{children}</ProtectedRoute>
-);
 
 export default ProtectedRoute;

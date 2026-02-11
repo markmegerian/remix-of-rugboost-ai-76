@@ -10,9 +10,8 @@ export const withCompanyScope = <T extends { eq: (column: string, value: string)
   companyId: string | null
 ): T => {
   if (!companyId) {
-    // If no company ID, the query will rely on RLS policies
-    // which handle the null case with user_id fallback
-    return query;
+    console.error('withCompanyScope called without companyId — query will not be scoped');
+    throw new Error('Company context required for this query');
   }
   return query.eq('company_id', companyId);
 };
@@ -40,7 +39,7 @@ export const belongsToCompany = (
   companyId: string | null
 ): boolean => {
   if (!record) return false;
-  if (!companyId) return true; // Fallback to user-based access
+  if (!companyId) return false; // Fail closed — no company context means no access
   return record.company_id === companyId;
 };
 

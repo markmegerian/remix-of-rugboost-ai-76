@@ -12,6 +12,8 @@ import { queryClient } from "@/lib/queryClient";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
 import GlobalSearch from "@/components/GlobalSearch";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { CompanyGuard } from "@/components/CompanyGuard";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -74,51 +76,59 @@ const App = () => (
                 <GlobalSearch />
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
+                   {/* ===== PUBLIC ROUTES — no guard ===== */}
                    <Route path="/" element={<Index />} />
                    <Route path="/auth" element={<Auth />} />
                    <Route path="/reset-password" element={<ResetPassword />} />
                    <Route path="/auth-callback" element={<AuthCallback />} />
-                   <Route path="/dashboard" element={<Dashboard />} />
-                   <Route path="/jobs/new" element={<NewJob />} />
-                   <Route path="/jobs/:jobId" element={<JobDetail />} />
-                   {/* Stable alias for Capacitor deep linking */}
-                   <Route path="/job/:jobId" element={<JobDetail />} />
-                    <Route path="/settings" element={<AccountSettings />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/company/setup" element={<CompanySetup />} />
-                    
-                   {/* Client Portal Routes */}
+                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                   <Route path="/privacy" element={<PrivacyPolicy />} />
+                   <Route path="/terms-of-service" element={<TermsOfService />} />
+                   <Route path="/support" element={<Support />} />
+                   <Route path="/screenshots" element={<ScreenshotGenerator />} />
+
+                   {/* ===== CLIENT TOKEN-BASED ROUTES — no auth guard (uses access tokens) ===== */}
                    <Route path="/client/auth" element={<ClientAuth />} />
-                   <Route path="/client/dashboard" element={<ClientDashboard />} />
-                   <Route path="/client/history" element={<ClientHistory />} />
                    <Route path="/client/set-password" element={<ClientSetPassword />} />
+                   <Route path="/client/:accessToken" element={<ClientPortal />} />
                    <Route path="/client/payment-success" element={<PaymentSuccess />} />
                    <Route path="/client/payment-cancelled" element={<PaymentCancelled />} />
                    {/* Stable payment routes for Capacitor deep linking */}
                    <Route path="/payment/success" element={<PaymentSuccess />} />
                    <Route path="/payment/cancel" element={<PaymentCancelled />} />
-                   <Route path="/client/:accessToken" element={<ClientPortal />} />
-                   
-                   {/* Admin Routes */}
-                   <Route path="/admin" element={<AdminDashboard />} />
-                   <Route path="/admin/users" element={<AdminUsers />} />
-                   <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
-                   <Route path="/admin/payouts" element={<AdminPayouts />} />
-                   <Route path="/admin/settings" element={<AdminSettings />} />
-                   <Route path="/admin/audit-log" element={<AdminAuditLog />} />
-                   
-                   {/* Utility Routes */}
-                   <Route path="/screenshots" element={<ScreenshotGenerator />} />
-                   
-                   {/* Legal Routes */}
-                   <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                   <Route path="/privacy" element={<PrivacyPolicy />} />
-                   <Route path="/terms-of-service" element={<TermsOfService />} />
-                   <Route path="/support" element={<Support />} />
-                   
+
+                   {/* ===== STAFF ROUTES — require authentication + staff role ===== */}
+                   <Route element={<ProtectedRoute requiredRole="staff" />}>
+                     <Route element={<CompanyGuard />}>
+                       <Route path="/dashboard" element={<Dashboard />} />
+                       <Route path="/jobs/new" element={<NewJob />} />
+                       <Route path="/jobs/:jobId" element={<JobDetail />} />
+                       <Route path="/job/:jobId" element={<JobDetail />} />
+                       <Route path="/settings" element={<AccountSettings />} />
+                       <Route path="/analytics" element={<Analytics />} />
+                     </Route>
+                     <Route path="/company/setup" element={<CompanySetup />} />
+                   </Route>
+
+                   {/* ===== CLIENT PORTAL ROUTES — require client authentication ===== */}
+                   <Route element={<ProtectedRoute requiredRole="client" redirectTo="/client/auth" />}>
+                     <Route path="/client/dashboard" element={<ClientDashboard />} />
+                     <Route path="/client/history" element={<ClientHistory />} />
+                   </Route>
+
+                   {/* ===== ADMIN ROUTES — require admin role ===== */}
+                   <Route element={<ProtectedRoute requiredRole="admin" />}>
+                     <Route path="/admin" element={<AdminDashboard />} />
+                     <Route path="/admin/users" element={<AdminUsers />} />
+                     <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
+                     <Route path="/admin/payouts" element={<AdminPayouts />} />
+                     <Route path="/admin/settings" element={<AdminSettings />} />
+                     <Route path="/admin/audit-log" element={<AdminAuditLog />} />
+                   </Route>
+
                    <Route path="*" element={<NotFound />} />
                  </Routes>
-               </Suspense>
+                </Suspense>
               </BrowserRouter>
              </TooltipProvider>
            </AppInitializer>

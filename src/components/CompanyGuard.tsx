@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, Building2 } from 'lucide-react';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface CompanyGuardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   requireCompanyAdmin?: boolean;
   fallback?: React.ReactNode;
 }
@@ -106,7 +106,7 @@ export const CompanyGuard: React.FC<CompanyGuardProps> = ({
     return <NotCompanyAdminState />;
   }
 
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 };
 
 /**
