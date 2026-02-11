@@ -9,7 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
-dist-ssr s
+dist-ssr
 *.local
 
 # Editor directories and files
@@ -22,3 +22,21 @@ dist-ssr s
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# Supabase local dev
+supabase/.temp/
+.supabase/
+
+# Capacitor native build output
+ios/
+android/
+
+# TypeScript build info
+*.tsbuildinfo
