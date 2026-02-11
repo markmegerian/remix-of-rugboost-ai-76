@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { queryKeys } from '@/lib/queryKeys';
-import { tenantQueryKeys } from '@/lib/tenantQueries';
 import { useCompany } from './useCompany';
 import { toast } from 'sonner';
 
@@ -37,7 +36,7 @@ export const useJobs = () => {
   const { companyId, loading: companyLoading } = useCompany();
   
   return useQuery({
-    queryKey: tenantQueryKeys.jobs.list(companyId),
+    queryKey: queryKeys.jobs.list(companyId),
     queryFn: async (): Promise<Job[]> => {
       // RLS handles company scoping via get_user_company_id()
       const { data, error } = await supabase
@@ -87,20 +86,20 @@ export const useUpdateJobStatus = () => {
     },
     onMutate: async ({ jobId, status }) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: tenantQueryKeys.jobs.list(companyId) });
-      await queryClient.cancelQueries({ queryKey: queryKeys.jobs.detail(jobId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.jobs.list(companyId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.jobs.detail(companyId, jobId) });
       
       // Snapshot previous values
-      const previousJobs = queryClient.getQueryData<Job[]>(tenantQueryKeys.jobs.list(companyId));
-      const previousJobDetail = queryClient.getQueryData(queryKeys.jobs.detail(jobId));
+      const previousJobs = queryClient.getQueryData<Job[]>(queryKeys.jobs.list(companyId));
+      const previousJobDetail = queryClient.getQueryData(queryKeys.jobs.detail(companyId, jobId));
       
       // Optimistically update jobs list
-      queryClient.setQueryData<Job[]>(tenantQueryKeys.jobs.list(companyId), (old) => 
+      queryClient.setQueryData<Job[]>(queryKeys.jobs.list(companyId), (old) => 
         old?.map(job => job.id === jobId ? { ...job, status } : job)
       );
       
       // Optimistically update job detail if it exists
-      queryClient.setQueryData(queryKeys.jobs.detail(jobId), (old: any) => {
+      queryClient.setQueryData(queryKeys.jobs.detail(companyId, jobId), (old: any) => {
         if (!old) return old;
         return {
           ...old,
@@ -113,10 +112,10 @@ export const useUpdateJobStatus = () => {
     onError: (err, variables, context) => {
       // Rollback on error
       if (context?.previousJobs) {
-        queryClient.setQueryData(tenantQueryKeys.jobs.list(companyId), context.previousJobs);
+        queryClient.setQueryData(queryKeys.jobs.list(companyId), context.previousJobs);
       }
       if (context?.previousJobDetail && context?.jobId) {
-        queryClient.setQueryData(queryKeys.jobs.detail(context.jobId), context.previousJobDetail);
+        queryClient.setQueryData(queryKeys.jobs.detail(companyId, context.jobId), context.previousJobDetail);
       }
       toast.error('Failed to update status');
     },
@@ -125,8 +124,8 @@ export const useUpdateJobStatus = () => {
     },
     onSettled: (data, error, variables) => {
       // Refetch to ensure server state
-      queryClient.invalidateQueries({ queryKey: tenantQueryKeys.jobs.list(companyId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(variables.jobId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.list(companyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.jobs.detail(companyId, variables.jobId) });
     },
   });
 };

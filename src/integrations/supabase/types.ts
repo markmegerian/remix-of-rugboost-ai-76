@@ -1152,6 +1152,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          identifier: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          identifier: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          identifier?: string
+        }
+        Relationships: []
+      }
       service_completions: {
         Row: {
           approved_estimate_id: string
@@ -1273,6 +1294,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_action: string
+          p_identifier: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: boolean
+      }
       check_token_rate_limit: {
         Args: {
           _block_seconds?: number

@@ -18,6 +18,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
 import { queryKeys } from '@/lib/queryKeys';
 import { format, isThisYear, isThisMonth, isThisWeek, parseISO } from 'date-fns';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
@@ -64,9 +65,10 @@ const History = () => {
     }
   }, [user, authLoading, navigate]);
 
+  const { companyId } = useCompany();
   // Use React Query for data fetching with optimized query
   const { data: jobs = [], isLoading } = useQuery({
-    queryKey: queryKeys.history.list(),
+    queryKey: queryKeys.history.list(companyId),
     queryFn: async (): Promise<HistoryJob[]> => {
       // Fetch completed jobs with their rugs in a single query
       const { data: jobsData, error: jobsError } = await supabase

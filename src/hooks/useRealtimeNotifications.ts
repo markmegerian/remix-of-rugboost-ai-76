@@ -2,11 +2,13 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queryKeys';
 
 export const useRealtimeNotifications = () => {
   const { user } = useAuth();
+  const { companyId } = useCompany();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -28,7 +30,6 @@ export const useRealtimeNotifications = () => {
           const newStatus = payload.new?.status;
           const jobNumber = payload.new?.job_number;
 
-          // Only notify on meaningful status changes
           if (oldStatus !== newStatus && jobNumber) {
             if (newStatus === 'completed') {
               toast.success(`Job #${jobNumber} completed!`, {
@@ -42,7 +43,7 @@ export const useRealtimeNotifications = () => {
           }
 
           // Invalidate jobs query to refresh data
-          queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+          queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all(companyId) });
         }
       )
       .subscribe();
@@ -58,7 +59,6 @@ export const useRealtimeNotifications = () => {
           table: 'payments',
         },
         async (payload) => {
-          // Check if this payment belongs to one of the user's jobs
           const { data: job } = await supabase
             .from('jobs')
             .select('job_number, user_id')
@@ -76,7 +76,7 @@ export const useRealtimeNotifications = () => {
             });
           }
 
-          queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+          queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all(companyId) });
         }
       )
       .subscribe();
@@ -93,7 +93,6 @@ export const useRealtimeNotifications = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          // Show toast for new notifications
           const notification = payload.new;
           if (notification) {
             toast(notification.title, {
@@ -101,17 +100,15 @@ export const useRealtimeNotifications = () => {
             });
           }
 
-          // Invalidate notifications query
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all(companyId) });
         }
       )
       .subscribe();
 
-    // Cleanup subscriptions
     return () => {
       supabase.removeChannel(jobsChannel);
       supabase.removeChannel(paymentsChannel);
       supabase.removeChannel(notificationsChannel);
     };
-  }, [user, queryClient]);
+  }, [user, companyId, queryClient]);
 };

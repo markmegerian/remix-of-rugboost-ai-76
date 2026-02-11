@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlanFeatures } from "@/hooks/usePlanFeatures";
+import { useCompany } from "@/hooks/useCompany";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
@@ -115,9 +116,9 @@ const Analytics = () => {
     }) as { date: string; count?: number; revenue?: number }[];
   }, [getDateRange]);
 
-  // Use React Query for data fetching
+  const { companyId } = useCompany();
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.analytics.byRange(dateRange),
+    queryKey: queryKeys.analytics.byRange(companyId, dateRange),
     queryFn: async (): Promise<AnalyticsData> => {
       const { start, end } = getDateRange();
       const startStr = start.toISOString();

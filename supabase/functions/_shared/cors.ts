@@ -62,8 +62,9 @@ function isOriginAllowed(origin: string | null): boolean {
     return true;
   }
   
-  // Check for lovable preview domains (pattern matching)
-  if (origin.includes('.lovableproject.com') || origin.includes('.lovable.app')) {
+  // Check for lovable preview/project domains (strict regex matching)
+  if (/^https:\/\/[a-z0-9-]+\.lovableproject\.com$/.test(origin) ||
+      /^https:\/\/[a-z0-9-]+\.lovable\.app$/.test(origin)) {
     return true;
   }
   
@@ -89,13 +90,9 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
   // Set origin if allowed
   if (origin && isOriginAllowed(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
-  } else if (!origin) {
-    // No origin header (e.g., native app, server-to-server)
-    // For function-to-function calls within Supabase, allow it
-    headers['Access-Control-Allow-Origin'] = '*';
   }
-  // If origin is not allowed, don't set Access-Control-Allow-Origin
-  // The browser will block the request
+  // If no origin header (native app, server-to-server) or origin not allowed:
+  // Do NOT set Access-Control-Allow-Origin — let the browser enforce same-origin
   
   return headers;
 }
@@ -140,14 +137,3 @@ export function corsJsonResponse(
     },
   });
 }
-
-/**
- * Legacy CORS headers for backward compatibility.
- * Use getCorsHeaders() for new implementations.
- * 
- * @deprecated Use getCorsHeaders(req) instead
- */
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};

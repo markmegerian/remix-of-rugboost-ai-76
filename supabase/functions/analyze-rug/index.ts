@@ -1,63 +1,26 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { getCorsHeaders, handleCorsPrelight } from '../_shared/cors.ts';
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-// Rate limiting configuration
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
-const RATE_LIMIT_MAX_REQUESTS = 10; // Max 10 requests per minute per user
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-
-// Clean up old rate limit entries periodically
-function cleanupRateLimits() {
-  const now = Date.now();
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetTime) {
-      rateLimitMap.delete(key);
-    }
-  }
-}
-
-// Check rate limit for a user
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetIn: number } {
-  cleanupRateLimits();
-  const now = Date.now();
-  const userLimit = rateLimitMap.get(userId);
-  
-  if (!userLimit || now > userLimit.resetTime) {
-    rateLimitMap.set(userId, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetIn: RATE_LIMIT_WINDOW_MS };
-  }
-  
-  if (userLimit.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, remaining: 0, resetIn: userLimit.resetTime - now };
-  }
-  
-  userLimit.count++;
-  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - userLimit.count, resetIn: userLimit.resetTime - now };
-}
 
 // Sanitize string input - remove potential injection characters
 function sanitizeString(input: string): string {
   return input
-    .replace(/[<>{}[\]\\]/g, '') // Remove potentially dangerous characters
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/data:/gi, '') // Remove data: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
+    .replace(/[<>{}[\]\\]/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/data:/gi, '')
+    .replace(/on\w+=/gi, '')
     .trim();
 }
 
 // Validate photo input - can be a URL or a storage path
 function isValidPhotoInput(input: string): boolean {
-  // Allow storage paths (e.g., "userId/photos/file.jpg")
   if (!input.includes('://')) {
-    // It's a storage path - validate it's a reasonable path
     return input.length > 0 && input.length < 500 && !input.includes('..') && !input.startsWith('/');
   }
   
-  // It's a URL - validate domain
   try {
     const parsed = new URL(input);
     const allowedHosts = [
@@ -76,7 +39,7 @@ async function getSignedUrlForPath(supabase: any, path: string): Promise<string 
   try {
     const { data, error } = await supabase.storage
       .from('rug-photos')
-      .createSignedUrl(path, 3600); // 1 hour expiry
+      .createSignedUrl(path, 3600);
     
     if (error) {
       console.error('Error creating signed URL for path:', path, error);
@@ -88,13 +51,6 @@ async function getSignedUrlForPath(supabase: any, path: string): Promise<string 
     return null;
   }
 }
-
-// CORS headers - allow all origins for mobile browser compatibility
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
 
 // Supported AI models for rug analysis
 const SUPPORTED_MODELS = ["google/gemini-2.5-pro", "google/gemini-2.5-flash"] as const;
@@ -274,11 +230,13 @@ IMAGE ANNOTATIONS (for the "imageAnnotations" field):
 
 Use the provided service pricing to calculate costs. Calculate costs based on square footage where applicable (multiply price per sq ft by total square feet). For linear foot services (overcasting, binding), estimate based on rug perimeter. If prices are not provided, use reasonable industry standard estimates but ALWAYS provide actual numbers.`;
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCorsPrelight(req);
   }
+
+  const corsHeaders = getCorsHeaders(req);
 
   try {
     // Verify authentication
@@ -310,24 +268,21 @@ serve(async (req) => {
 
     const authenticatedUserId = claimsData.claims.sub as string;
 
-    // Check rate limit
-    const rateLimit = checkRateLimit(authenticatedUserId);
-    if (!rateLimit.allowed) {
+    // Database-backed rate limiting
+    const supabaseServiceKeyForRL = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAdminRL = createClient(supabaseUrl, supabaseServiceKeyForRL);
+    const { data: rlAllowed } = await supabaseAdminRL.rpc('check_rate_limit', {
+      p_identifier: authenticatedUserId,
+      p_action: 'analyze_rug',
+      p_max_requests: 10,
+      p_window_minutes: 1,
+    });
+
+    if (!rlAllowed) {
       console.warn("Rate limit exceeded for user:", authenticatedUserId);
       return new Response(
-        JSON.stringify({ 
-          error: 'Rate limit exceeded. Please try again later.',
-          resetIn: Math.ceil(rateLimit.resetIn / 1000)
-        }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            "Content-Type": "application/json",
-            "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000))
-          } 
-        }
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
