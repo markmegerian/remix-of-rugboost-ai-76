@@ -17,20 +17,18 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
     }
     
     if (user) {
-      // Route based on user role
-      if (isClient) {
-        // Clients go to their job list
-        navigate('/client/dashboard');
-      } else if (isAdmin || isStaff) {
+      // Route based on user role — staff/admin take priority over client
+      if (isAdmin || isStaff) {
         // Staff and Admin - check if they have a company
         if (hasCompany) {
           navigate('/dashboard');
         } else {
           navigate('/company/setup');
         }
+      } else if (isClient) {
+        navigate('/client/dashboard');
       } else {
         // User has no roles yet - might be new staff signup
-        // Default to company setup
         navigate('/company/setup');
       }
     } else {
