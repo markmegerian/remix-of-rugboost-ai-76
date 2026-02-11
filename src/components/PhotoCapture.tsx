@@ -40,6 +40,14 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const [photoItems, setPhotoItems] = useState<PhotoItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [failedUploads, setFailedUploads] = useState<string[]>([]);
+  // Track all object URLs for proper cleanup
+  const objectUrlsRef = useRef<string[]>([]);
+
+  const createObjectUrl = (file: File): string => {
+    const url = URL.createObjectURL(file);
+    objectUrlsRef.current.push(url);
+    return url;
+  };
 
   // Sync external photos to internal state (for initial load)
   useEffect(() => {
@@ -47,17 +55,18 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       const items: PhotoItem[] = photos.map((file, index) => ({
         id: `existing-${index}-${Date.now()}`,
         file,
-        preview: URL.createObjectURL(file),
+        preview: createObjectUrl(file),
         status: 'success' as const,
       }));
       setPhotoItems(items);
     }
   }, [photos, photoItems.length]);
 
-  // Cleanup previews on unmount
+  // Cleanup all object URLs on unmount
   useEffect(() => {
     return () => {
-      photoItems.forEach(item => URL.revokeObjectURL(item.preview));
+      objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
     };
   }, []);
 
@@ -70,7 +79,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     const newItems: PhotoItem[] = newFiles.map((file, index) => ({
       id: `photo-${Date.now()}-${index}`,
       file,
-      preview: URL.createObjectURL(file),
+      preview: createObjectUrl(file),
       status: 'pending' as const,
     }));
 
@@ -93,7 +102,6 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
-  // Convert native photo URI to File object
   const uriToFile = async (uri: string, filename: string): Promise<File | null> => {
     try {
       const response = await fetch(uri);
@@ -105,7 +113,6 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     }
   };
 
-  // Handle native camera capture
   const handleNativeCamera = async () => {
     const photo = await takePhoto();
     if (photo?.webPath) {
@@ -115,7 +122,6 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     }
   };
 
-  // Handle native photo picker
   const handleNativePicker = async () => {
     const remainingSlots = maxPhotos - photoItems.length;
     const selectedPhotos = await pickPhotos(remainingSlots);
@@ -156,7 +162,6 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     setFailedUploads(prev => prev.filter(fid => fid !== id));
   };
 
-  // Drag and drop handlers (optional for desktop)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);
@@ -195,50 +200,22 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Hidden inputs - camera with capture, gallery without */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleCameraCapture}
-        className="hidden"
-        disabled={disabled}
-      />
-      <input
-        ref={galleryInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleGallerySelect}
-        className="hidden"
-        disabled={disabled}
-      />
+      {/* Hidden inputs */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleCameraCapture} className="hidden" disabled={disabled} />
+      <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={handleGallerySelect} className="hidden" disabled={disabled} />
 
-      {/* Header with count and action buttons */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-foreground">
           Rug Photos ({photoItems.length}/{maxPhotos})
         </label>
         {remainingSlots > 0 && !disabled && (
           <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={openCamera}
-              className="gap-1.5"
-            >
+            <Button type="button" variant="outline" size="sm" onClick={openCamera} className="gap-1.5">
               <Camera className="h-4 w-4" />
               <span className="hidden sm:inline">{isNative ? 'Camera' : 'Photo'}</span>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={openGallery}
-              className="gap-1.5"
-            >
+            <Button type="button" variant="outline" size="sm" onClick={openGallery} className="gap-1.5">
               <ImagePlus className="h-4 w-4" />
               <span className="hidden sm:inline">Gallery</span>
             </Button>
@@ -285,9 +262,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           onDrop={handleDrop}
           className={cn(
             "flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-8 cursor-pointer transition-all duration-200",
-            isDragOver 
-              ? "border-primary bg-primary/10" 
-              : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50",
+            isDragOver ? "border-primary bg-primary/10" : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50",
             disabled && "opacity-50 cursor-not-allowed"
           )}
         >
@@ -301,32 +276,11 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             </p>
           </div>
           <div className="flex gap-2 mt-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                openCamera();
-              }}
-              className="gap-1.5"
-              disabled={disabled}
-            >
-              <Camera className="h-4 w-4" />
-              Camera
+            <Button type="button" size="sm" onClick={(e) => { e.stopPropagation(); openCamera(); }} className="gap-1.5" disabled={disabled}>
+              <Camera className="h-4 w-4" /> Camera
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                openGallery();
-              }}
-              className="gap-1.5"
-              disabled={disabled}
-            >
-              <ImagePlus className="h-4 w-4" />
-              Gallery
+            <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openGallery(); }} className="gap-1.5" disabled={disabled}>
+              <ImagePlus className="h-4 w-4" /> Gallery
             </Button>
           </div>
         </div>
@@ -334,69 +288,30 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
       {/* Photo thumbnails grid */}
       {hasPhotos && (
-        <div 
-          className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2"
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
           {photoItems.map((item, index) => (
-            <div
-              key={item.id}
-              className={cn(
-                "relative aspect-square rounded-lg overflow-hidden bg-muted shadow-sm animate-in fade-in zoom-in-95 duration-200",
-                item.status === 'error' && "ring-2 ring-destructive"
-              )}
-            >
-              <img
-                src={item.preview}
-                alt={`Photo ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
-              
-              {/* Status overlay */}
+            <div key={item.id} className={cn("relative aspect-square rounded-lg overflow-hidden bg-muted shadow-sm animate-in fade-in zoom-in-95 duration-200", item.status === 'error' && "ring-2 ring-destructive")}>
+              <img src={item.preview} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
               {item.status === 'uploading' && (
                 <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               )}
-              
               {item.status === 'error' && (
-                <button
-                  type="button"
-                  onClick={() => retryUpload(item.id)}
-                  className="absolute inset-0 bg-destructive/80 flex flex-col items-center justify-center gap-1 text-destructive-foreground"
-                >
-                  <RotateCcw className="h-5 w-5" />
-                  <span className="text-xs font-medium">Retry</span>
+                <button type="button" onClick={() => retryUpload(item.id)} className="absolute inset-0 bg-destructive/80 flex flex-col items-center justify-center gap-1 text-destructive-foreground">
+                  <RotateCcw className="h-5 w-5" /><span className="text-xs font-medium">Retry</span>
                 </button>
               )}
-              
-              {/* Remove button */}
               {item.status !== 'uploading' && (
-                <button
-                  type="button"
-                  onClick={() => removePhoto(item.id)}
-                  className="absolute top-1 right-1 rounded-full bg-foreground/80 p-1 text-background hover:bg-foreground transition-colors"
-                >
+                <button type="button" onClick={() => removePhoto(item.id)} className="absolute top-1 right-1 rounded-full bg-foreground/80 p-1 text-background hover:bg-foreground transition-colors">
                   <X className="h-3 w-3" />
                 </button>
               )}
-              
-              {/* Photo number badge */}
-              <div className="absolute bottom-1 left-1 rounded-full bg-foreground/70 px-1.5 py-0.5 text-[10px] text-background font-medium">
-                {index + 1}
-              </div>
+              <div className="absolute bottom-1 left-1 rounded-full bg-foreground/70 px-1.5 py-0.5 text-[10px] text-background font-medium">{index + 1}</div>
             </div>
           ))}
-          
-          {/* Add more button */}
           {remainingSlots > 0 && !disabled && (
-            <button
-              type="button"
-              onClick={openCamera}
-              className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all"
-            >
+            <button type="button" onClick={openCamera} className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all">
               <Camera className="h-5 w-5 text-muted-foreground" />
               <span className="text-[10px] text-muted-foreground">Add</span>
             </button>

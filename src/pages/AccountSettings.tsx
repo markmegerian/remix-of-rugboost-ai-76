@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ServicePricing from "@/components/ServicePricing";
 import EmailTemplatesSettings from "@/components/EmailTemplatesSettings";
 import PaymentInfoSettings from "@/components/PaymentInfoSettings";
-import { useSignedUrl } from "@/hooks/useSignedUrl";
+import { useCachedSignedUrl } from "@/hooks/useSignedUrls";
 import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
@@ -84,7 +84,7 @@ const AccountSettings = () => {
   const [savingNotifications, setSavingNotifications] = useState(false);
 
   // Use the signed URL hook for logo display
-  const { signedUrl: logoSignedUrl } = useSignedUrl(profile?.logo_path);
+  const { signedUrl: logoSignedUrl } = useCachedSignedUrl(profile?.logo_path);
 
   // Check if form has unsaved changes
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialFormData);

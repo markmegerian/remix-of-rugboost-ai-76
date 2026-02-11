@@ -17,8 +17,17 @@ const SignedUrlContext = createContext<SignedUrlContextValue | null>(null);
 const BUCKET = 'rug-photos';
 const EXPIRES_IN = 3600;
 const REFRESH_BUFFER = 300;
+const MAX_CACHE_SIZE = 500;
 
 const urlCache = new Map<string, SignedUrlCache>();
+
+function addToUrlCache(key: string, value: SignedUrlCache) {
+  if (urlCache.size >= MAX_CACHE_SIZE) {
+    const keysToDelete = Array.from(urlCache.keys()).slice(0, Math.floor(MAX_CACHE_SIZE / 2));
+    keysToDelete.forEach(k => urlCache.delete(k));
+  }
+  urlCache.set(key, value);
+}
 
 const extractFilePath = (input: string): string => {
   if (!input.startsWith('http')) {
@@ -70,7 +79,7 @@ export const batchSignUrls = async (filePaths: string[]): Promise<Map<string, st
     data?.forEach((item, index) => {
       if (item.signedUrl) {
         const path = cleanPaths[index];
-        urlCache.set(path, { url: item.signedUrl, expiresAt });
+        addToUrlCache(path, { url: item.signedUrl, expiresAt });
         results.set(path, item.signedUrl);
       }
     });
