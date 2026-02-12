@@ -151,16 +151,19 @@ Deno.serve(async (req) => {
       if (createError.message?.includes('already been registered') || 
           createError.message?.includes('already exists') ||
           createError.message?.includes('duplicate')) {
-        // User exists - get their ID by listing users filtered by email
-        const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-          filter: `email.eq.${normalizedEmail}`,
-          page: 1,
-          perPage: 1,
+        // User exists - find them via GoTrue admin API
+        const goTrueUrl = `${supabaseUrl}/auth/v1/admin/users?filter=email%20eq%20${encodeURIComponent(normalizedEmail)}&page=1&per_page=1`;
+        const adminResponse = await fetch(goTrueUrl, {
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'apikey': serviceRoleKey,
+          },
         });
         
-        const existingUser = listData?.users?.[0];
-        if (listError || !existingUser) {
-          console.error(`[${requestId}] Error getting existing user:`, listError?.message);
+        const adminData = await adminResponse.json();
+        const existingUser = adminData?.users?.[0];
+        if (!existingUser) {
+          console.error(`[${requestId}] Could not find existing user by email`);
           throw new Error('Failed to find existing user');
         }
         
