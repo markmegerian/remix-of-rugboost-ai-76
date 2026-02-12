@@ -14,6 +14,7 @@ import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff, M
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ServicePricing from "@/components/ServicePricing";
 import ServiceCatalogSettings from "@/components/ServiceCatalogSettings";
+import DimensionFormatSettings from "@/components/DimensionFormatSettings";
 import EmailTemplatesSettings from "@/components/EmailTemplatesSettings";
 import PaymentInfoSettings from "@/components/PaymentInfoSettings";
 import { useCachedSignedUrl } from "@/hooks/useSignedUrls";
@@ -557,6 +558,9 @@ const AccountSettings = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dimension Format Setting (Admin only) */}
+          <DimensionFormatSettings />
 
           {/* Service Catalog (Admin: toggle which services appear) */}
           {user && <ServiceCatalogSettings userId={user.id} />}

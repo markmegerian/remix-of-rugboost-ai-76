@@ -30,6 +30,7 @@ export interface Rug {
   photo_urls: string[] | null;
   analysis_report: string | null;
   image_annotations: unknown;
+  system_services: unknown;
   created_at: string;
   estimate_approved?: boolean;
   company_id?: string | null;

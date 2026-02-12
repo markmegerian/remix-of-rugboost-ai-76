@@ -173,8 +173,30 @@ RESPONSE FORMAT - Your response must be valid JSON with this structure:
         }
       ]
     }
+  ],
+  "edgeSuggestions": [
+    {
+      "serviceType": "fringe",
+      "edges": ["end1", "end2"],
+      "rationale": "Both ends show significant fringe loss"
+    },
+    {
+      "serviceType": "binding",
+      "edges": ["side1"],
+      "rationale": "Left side binding is separating"
+    }
   ]
 }
+
+EDGE SUGGESTIONS (for the "edgeSuggestions" field):
+- Provide edge-specific damage observations for linear foot services (fringe, binding, overcasting, zenjireh, etc.)
+- Use these edge identifiers ONLY: "end1" (top/fringe end A), "end2" (bottom/fringe end B), "side1" (left edge), "side2" (right edge)
+- serviceType should be a lowercase keyword matching the service: "fringe", "binding", "overcasting", "zenjireh", "leather", "cotton", "glue"
+- Include a brief rationale explaining what damage was observed on each edge
+- Photos 3-4 correspond to fringes (ends), Photos 5-6 correspond to edges (sides)
+- Only include edges that actually need work based on the photos
+- If ALL edges need work, list all four edges
+- If only specific edges are damaged, list only those
 
 ESTIMATE LETTER FORMAT (for the "letter" field):
 
@@ -205,11 +227,14 @@ Available services to describe (only include those relevant to this rug):
 3. RUG BREAKDOWN AND SERVICES: Create a clear itemized list for the rug showing:
    - Rug Number and Type with Dimensions
    - Each service with its calculated cost (ALWAYS include actual dollar amounts)
+   - For square foot services, show the per-sqft rate and total sqft
+   - For linear foot services, show the per-linear-ft rate and total linear feet (specify which edges)
    - Subtotal
 
 Format like:
 Rug #[number]: [Type] ([dimensions])
-Professional Cleaning: $[amount]
+Professional Cleaning ([sqft] sq ft × $[rate]/sq ft): $[amount]
+Hand Fringe ([linear ft] linear ft, [which ends/sides]): $[amount]
 [Other services]: $[amount]
 Subtotal: $[total]
 
@@ -228,7 +253,7 @@ IMAGE ANNOTATIONS (for the "imageAnnotations" field):
   - y: Percentage from top (0-100) - must be within the rug's visible area in the photo
 - If a photo is a general overview with no specific issues to mark, return an empty annotations array for that photo
 
-Use the provided service pricing to calculate costs. Calculate costs based on square footage where applicable (multiply price per sq ft by total square feet). For linear foot services (overcasting, binding), estimate based on rug perimeter. If prices are not provided, use reasonable industry standard estimates but ALWAYS provide actual numbers.`;
+Use the provided service pricing to calculate costs. Calculate costs based on square footage where applicable (multiply price per sq ft by total square feet). For linear foot services (overcasting, binding, fringe), calculate based on specific edges that need work and their measurements. If prices are not provided, use reasonable industry standard estimates but ALWAYS provide actual numbers.`;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -527,6 +552,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
     // Try to parse as JSON (new structured format)
     let analysisReport: string;
     let imageAnnotations: any[] = [];
+    let edgeSuggestions: any[] = [];
 
     try {
       // Clean up any markdown code blocks that might wrap the JSON
@@ -539,6 +565,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
       const parsed = JSON.parse(cleanedContent);
       analysisReport = parsed.letter || rawContent;
       imageAnnotations = parsed.imageAnnotations || [];
+      edgeSuggestions = parsed.edgeSuggestions || [];
     } catch (parseError) {
       // Check if response was truncated (ends with incomplete JSON)
       const isTruncated = rawContent.includes('"letter"') && 
@@ -571,6 +598,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
     return new Response(JSON.stringify({ 
       report: analysisReport,
       imageAnnotations: imageAnnotations,
+      edgeSuggestions: edgeSuggestions,
       modelUsed: model,
       processingTimeMs: processingTimeMs
     }), {

@@ -1,4 +1,6 @@
-import { createContext, useContext, ReactNode, useCallback } from 'react';
+import { createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
+import type { DimensionFormat } from '@/lib/rugDimensions';
+import { DEFAULT_DIMENSION_FORMAT } from '@/lib/rugDimensions';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -185,4 +187,16 @@ export const useCompanyScope = () => {
     // Check if we have a valid company context
     isReady: !!companyId,
   };
+};
+
+/**
+ * Hook to get the company's configured dimension format.
+ * Returns the default ('ft_in') if no company context or no setting.
+ */
+export const useDimensionFormat = (): DimensionFormat => {
+  const { company } = useCompany();
+  return useMemo(() => {
+    const settings = (company?.settings ?? {}) as Record<string, unknown>;
+    return (settings.dimension_format as DimensionFormat) || DEFAULT_DIMENSION_FORMAT;
+  }, [company?.settings]);
 };

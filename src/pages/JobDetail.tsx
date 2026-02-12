@@ -93,6 +93,7 @@ interface Rug {
   photo_urls: string[] | null;
   analysis_report: string | null;
   image_annotations: unknown;
+  system_services: unknown;
   created_at: string;
   estimate_approved?: boolean;
 }
@@ -551,16 +552,18 @@ const JobDetail = () => {
       // Stage 3: Generating report
       setAnalysisStage('generating');
       
-      // Store image annotations if provided
+      // Store image annotations and edge suggestions if provided
       const annotations = data.imageAnnotations || [];
+      const edgeSuggs = data.edgeSuggestions || [];
       setImageAnnotations(annotations);
 
-      // Update the rug with analysis and annotations
+      // Update the rug with analysis, annotations, and edge suggestions
       const { error: updateError } = await supabase
         .from('inspections')
         .update({ 
           analysis_report: data.report,
-          image_annotations: annotations
+          image_annotations: annotations,
+          system_services: { edgeSuggestions: edgeSuggs },
         })
         .eq('id', rug.id);
 
@@ -617,16 +620,18 @@ const JobDetail = () => {
 
       setAnalysisStage('generating');
 
-      // Store image annotations if provided
+      // Store image annotations and edge suggestions if provided
       const annotations = data.imageAnnotations || [];
+      const edgeSuggs = data.edgeSuggestions || [];
       setImageAnnotations(annotations);
 
-      // Update the rug with new analysis and annotations
+      // Update the rug with new analysis, annotations, and edge suggestions
       const { error: updateError } = await supabase
         .from('inspections')
         .update({ 
           analysis_report: data.report,
-          image_annotations: annotations
+          image_annotations: annotations,
+          system_services: { edgeSuggestions: edgeSuggs },
         })
         .eq('id', rug.id);
 
@@ -636,7 +641,8 @@ const JobDetail = () => {
       setSelectedRug(prev => prev ? { 
         ...prev, 
         analysis_report: data.report,
-        image_annotations: annotations
+        image_annotations: annotations,
+        system_services: { edgeSuggestions: edgeSuggs },
       } : null);
 
       setAnalysisStage('complete');
@@ -699,7 +705,11 @@ const JobDetail = () => {
 
         await supabase
           .from('inspections')
-          .update({ analysis_report: data.report })
+          .update({ 
+            analysis_report: data.report,
+            image_annotations: data.imageAnnotations || [],
+            system_services: { edgeSuggestions: data.edgeSuggestions || [] },
+          })
           .eq('id', rug.id);
 
         successCount++;
@@ -934,6 +944,13 @@ const JobDetail = () => {
                 rugDimensions={
                   selectedRug.length && selectedRug.width
                     ? { lengthFt: selectedRug.length, widthFt: selectedRug.width }
+                    : null
+                }
+                edgeSuggestions={
+                  selectedRug.system_services &&
+                  typeof selectedRug.system_services === 'object' &&
+                  !Array.isArray(selectedRug.system_services)
+                    ? (selectedRug.system_services as any).edgeSuggestions || null
                     : null
                 }
                 inspectionId={selectedRug.id}

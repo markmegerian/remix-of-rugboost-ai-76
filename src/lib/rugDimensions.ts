@@ -15,6 +15,9 @@
 
 export type DimensionFormat = 'ft_in' | 'decimal_ft';
 
+/** Default dimension format if no company setting is found */
+export const DEFAULT_DIMENSION_FORMAT: DimensionFormat = 'ft_in';
+
 /**
  * Parse a rug-industry dimension string into mathematical feet.
  *
@@ -97,4 +100,42 @@ export function calculateLinearFeet(
  */
 export function calculateSquareFeet(dims: RugDimensions): number {
   return dims.lengthFt * dims.widthFt;
+}
+
+// ─── Edge suggestion parsing ───────────────────────────────────
+
+/**
+ * Represents AI-suggested edges for a specific service type.
+ */
+export interface EdgeSuggestion {
+  servicePattern: string;   // e.g. "fringe", "binding", "overcasting"
+  suggestedEdges: RugEdge[];
+  rationale: string;
+}
+
+/**
+ * Parse AI edge suggestions from the analysis report's structured edgeSuggestions field.
+ */
+export function parseEdgeSuggestions(suggestions: any[]): EdgeSuggestion[] {
+  if (!Array.isArray(suggestions)) return [];
+  return suggestions
+    .filter(s => s && typeof s.serviceType === 'string' && Array.isArray(s.edges))
+    .map(s => ({
+      servicePattern: s.serviceType.toLowerCase(),
+      suggestedEdges: s.edges.filter((e: string) =>
+        ['end1', 'end2', 'side1', 'side2'].includes(e),
+      ) as RugEdge[],
+      rationale: s.rationale || '',
+    }));
+}
+
+/**
+ * Find suggested edges for a given service name.
+ */
+export function getSuggestedEdgesForService(
+  serviceName: string,
+  suggestions: EdgeSuggestion[],
+): EdgeSuggestion | null {
+  const lower = serviceName.toLowerCase();
+  return suggestions.find(s => lower.includes(s.servicePattern)) ?? null;
 }

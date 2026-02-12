@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { RugDimensions } from '@/lib/rugDimensions';
+import { calculateSquareFeet, calculateLinearFeet, type EdgeSuggestion, parseEdgeSuggestions, getSuggestedEdgesForService } from '@/lib/rugDimensions';
+import { getServiceUnit } from '@/lib/serviceUnits';
 import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2, Lightbulb, Lock, AlertTriangle, Shield, AlertCircle, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -70,6 +72,8 @@ interface EstimateReviewProps {
   isLocked?: boolean;
   /** Parsed rug dimensions for auto-calculating service quantities */
   rugDimensions?: RugDimensions | null;
+  /** AI edge suggestions from analysis */
+  edgeSuggestions?: any[] | null;
 }
 
 const PRIORITY_COLORS = {
@@ -89,7 +93,12 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   existingApprovedEstimate,
   isLocked = false,
   rugDimensions = null,
+  edgeSuggestions: rawEdgeSuggestions = null,
 }) => {
+  const parsedEdgeSuggestions = React.useMemo(
+    () => parseEdgeSuggestions(rawEdgeSuggestions || []),
+    [rawEdgeSuggestions],
+  );
   const { user } = useAuth();
   const { isAdmin } = useAdminAuth();
   const [services, setServices] = useState<ServiceItem[]>([]);
@@ -184,7 +193,6 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
       const lowerLine = line.toLowerCase();
       const trimmedLine = line.trim();
       
-      // Detect the RUG BREAKDOWN AND SERVICES section or similar headers
       if (lowerLine.includes('rug breakdown') || 
           lowerLine.includes('estimate of services') ||
           lowerLine.includes('services and costs') ||
@@ -193,7 +201,6 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         continue;
       }
       
-      // Stop parsing at certain sections
       if (lowerLine.includes('total estimate') || 
           lowerLine.includes('total investment') ||
           lowerLine.includes('next steps') ||
@@ -203,35 +210,25 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         continue;
       }
       
-      // Skip rug headers (e.g., "Rug #1: Persian (8x10)")
-      if (lowerLine.startsWith('rug #') || lowerLine.startsWith('rug:')) {
-        continue;
-      }
+      if (lowerLine.startsWith('rug #') || lowerLine.startsWith('rug:')) continue;
+      if (lowerLine.includes('subtotal')) continue;
       
-      // Skip subtotal lines
-      if (lowerLine.includes('subtotal')) {
-        continue;
-      }
-      
-      // Parse service lines with format "Service Name: $amount" or "- Service Name: $amount"
       if (inBreakdownSection && trimmedLine.length > 0) {
-        // Match pattern: "Service Name: $123.45" or "- Service Name: $123.45"
         const serviceMatch = trimmedLine.match(/^[-*]?\s*(.+?):\s*\$([0-9,]+(?:\.[0-9]{2})?)/);
         
         if (serviceMatch) {
-          const serviceName = serviceMatch[1].trim();
+          const serviceName = serviceMatch[1].trim()
+            // Strip parenthetical details like "(80 sq ft × $3.50/sq ft)"
+            .replace(/\s*\([^)]*\)\s*$/, '');
           const price = parseFloat(serviceMatch[2].replace(',', ''));
           
-          // Skip if service name is too short or looks like a header
           if (serviceName.length < 3) continue;
           
-          // Check if this service already exists
           const existingIndex = services.findIndex(
             s => s.name.toLowerCase() === serviceName.toLowerCase()
           );
           
           if (existingIndex >= 0) {
-            // Update price if found and add to quantity
             services[existingIndex].quantity += 1;
             if (price > 0 && services[existingIndex].unitPrice === 0) {
               services[existingIndex].unitPrice = price;
@@ -243,15 +240,15 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
               quantity: 1,
               unitPrice: price,
               priority: getServicePriority(serviceName),
+              source: 'ai',
             });
           }
         }
       }
     }
     
-    // If no services were found in structured format, try alternative parsing
+    // Fallback: look for any line with a dollar amount
     if (services.length === 0) {
-      // Look for any line with a dollar amount and service-like name
       for (const line of lines) {
         const trimmedLine = line.trim();
         const priceMatch = trimmedLine.match(/^(.+?):\s*\$([0-9,]+(?:\.[0-9]{2})?)/);
@@ -259,19 +256,16 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         if (priceMatch) {
           const serviceName = priceMatch[1].trim()
             .replace(/^[-*]\s*/, '')
-            .replace(/\*\*/g, '');
+            .replace(/\*\*/g, '')
+            .replace(/\s*\([^)]*\)\s*$/, '');
           const price = parseFloat(priceMatch[2].replace(',', ''));
           
-          // Skip common non-service lines
           const lowerName = serviceName.toLowerCase();
           if (lowerName.includes('subtotal') || 
               lowerName.includes('total') ||
               lowerName.includes('rug #') ||
-              serviceName.length < 3) {
-            continue;
-          }
+              serviceName.length < 3) continue;
           
-          // Check if already exists
           const existingIndex = services.findIndex(
             s => s.name.toLowerCase() === serviceName.toLowerCase()
           );
@@ -283,8 +277,70 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
               quantity: 1,
               unitPrice: price,
               priority: getServicePriority(serviceName),
+              source: 'ai',
             });
           }
+        }
+      }
+    }
+    
+    // ── Auto-recalculate quantities using unit types + dimensions ──
+    const hasDims = rugDimensions && rugDimensions.lengthFt > 0 && rugDimensions.widthFt > 0;
+    
+    for (const svc of services) {
+      const unitConfig = getServiceUnit(svc.name);
+      
+      if (hasDims && unitConfig.unit === 'sqft') {
+        const sqft = calculateSquareFeet(rugDimensions!);
+        // Derive unit price from total ÷ sqft if AI gave a lump total
+        if (svc.quantity === 1 && svc.unitPrice > 0) {
+          // Check if the AI price looks like a total (much larger than a per-sqft rate)
+          const catalogEntry = availableServices.find(
+            a => a.name.toLowerCase() === svc.name.toLowerCase()
+          );
+          if (catalogEntry && catalogEntry.unitPrice > 0) {
+            svc.unitPrice = catalogEntry.unitPrice;
+          } else if (svc.unitPrice > sqft) {
+            // AI gave total price – derive unit price
+            svc.unitPrice = Math.round((svc.unitPrice / sqft) * 100) / 100;
+          }
+        }
+        svc.quantity = Math.round(sqft * 100) / 100;
+      } else if (hasDims && unitConfig.unit === 'linear_ft') {
+        // Use AI edge suggestions if available
+        const suggestion = getSuggestedEdgesForService(svc.name, parsedEdgeSuggestions);
+        if (suggestion && suggestion.suggestedEdges.length > 0) {
+          const linFt = calculateLinearFeet(rugDimensions!, suggestion.suggestedEdges);
+          // Derive unit price from total if AI gave a lump
+          const catalogEntry = availableServices.find(
+            a => a.name.toLowerCase() === svc.name.toLowerCase()
+          );
+          if (catalogEntry && catalogEntry.unitPrice > 0) {
+            svc.unitPrice = catalogEntry.unitPrice;
+          } else if (svc.quantity === 1 && svc.unitPrice > linFt) {
+            svc.unitPrice = Math.round((svc.unitPrice / linFt) * 100) / 100;
+          }
+          svc.quantity = Math.round(linFt * 100) / 100;
+        } else {
+          // No edge suggestions – use full perimeter as fallback
+          const perimeter = 2 * (rugDimensions!.lengthFt + rugDimensions!.widthFt);
+          const catalogEntry = availableServices.find(
+            a => a.name.toLowerCase() === svc.name.toLowerCase()
+          );
+          if (catalogEntry && catalogEntry.unitPrice > 0) {
+            svc.unitPrice = catalogEntry.unitPrice;
+          } else if (svc.quantity === 1 && svc.unitPrice > perimeter) {
+            svc.unitPrice = Math.round((svc.unitPrice / perimeter) * 100) / 100;
+          }
+          svc.quantity = Math.round(perimeter * 100) / 100;
+        }
+      } else if (unitConfig.unit !== 'variable') {
+        // 'each' type or no dims – try to use catalog price
+        const catalogEntry = availableServices.find(
+          a => a.name.toLowerCase() === svc.name.toLowerCase()
+        );
+        if (catalogEntry && catalogEntry.unitPrice > 0 && svc.unitPrice === 0) {
+          svc.unitPrice = catalogEntry.unitPrice;
         }
       }
     }
