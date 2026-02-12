@@ -56,7 +56,8 @@ const config: CapacitorConfig = {
     },
     Keyboard: {
       // Resize the WebView when keyboard appears
-      resize: 'body',
+      // 'native' prevents body height manipulation that breaks iOS scrolling
+      resize: 'native',
       resizeOnFullScreen: true,
       // Dark keyboard style to match app
       style: 'dark',
