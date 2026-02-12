@@ -270,102 +270,142 @@ const AccountsReceivable = () => {
                 <p>No payments found</p>
               </div>
             ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Job</TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPayments.map((payment) => {
-                      const config = getStatusConfig(payment.status);
-                      const StatusIcon = config.icon;
-
-                      return (
-                        <TableRow 
-                          key={payment.id} 
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => navigate(`/jobs/${payment.job_id}`)}
-                        >
-                          <TableCell>
-                            <span className="font-medium">
-                              {payment.job?.job_number || 'Unknown'}
+              <>
+                {/* Mobile card list */}
+                <div className="md:hidden space-y-3">
+                  {filteredPayments.map((payment) => {
+                    const config = getStatusConfig(payment.status);
+                    const StatusIcon = config.icon;
+                    return (
+                      <div
+                        key={payment.id}
+                        className="rounded-lg border border-border bg-card p-4 active:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => navigate(`/jobs/${payment.job_id}`)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-foreground truncate">
+                            {payment.job?.client_name || 'Unknown'}
+                          </span>
+                          <Badge variant="outline" className={config.className}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {config.label}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1.5 text-sm text-muted-foreground">
+                          <span className="font-mono">{payment.job?.job_number || 'Unknown'}</span>
+                          <span>{format(new Date(payment.created_at), 'MMM d, yyyy')}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1.5">
+                          <span className="font-semibold text-lg text-foreground">${payment.amount.toFixed(2)}</span>
+                          {payment.paid_at && (
+                            <span className="text-xs text-muted-foreground">
+                              Paid {format(new Date(payment.paid_at), 'MMM d')}
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">
-                                {payment.job?.client_name || 'Unknown'}
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden md:block rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead>Job</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPayments.map((payment) => {
+                        const config = getStatusConfig(payment.status);
+                        const StatusIcon = config.icon;
+
+                        return (
+                          <TableRow 
+                            key={payment.id} 
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => navigate(`/jobs/${payment.job_id}`)}
+                          >
+                            <TableCell>
+                              <span className="font-medium">
+                                {payment.job?.job_number || 'Unknown'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">
+                                  {payment.job?.client_name || 'Unknown'}
+                                </div>
+                                {payment.job?.client_email && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {payment.job.client_email}
+                                  </div>
+                                )}
                               </div>
-                              {payment.job?.client_email && (
-                                <div className="text-xs text-muted-foreground">
-                                  {payment.job.client_email}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-semibold text-lg">
+                                ${payment.amount.toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={config.className}>
+                                <StatusIcon className="h-3 w-3 mr-1" />
+                                {config.label}
+                              </Badge>
+                              {payment.paid_at && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Paid {format(new Date(payment.paid_at), 'MMM d')}
                                 </div>
                               )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-semibold text-lg">
-                              ${payment.amount.toFixed(2)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={config.className}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {config.label}
-                            </Badge>
-                            {payment.paid_at && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Paid {format(new Date(payment.paid_at), 'MMM d')}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {format(new Date(payment.created_at), 'MMM d, yyyy')}
                               </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              {format(new Date(payment.created_at), 'MMM d, yyyy')}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {format(new Date(payment.created_at), 'h:mm a')}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/jobs/${payment.job_id}`)}
-                              >
-                                View Job
-                              </Button>
-                              {payment.stripe_payment_intent_id && (
+                              <div className="text-xs text-muted-foreground">
+                                {format(new Date(payment.created_at), 'h:mm a')}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  asChild
+                                  onClick={() => navigate(`/jobs/${payment.job_id}`)}
                                 >
-                                  <a 
-                                    href={`https://dashboard.stripe.com/payments/${payment.stripe_payment_intent_id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
+                                  View Job
                                 </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                                {payment.stripe_payment_intent_id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    asChild
+                                  >
+                                    <a 
+                                      href={`https://dashboard.stripe.com/payments/${payment.stripe_payment_intent_id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
