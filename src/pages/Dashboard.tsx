@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Eye, Plus, LogOut, ChevronRight, PlayCircle, Clock, CheckCircle, Settings, Users, DollarSign, TrendingUp, Building2 } from 'lucide-react';
+import { Briefcase, Eye, Plus, LogOut, ChevronRight, Settings, Users, TrendingUp, CheckCircle, Clock, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,48 +17,8 @@ import { DashboardSkeleton, DashboardJobTableSkeleton } from '@/components/skele
 import MobileNav from '@/components/MobileNav';
 import JobsFilter, { JobFilters } from '@/components/JobsFilter';
 import { BillingStatusBanner } from '@/components/BillingStatusBanner';
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
-          <CheckCircle className="h-3 w-3" />
-          Completed
-        </Badge>;
-    case 'in-progress':
-      return <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600">
-          <Clock className="h-3 w-3" />
-          In Progress
-        </Badge>;
-    default:
-      return <Badge variant="outline" className="gap-1 border-blue-500 text-blue-600">
-          <PlayCircle className="h-3 w-3" />
-          Active
-        </Badge>;
-  }
-};
-
-const getPaymentBadge = (paymentStatus: string | null, totalAmount: number) => {
-  if (!totalAmount || totalAmount === 0) {
-    return null;
-  }
-  
-  if (paymentStatus === 'paid') {
-    return (
-      <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
-        <CheckCircle className="h-3 w-3" />
-        Paid
-      </Badge>
-    );
-  }
-  
-  return (
-    <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600">
-      <DollarSign className="h-3 w-3" />
-      Pending
-    </Badge>
-  );
-};
+import { getStatusBadge, getPaymentBadge } from '@/lib/jobBadges';
+import JobCard from '@/components/JobCard';
 
 const DEFAULT_FILTERS: JobFilters = {
   search: '',
@@ -90,7 +50,6 @@ const Dashboard = () => {
       return;
     }
     
-    // Redirect staff/admin users without a company to setup
     if (!authLoading && !companyLoading && user && isStaff && !hasCompany) {
       navigate('/company/setup');
     }
@@ -105,7 +64,6 @@ const Dashboard = () => {
     return <DashboardSkeleton />;
   }
 
-  // Get display name from branding or company name
   const displayName = branding?.business_name || company?.name || 'RugBoost';
 
   return (
@@ -148,7 +106,6 @@ const Dashboard = () => {
             <Button onClick={handleSignOut} variant="ghost" size="icon" className="hidden sm:flex">
               <LogOut className="h-4 w-4" />
             </Button>
-            {/* Mobile Navigation */}
             <MobileNav isAdmin={isAdmin} onSignOut={handleSignOut} />
           </div>
         </div>
@@ -156,7 +113,6 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Billing Status Banner */}
         <BillingStatusBanner />
         
         <div className="space-y-6">
@@ -228,7 +184,7 @@ const Dashboard = () => {
             activeFilterCount={activeFilterCount}
           />
 
-          {/* Jobs Table */}
+          {/* Jobs List */}
           {isLoading ? (
             <DashboardJobTableSkeleton />
           ) : (
@@ -254,60 +210,70 @@ const Dashboard = () => {
                     )}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Job #</TableHead>
-                          <TableHead>Client</TableHead>
-                          <TableHead>Rugs</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Payment</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredJobs.map((job: JobWithDetails) => (
-                          <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/jobs/${job.id}`)}>
-                            <TableCell className="font-medium">
-                              {format(new Date(job.created_at), 'MMM d, yyyy')}
-                            </TableCell>
-                            <TableCell className="font-mono">{job.job_number}</TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{job.client_name}</div>
-                                {job.client_email && (
-                                  <div className="text-xs text-muted-foreground">{job.client_email}</div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{job.rug_count} rugs</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(job.status)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                {getPaymentBadge(job.payment_status, job.total_amount)}
-                                {job.total_amount > 0 && (
-                                  <span className="text-sm font-medium">${job.total_amount.toFixed(2)}</span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="ghost" size="sm" className="gap-1">
-                                <Eye className="h-4 w-4" />
-                                View
-                                <ChevronRight className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
+                  <>
+                    {/* Mobile card list */}
+                    <div className="md:hidden space-y-3">
+                      {filteredJobs.map((job: JobWithDetails) => (
+                        <JobCard key={job.id} job={job} />
+                      ))}
+                    </div>
+
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Job #</TableHead>
+                            <TableHead>Client</TableHead>
+                            <TableHead>Rugs</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Payment</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredJobs.map((job: JobWithDetails) => (
+                            <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/jobs/${job.id}`)}>
+                              <TableCell className="font-medium">
+                                {format(new Date(job.created_at), 'MMM d, yyyy')}
+                              </TableCell>
+                              <TableCell className="font-mono">{job.job_number}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{job.client_name}</div>
+                                  {job.client_email && (
+                                    <div className="text-xs text-muted-foreground">{job.client_email}</div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{job.rug_count} rugs</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {getStatusBadge(job.status)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-1">
+                                  {getPaymentBadge(job.payment_status, job.total_amount)}
+                                  {job.total_amount > 0 && (
+                                    <span className="text-sm font-medium">${job.total_amount.toFixed(2)}</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="gap-1">
+                                  <Eye className="h-4 w-4" />
+                                  View
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
