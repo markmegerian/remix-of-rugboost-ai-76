@@ -24,8 +24,10 @@ import JobListSkeleton from "@/components/skeletons/JobListSkeleton";
 // Lazy-load GlobalSearch (Cmd+K dialog — not needed on initial render)
 const GlobalSearch = lazy(() => import("@/components/GlobalSearch"));
 
+// Eagerly load Index — it's the landing route and LCP-critical
+import Index from "./pages/Index";
+
 // Lazy load pages for code splitting
-const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const NewJob = lazy(() => import("./pages/NewJob"));
