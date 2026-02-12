@@ -19,6 +19,7 @@ import JobsFilter, { JobFilters } from '@/components/JobsFilter';
 import { BillingStatusBanner } from '@/components/BillingStatusBanner';
 import { getStatusBadge, getPaymentBadge } from '@/lib/jobBadges';
 import JobCard from '@/components/JobCard';
+import PullToRefresh from '@/components/PullToRefresh';
 
 const DEFAULT_FILTERS: JobFilters = {
   search: '',
@@ -41,7 +42,8 @@ const Dashboard = () => {
     uniqueClients, 
     isLoading, 
     stats, 
-    activeFilterCount 
+    activeFilterCount,
+    refetch,
   } = useJobsWithFilters(filters);
 
   useEffect(() => {
@@ -211,12 +213,12 @@ const Dashboard = () => {
                   </div>
                 ) : (
                   <>
-                    {/* Mobile card list */}
-                    <div className="md:hidden space-y-3">
+                    {/* Mobile card list with pull-to-refresh */}
+                    <PullToRefresh onRefresh={refetch} className="md:hidden space-y-3">
                       {filteredJobs.map((job: JobWithDetails) => (
                         <JobCard key={job.id} job={job} />
                       ))}
-                    </div>
+                    </PullToRefresh>
 
                     {/* Desktop table */}
                     <div className="hidden md:block overflow-x-auto">
