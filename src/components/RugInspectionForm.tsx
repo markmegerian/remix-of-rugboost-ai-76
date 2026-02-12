@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Loader2, Send, User, Hash, Ruler, Sparkles } from 'lucide-react';
+import { useDimensionFormat } from '@/hooks/useCompany';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,6 +52,7 @@ interface RugInspectionFormProps {
 }
 
 const RugInspectionForm: React.FC<RugInspectionFormProps> = ({ onSubmit, isLoading }) => {
+  const dimensionFormat = useDimensionFormat();
   const [photos, setPhotos] = useState<File[]>([]);
   const [formData, setFormData] = useState<FormData>({
     clientName: '',
@@ -184,38 +186,50 @@ const RugInspectionForm: React.FC<RugInspectionFormProps> = ({ onSubmit, isLoadi
 
           <div className="space-y-2">
             <Label htmlFor="length" className="flex items-center gap-1">
-              <Ruler className="h-3 w-3" /> Length (ft.in)
+              <Ruler className="h-3 w-3" /> Length {dimensionFormat === 'ft_in' ? '(ft.in)' : '(ft)'}
             </Label>
             <Input
               id="length"
               name="length"
               type="text"
               inputMode="decimal"
-              placeholder="9.06"
+              placeholder={dimensionFormat === 'ft_in' ? '9.06' : '9.50'}
               value={formData.length}
               onChange={handleInputChange}
             />
-            <p className="text-[10px] text-muted-foreground">
-              Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
-            </p>
+            {dimensionFormat === 'ft_in' ? (
+              <p className="text-[10px] text-muted-foreground">
+                Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                Enter decimal feet (e.g. 9.50 = 9½ feet).
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="width" className="flex items-center gap-1">
-              <Ruler className="h-3 w-3" /> Width (ft.in)
+              <Ruler className="h-3 w-3" /> Width {dimensionFormat === 'ft_in' ? '(ft.in)' : '(ft)'}
             </Label>
             <Input
               id="width"
               name="width"
               type="text"
               inputMode="decimal"
-              placeholder="6.08"
+              placeholder={dimensionFormat === 'ft_in' ? '6.08' : '6.67'}
               value={formData.width}
               onChange={handleInputChange}
             />
-            <p className="text-[10px] text-muted-foreground">
-              Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
-            </p>
+            {dimensionFormat === 'ft_in' ? (
+              <p className="text-[10px] text-muted-foreground">
+                Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                Enter decimal feet (e.g. 6.67 = 6 ft 8 in).
+              </p>
+            )}
           </div>
         </div>
       </section>
