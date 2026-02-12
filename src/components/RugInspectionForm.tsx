@@ -184,32 +184,38 @@ const RugInspectionForm: React.FC<RugInspectionFormProps> = ({ onSubmit, isLoadi
 
           <div className="space-y-2">
             <Label htmlFor="length" className="flex items-center gap-1">
-              <Ruler className="h-3 w-3" /> Length (ft)
+              <Ruler className="h-3 w-3" /> Length (ft.in)
             </Label>
             <Input
               id="length"
               name="length"
-              type="number"
-              step="0.1"
-              placeholder="8.5"
+              type="text"
+              inputMode="decimal"
+              placeholder="9.06"
               value={formData.length}
               onChange={handleInputChange}
             />
+            <p className="text-[10px] text-muted-foreground">
+              Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="width" className="flex items-center gap-1">
-              <Ruler className="h-3 w-3" /> Width (ft)
+              <Ruler className="h-3 w-3" /> Width (ft.in)
             </Label>
             <Input
               id="width"
               name="width"
-              type="number"
-              step="0.1"
-              placeholder="5.5"
+              type="text"
+              inputMode="decimal"
+              placeholder="6.08"
               value={formData.width}
               onChange={handleInputChange}
             />
+            <p className="text-[10px] text-muted-foreground">
+              Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
+            </p>
           </div>
         </div>
       </section>

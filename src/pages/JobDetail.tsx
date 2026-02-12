@@ -931,6 +931,11 @@ const JobDetail = () => {
                   dimensions: `${selectedRug.length || '–'}' × ${selectedRug.width || '–'}'`,
                   squareFootage,
                 }}
+                rugDimensions={
+                  selectedRug.length && selectedRug.width
+                    ? { lengthFt: selectedRug.length, widthFt: selectedRug.width }
+                    : null
+                }
                 inspectionId={selectedRug.id}
                 jobId={jobId || ''}
                 availableServices={servicePrices}
