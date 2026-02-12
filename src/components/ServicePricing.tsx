@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { DollarSign, Loader2, Save, Wrench } from "lucide-react";
 import { DEFAULT_SERVICES, DEFAULT_VARIABLE_SERVICES } from "@/lib/defaultServices";
+import { getServiceUnit } from "@/lib/serviceUnits";
 import { useCompany } from "@/hooks/useCompany";
 
 interface ServicePricingProps {
@@ -198,28 +199,34 @@ const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {DEFAULT_SERVICES.map((service) => (
-              <div key={service} className="space-y-1">
-                <Label htmlFor={service} className="text-sm">
-                  {service}
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
-                  </span>
-                  <Input
-                    id={service}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={prices[service] || ""}
-                    onChange={(e) => handlePriceChange(service, e.target.value)}
-                    placeholder="0.00"
-                    className="pl-7"
-                  />
+            {DEFAULT_SERVICES.map((service) => {
+              const unit = getServiceUnit(service);
+              return (
+                <div key={service} className="space-y-1">
+                  <Label htmlFor={service} className="text-sm flex items-center gap-2">
+                    {service}
+                    <Badge variant="outline" className="text-[9px] h-4">
+                      {unit.label}
+                    </Badge>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      id={service}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={prices[service] || ""}
+                      onChange={(e) => handlePriceChange(service, e.target.value)}
+                      placeholder="0.00"
+                      className="pl-7"
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

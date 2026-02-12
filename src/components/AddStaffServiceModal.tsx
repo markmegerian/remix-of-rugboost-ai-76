@@ -1,8 +1,11 @@
 // Staff/Admin Modal for Adding Services to AI-Generated Estimates
 // Appends services with source='staff' tracking
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { DEFAULT_VARIABLE_SERVICES } from '@/lib/defaultServices';
+import { getServiceUnit } from '@/lib/serviceUnits';
+import { calculateLinearFeet, calculateSquareFeet, type RugEdge, type RugDimensions } from '@/lib/rugDimensions';
+import RugEdgeDiagram from './RugEdgeDiagram';
 import {
   Dialog,
   DialogContent,
@@ -32,12 +35,15 @@ export interface StaffAddedService {
   quantity: number;
   unitPrice: number;
   priority: 'high' | 'medium' | 'low';
-  // Staff addition metadata
   source: 'ai' | 'staff';
   addedBy?: string;
   addedByName?: string;
   addedAt?: string;
   reasonNote?: string;
+  /** Selected edges for linear-ft services */
+  selectedEdges?: RugEdge[];
+  /** The unit type used for this service */
+  unitType?: string;
 }
 
 interface AddStaffServiceModalProps {
@@ -48,6 +54,8 @@ interface AddStaffServiceModalProps {
   isAdmin: boolean;
   userId: string;
   userName?: string;
+  /** Rug dimensions in mathematical feet (already parsed) */
+  rugDimensions?: RugDimensions | null;
 }
 
 export default function AddStaffServiceModal({
@@ -58,29 +66,47 @@ export default function AddStaffServiceModal({
   isAdmin,
   userId,
   userName,
+  rugDimensions,
 }: AddStaffServiceModalProps) {
   const [selectedService, setSelectedService] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [unitPrice, setUnitPrice] = useState<number>(0);
   const [reasonNote, setReasonNote] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [selectedEdges, setSelectedEdges] = useState<RugEdge[]>([]);
 
   const variableServiceNames = new Set(DEFAULT_VARIABLE_SERVICES as readonly string[]);
 
-  // Get unique service names from catalog
   const serviceOptions = useMemo(() => {
     const uniqueNames = [...new Set(availableServices.map(s => s.name))];
     return uniqueNames.sort((a, b) => a.localeCompare(b));
   }, [availableServices]);
 
   const isVariablePrice = variableServiceNames.has(selectedService);
+  const serviceUnit = selectedService ? getServiceUnit(selectedService) : null;
+  const isEdgeSelectable = serviceUnit?.edgeSelectable ?? false;
+  const hasDimensions = rugDimensions && rugDimensions.lengthFt > 0 && rugDimensions.widthFt > 0;
 
-  // When service selection changes, prefill price
-  const handleServiceChange = (serviceName: string) => {
+  // Auto-calculate quantity based on unit type + dimensions
+  const autoQuantity = useMemo(() => {
+    if (!hasDimensions || !serviceUnit) return null;
+
+    if (serviceUnit.unit === 'sqft') {
+      return calculateSquareFeet(rugDimensions!);
+    }
+    if (serviceUnit.unit === 'linear_ft' && selectedEdges.length > 0) {
+      return calculateLinearFeet(rugDimensions!, selectedEdges);
+    }
+    return null;
+  }, [serviceUnit, hasDimensions, rugDimensions, selectedEdges]);
+
+  // When service selection changes, prefill price and reset edges
+  const handleServiceChange = useCallback((serviceName: string) => {
     setSelectedService(serviceName);
+    setSelectedEdges([]);
     const isVariable = variableServiceNames.has(serviceName);
     if (isVariable) {
-      setUnitPrice(0); // Variable services always require manual entry
+      setUnitPrice(0);
     } else {
       const catalogService = availableServices.find(s => s.name === serviceName);
       if (catalogService) {
@@ -88,10 +114,18 @@ export default function AddStaffServiceModal({
       }
     }
     setError(null);
-  };
+  }, [availableServices, variableServiceNames]);
+
+  // Update quantity when auto-calculation changes
+  const effectiveQuantity = autoQuantity !== null ? Math.round(autoQuantity * 100) / 100 : quantity;
+
+  const handleToggleEdge = useCallback((edge: RugEdge) => {
+    setSelectedEdges(prev =>
+      prev.includes(edge) ? prev.filter(e => e !== edge) : [...prev, edge],
+    );
+  }, []);
 
   const handleSubmit = () => {
-    // Validation
     if (!selectedService) {
       setError('Please select a service');
       return;
@@ -100,8 +134,8 @@ export default function AddStaffServiceModal({
       setError('A reason note is required to explain why this service was added');
       return;
     }
-    if (quantity < 1) {
-      setError('Quantity must be at least 1');
+    if (effectiveQuantity < 0.01) {
+      setError(isEdgeSelectable ? 'Please select at least one edge' : 'Quantity must be at least 1');
       return;
     }
     if (unitPrice < 0) {
@@ -116,7 +150,7 @@ export default function AddStaffServiceModal({
     const newService: StaffAddedService = {
       id: crypto.randomUUID(),
       name: selectedService,
-      quantity,
+      quantity: effectiveQuantity,
       unitPrice,
       priority: 'medium',
       source: 'staff',
@@ -124,6 +158,8 @@ export default function AddStaffServiceModal({
       addedByName: userName || undefined,
       addedAt: new Date().toISOString(),
       reasonNote: reasonNote.trim(),
+      selectedEdges: isEdgeSelectable ? selectedEdges : undefined,
+      unitType: serviceUnit?.unit,
     };
 
     onAdd(newService);
@@ -133,6 +169,7 @@ export default function AddStaffServiceModal({
     setQuantity(1);
     setUnitPrice(0);
     setReasonNote('');
+    setSelectedEdges([]);
     setError(null);
     onOpenChange(false);
   };
@@ -142,15 +179,16 @@ export default function AddStaffServiceModal({
     setQuantity(1);
     setUnitPrice(0);
     setReasonNote('');
+    setSelectedEdges([]);
     setError(null);
     onOpenChange(false);
   };
 
-  const total = quantity * unitPrice;
+  const total = effectiveQuantity * unitPrice;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
@@ -170,18 +208,19 @@ export default function AddStaffServiceModal({
                 <SelectValue placeholder="Select a service from catalog..." />
               </SelectTrigger>
               <SelectContent className="max-h-60">
-                {serviceOptions.map(name => (
-                  <SelectItem key={name} value={name}>
-                    <span className="flex items-center gap-2">
-                      {name}
-                      {variableServiceNames.has(name) && (
+                {serviceOptions.map(name => {
+                  const unit = getServiceUnit(name);
+                  return (
+                    <SelectItem key={name} value={name}>
+                      <span className="flex items-center gap-2">
+                        {name}
                         <Badge variant="outline" className="text-[10px] h-4 ml-1">
-                          Variable
+                          {unit.label}
                         </Badge>
-                      )}
-                    </span>
-                  </SelectItem>
-                ))}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -196,17 +235,58 @@ export default function AddStaffServiceModal({
             </Alert>
           )}
 
+          {/* Edge selector for linear-ft services */}
+          {isEdgeSelectable && hasDimensions && (
+            <div className="space-y-2">
+              <Label>Select Edges *</Label>
+              <RugEdgeDiagram
+                dimensions={rugDimensions!}
+                selectedEdges={selectedEdges}
+                onToggleEdge={handleToggleEdge}
+              />
+              {selectedEdges.length > 0 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Total linear feet: <span className="font-semibold">{effectiveQuantity.toFixed(2)} ft</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {isEdgeSelectable && !hasDimensions && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Rug dimensions are not set. Please enter length and width on the rug to auto-calculate linear footage.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Auto-calculated sqft notice */}
+          {serviceUnit?.unit === 'sqft' && hasDimensions && (
+            <div className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              Quantity auto-calculated: <span className="font-semibold">{effectiveQuantity.toFixed(2)} sq ft</span> ({rugDimensions!.lengthFt.toFixed(2)}′ × {rugDimensions!.widthFt.toFixed(2)}′)
+            </div>
+          )}
+
           {/* Quantity & Price */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
+              <Label htmlFor="quantity">
+                Quantity {serviceUnit ? `(${serviceUnit.label})` : ''}
+              </Label>
               <Input
                 id="quantity"
                 type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                min="0.01"
+                step="0.01"
+                value={autoQuantity !== null ? effectiveQuantity.toFixed(2) : quantity}
+                onChange={(e) => setQuantity(parseFloat(e.target.value) || 1)}
+                disabled={autoQuantity !== null}
+                className={autoQuantity !== null ? 'bg-muted' : ''}
               />
+              {autoQuantity !== null && (
+                <p className="text-[10px] text-muted-foreground">Auto-calculated from dimensions</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit-price">

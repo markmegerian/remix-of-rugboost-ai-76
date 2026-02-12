@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import type { RugDimensions } from '@/lib/rugDimensions';
 import { ArrowLeft, Plus, Trash2, Save, Check, Edit2, DollarSign, Loader2, Lightbulb, Lock, AlertTriangle, Shield, AlertCircle, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -67,6 +68,8 @@ interface EstimateReviewProps {
   } | null;
   /** If true, estimate is locked and cannot be modified */
   isLocked?: boolean;
+  /** Parsed rug dimensions for auto-calculating service quantities */
+  rugDimensions?: RugDimensions | null;
 }
 
 const PRIORITY_COLORS = {
@@ -85,6 +88,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   availableServices = [],
   existingApprovedEstimate,
   isLocked = false,
+  rugDimensions = null,
 }) => {
   const { user } = useAuth();
   const { isAdmin } = useAdminAuth();
@@ -835,6 +839,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         isAdmin={isAdmin}
         userId={user?.id || ''}
         userName={user?.email || undefined}
+        rugDimensions={rugDimensions}
       />
     </div>
   );
