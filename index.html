@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
     <!-- Preconnect to external origins for faster resource loading -->
-    <link rel="dns-prefetch" href="https://tviommdnpvfceuprrwzf.supabase.co" />
-    <link rel="preconnect" href="https://tviommdnpvfceuprrwzf.supabase.co" crossorigin />
+    <!-- Preload critical fonts to break CSS→font dependency chain -->
+    <link rel="preload" href="/assets/inter-latin-400-normal-C38fXH4l.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/inter-latin-500-normal-Cerq10X2.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/inter-latin-600-normal-LgqL8muc.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/assets/inter-latin-700-normal-Yt3aPRUw.woff2" as="font" type="font/woff2" crossorigin>
     
     <!-- iOS App Store / Capacitor Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
