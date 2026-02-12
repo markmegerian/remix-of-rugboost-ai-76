@@ -4,7 +4,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { DEFAULT_VARIABLE_SERVICES } from '@/lib/defaultServices';
 import { getServiceUnit } from '@/lib/serviceUnits';
-import { calculateLinearFeet, calculateSquareFeet, type RugEdge, type RugDimensions } from '@/lib/rugDimensions';
+import { calculateLinearFeet, calculateSquareFeet, formatDimension, type RugEdge, type RugDimensions } from '@/lib/rugDimensions';
+import { useDimensionFormat } from '@/hooks/useCompany';
 import RugEdgeDiagram from './RugEdgeDiagram';
 import {
   Dialog,
@@ -74,6 +75,7 @@ export default function AddStaffServiceModal({
   const [reasonNote, setReasonNote] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [selectedEdges, setSelectedEdges] = useState<RugEdge[]>([]);
+  const dimensionFormat = useDimensionFormat();
 
   const variableServiceNames = new Set(DEFAULT_VARIABLE_SERVICES as readonly string[]);
 
@@ -243,6 +245,7 @@ export default function AddStaffServiceModal({
                 dimensions={rugDimensions!}
                 selectedEdges={selectedEdges}
                 onToggleEdge={handleToggleEdge}
+                dimensionFormat={dimensionFormat}
               />
               {selectedEdges.length > 0 && (
                 <p className="text-xs text-muted-foreground text-center">
@@ -264,7 +267,7 @@ export default function AddStaffServiceModal({
           {/* Auto-calculated sqft notice */}
           {serviceUnit?.unit === 'sqft' && hasDimensions && (
             <div className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-              Quantity auto-calculated: <span className="font-semibold">{effectiveQuantity.toFixed(2)} sq ft</span> ({rugDimensions!.lengthFt.toFixed(2)}′ × {rugDimensions!.widthFt.toFixed(2)}′)
+              Quantity auto-calculated: <span className="font-semibold">{effectiveQuantity.toFixed(2)} sq ft</span> ({formatDimension(rugDimensions!.lengthFt, dimensionFormat)} × {formatDimension(rugDimensions!.widthFt, dimensionFormat)})
             </div>
           )}
 
