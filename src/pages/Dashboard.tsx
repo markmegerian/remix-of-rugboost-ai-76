@@ -70,16 +70,16 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+        <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
+          <div className="flex items-center gap-2 md:gap-3">
             {branding?.logo_url ? (
-              <img src={branding.logo_url} alt={displayName} className="h-10 w-10 object-contain" />
+              <img src={branding.logo_url} alt={displayName} className="h-8 w-8 md:h-10 md:w-10 object-contain" />
             ) : (
-              <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10 border-0" />
+              <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10 border-0" />
             )}
             <div>
-              <h1 className="text-xl font-bold text-foreground font-sans">{displayName}</h1>
-              <p className="text-xs text-muted-foreground">Jobs</p>
+              <h1 className="text-lg md:text-xl font-bold text-foreground font-sans">{displayName}</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Jobs</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
