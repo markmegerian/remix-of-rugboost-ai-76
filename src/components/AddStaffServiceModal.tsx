@@ -2,6 +2,7 @@
 // Appends services with source='staff' tracking
 
 import { useState, useMemo } from 'react';
+import { DEFAULT_VARIABLE_SERVICES } from '@/lib/defaultServices';
 import {
   Dialog,
   DialogContent,
@@ -21,8 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, Plus } from 'lucide-react';
+import { AlertCircle, Plus, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
 export interface StaffAddedService {
   id: string;
@@ -63,18 +65,27 @@ export default function AddStaffServiceModal({
   const [reasonNote, setReasonNote] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
+  const variableServiceNames = new Set(DEFAULT_VARIABLE_SERVICES as readonly string[]);
+
   // Get unique service names from catalog
   const serviceOptions = useMemo(() => {
     const uniqueNames = [...new Set(availableServices.map(s => s.name))];
     return uniqueNames.sort((a, b) => a.localeCompare(b));
   }, [availableServices]);
 
+  const isVariablePrice = variableServiceNames.has(selectedService);
+
   // When service selection changes, prefill price
   const handleServiceChange = (serviceName: string) => {
     setSelectedService(serviceName);
-    const catalogService = availableServices.find(s => s.name === serviceName);
-    if (catalogService) {
-      setUnitPrice(catalogService.unitPrice);
+    const isVariable = variableServiceNames.has(serviceName);
+    if (isVariable) {
+      setUnitPrice(0); // Variable services always require manual entry
+    } else {
+      const catalogService = availableServices.find(s => s.name === serviceName);
+      if (catalogService) {
+        setUnitPrice(catalogService.unitPrice);
+      }
     }
     setError(null);
   };
@@ -95,6 +106,10 @@ export default function AddStaffServiceModal({
     }
     if (unitPrice < 0) {
       setError('Price cannot be negative');
+      return;
+    }
+    if (isVariablePrice && unitPrice === 0) {
+      setError('Please enter a price for this variable-price service');
       return;
     }
 
@@ -157,12 +172,29 @@ export default function AddStaffServiceModal({
               <SelectContent className="max-h-60">
                 {serviceOptions.map(name => (
                   <SelectItem key={name} value={name}>
-                    {name}
+                    <span className="flex items-center gap-2">
+                      {name}
+                      {variableServiceNames.has(name) && (
+                        <Badge variant="outline" className="text-[10px] h-4 ml-1">
+                          Variable
+                        </Badge>
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Variable price hint */}
+          {isVariablePrice && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                This is a variable-price service. Enter the price based on the specific rug's needs.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Quantity & Price */}
           <div className="grid grid-cols-2 gap-4">
@@ -178,7 +210,10 @@ export default function AddStaffServiceModal({
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit-price">
-                Unit Price ($) {!isAdmin && <span className="text-xs text-muted-foreground">(catalog rate)</span>}
+                Unit Price ($) {isVariablePrice 
+                  ? <span className="text-xs text-amber-600">(required)</span>
+                  : !isAdmin && <span className="text-xs text-muted-foreground">(catalog rate)</span>
+                }
               </Label>
               <Input
                 id="unit-price"
@@ -187,9 +222,10 @@ export default function AddStaffServiceModal({
                 step="0.01"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(parseFloat(e.target.value) || 0)}
-                disabled={!isAdmin}
+                disabled={!isAdmin && !isVariablePrice}
+                className={isVariablePrice ? 'border-amber-300 focus-visible:ring-amber-400' : ''}
               />
-              {!isAdmin && (
+              {!isAdmin && !isVariablePrice && (
                 <p className="text-[10px] text-muted-foreground">
                   Only admins can modify pricing
                 </p>

@@ -4,7 +4,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { batchSignUrls } from '@/hooks/useSignedUrls';
 import { useCompany } from './useCompany';
 import { validateTenantAccess } from './useLifecycleGuards';
-import { DEFAULT_SERVICES } from '@/lib/defaultServices';
+import { DEFAULT_SERVICES, DEFAULT_VARIABLE_SERVICES } from '@/lib/defaultServices';
 
 export interface JobDetail {
   id: string;
@@ -176,6 +176,17 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         ? fetchedPrices.map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
         : DEFAULT_SERVICES.map(name => ({ name, unitPrice: 0 }));
 
+      // Include enabled variable-price services (is_additional=true) with unitPrice=0
+      const enabledVariableServices = (pricesResult.data || [])
+        .filter(p => p.is_additional);
+      
+      const variableServicePrices: ServicePrice[] = enabledVariableServices.length > 0
+        ? enabledVariableServices.map(p => ({ name: p.service_name, unitPrice: 0 }))
+        : DEFAULT_VARIABLE_SERVICES.map(name => ({ name, unitPrice: 0 }));
+
+      // Combine fixed + variable for the full available services list
+      const allServicePrices = [...servicePrices, ...variableServicePrices];
+
       const upsellServices: UpsellService[] = (pricesResult.data || [])
         .filter(p => p.is_additional)
         .map(p => ({ name: p.service_name, unitPrice: p.unit_price }));
@@ -230,7 +241,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         job,
         rugs,
         branding: brandingResult.data as BusinessBranding | null,
-        servicePrices,
+        servicePrices: allServicePrices,
         upsellServices,
         approvedEstimates,
         payments: (paymentsResult.data || []) as Payment[],
