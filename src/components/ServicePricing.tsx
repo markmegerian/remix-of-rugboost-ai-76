@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { DollarSign, Loader2, Save } from "lucide-react";
 import { DEFAULT_SERVICES } from "@/lib/defaultServices";
+import { useCompany } from "@/hooks/useCompany";
 
 interface ServicePrice {
   id?: string;
@@ -22,13 +23,29 @@ const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { companyId } = useCompany();
 
   const fetchPrices = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("service_prices")
-        .select("*")
-        .eq("user_id", userId);
+      let data;
+      let error;
+
+      if (companyId) {
+        const result = await supabase
+          .from("company_service_prices")
+          .select("service_name, unit_price, is_additional")
+          .eq("company_id", companyId)
+          .eq("is_additional", false);
+        data = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from("service_prices")
+          .select("*")
+          .eq("user_id", userId);
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
@@ -48,7 +65,7 @@ const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, companyId]);
 
   useEffect(() => {
     fetchPrices();
@@ -62,18 +79,32 @@ const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      // Upsert all prices
-      const upsertData = Object.entries(prices).map(([service_name, unit_price]) => ({
-        user_id: userId,
-        service_name,
-        unit_price,
-      }));
+      if (companyId) {
+        const upsertData = Object.entries(prices).map(([service_name, unit_price]) => ({
+          company_id: companyId,
+          service_name,
+          unit_price,
+          is_additional: false,
+        }));
 
-      const { error } = await supabase
-        .from("service_prices")
-        .upsert(upsertData, { onConflict: "user_id,service_name" });
+        const { error } = await supabase
+          .from("company_service_prices")
+          .upsert(upsertData, { onConflict: "company_id,service_name" });
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        const upsertData = Object.entries(prices).map(([service_name, unit_price]) => ({
+          user_id: userId,
+          service_name,
+          unit_price,
+        }));
+
+        const { error } = await supabase
+          .from("service_prices")
+          .upsert(upsertData, { onConflict: "user_id,service_name" });
+
+        if (error) throw error;
+      }
 
       toast.success("Service prices saved successfully");
     } catch (error) {
@@ -82,7 +113,7 @@ const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
     } finally {
       setSaving(false);
     }
-  }, [prices, userId]);
+  }, [prices, userId, companyId]);
 
   if (loading) {
     return (
