@@ -168,12 +168,12 @@ const History = () => {
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-          <div className="container mx-auto flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-3">
-              <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
+          <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10" />
               <div>
-                <h1 className="font-display text-xl font-bold text-foreground">Completed Jobs</h1>
-                <p className="text-xs text-muted-foreground">Service History</p>
+                <h1 className="font-display text-lg md:text-xl font-bold text-foreground">Completed Jobs</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">Service History</p>
               </div>
             </div>
           </div>
@@ -189,25 +189,24 @@ const History = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
+        <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10" />
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground">Completed Jobs</h1>
-              <p className="text-xs text-muted-foreground">Service History</p>
+              <h1 className="font-display text-lg md:text-xl font-bold text-foreground">Completed Jobs</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Service History</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Jobs
+          <div className="flex items-center gap-2 md:gap-3">
+            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Back to Jobs</span>
             </Button>
-            <Button onClick={() => navigate('/settings')} variant="ghost" size="sm" className="gap-2">
+            <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden sm:flex">
               <Settings className="h-4 w-4" />
             </Button>
-            <Button onClick={handleSignOut} variant="outline" size="sm" className="gap-2">
+            <Button onClick={handleSignOut} variant="ghost" size="icon" className="hidden sm:flex">
               <LogOut className="h-4 w-4" />
-              Sign Out
             </Button>
           </div>
         </div>

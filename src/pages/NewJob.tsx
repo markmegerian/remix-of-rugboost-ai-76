@@ -82,17 +82,17 @@ const NewJob = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
+        <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10" />
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground">RugBoost</h1>
-              <p className="text-xs text-muted-foreground">New Job</p>
+              <h1 className="font-display text-lg md:text-xl font-bold text-foreground">RugBoost</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">New Job</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
+          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
+            <ArrowLeft className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Back to Dashboard</span>
           </Button>
         </div>
       </header>
