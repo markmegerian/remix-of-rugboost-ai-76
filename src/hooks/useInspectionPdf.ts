@@ -119,22 +119,18 @@ async function getSignedPhotoUrls(photoUrls: string[]): Promise<PhotoData[]> {
   if (!photoUrls || photoUrls.length === 0) return [];
   
   try {
-    // Sign storage URLs
-    const signedUrls: PhotoData[] = [];
+    const paths = photoUrls.slice(0, 5).map(url => url.replace(/^.*\/rug-photos\//, ''));
     
-    for (const url of photoUrls.slice(0, 5)) { // Limit to 5 photos
-      const path = url.replace(/^.*\/rug-photos\//, '');
-      
-      const { data, error } = await supabase.storage
-        .from('rug-photos')
-        .createSignedUrl(path, 300); // 5 min expiry
-      
-      if (!error && data?.signedUrl) {
-        signedUrls.push({ url: data.signedUrl });
-      }
-    }
+    // Batch sign all URLs in a single request
+    const { data, error } = await supabase.storage
+      .from('rug-photos')
+      .createSignedUrls(paths, 300); // 5 min expiry
     
-    return signedUrls;
+    if (error || !data) return [];
+    
+    return data
+      .filter(item => !item.error && item.signedUrl)
+      .map(item => ({ url: item.signedUrl }));
   } catch (error) {
     console.error('[PDF] Failed to sign photo URLs:', error);
     return [];

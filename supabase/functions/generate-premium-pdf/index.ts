@@ -472,9 +472,10 @@ class PremiumPdfRenderer {
       this.y += boxHeight + SPACE.sm;
     }
     
-    // Photo thumbnails (if available)
+    // Photo thumbnails using prefetched images (no network calls)
     if (rug.photos && rug.photos.length > 0) {
-      await this.drawPhotoThumbnails(rug.photos);
+      const prefetched = (rug as any)._prefetchedPhotos as (string | null)[] | undefined;
+      this.drawPhotoThumbnailsFromCache(rug.photos, prefetched);
     }
     
     // Services table
@@ -494,7 +495,7 @@ class PremiumPdfRenderer {
     this.y += 18;
   }
 
-  private async drawPhotoThumbnails(photos: PhotoData[]) {
+  private drawPhotoThumbnailsFromCache(photos: PhotoData[], prefetchedImages?: (string | null)[]) {
     this.checkPageBreak(35);
     
     const thumbSize = 25;
@@ -506,26 +507,20 @@ class PremiumPdfRenderer {
     setColor(this.doc, PALETTE.slate, 'text');
     this.doc.text('INSPECTION PHOTOS', startX, this.y + 4);
     this.y += 8;
-    
+
     for (let i = 0; i < maxPhotos; i++) {
-      const photo = photos[i];
       const x = startX + (thumbSize + SPACE.xs) * i;
       
-      // Photo placeholder frame
       setColor(this.doc, PALETTE.cloud, 'fill');
       this.doc.roundedRect(x, this.y, thumbSize, thumbSize, 2, 2, 'F');
       setColor(this.doc, PALETTE.silver, 'draw');
       this.doc.roundedRect(x, this.y, thumbSize, thumbSize, 2, 2, 'S');
       
-      // Try to load actual photo
-      if (photo.url) {
+      const imageData = prefetchedImages?.[i];
+      if (imageData) {
         try {
-          const imageData = await fetchImageAsBase64(photo.url);
-          if (imageData) {
-            this.doc.addImage(imageData, 'JPEG', x + 1, this.y + 1, thumbSize - 2, thumbSize - 2);
-          }
+          this.doc.addImage(imageData, 'JPEG', x + 1, this.y + 1, thumbSize - 2, thumbSize - 2);
         } catch (e) {
-          // Photo couldn't load - show placeholder
           this.doc.setFontSize(TYPE.tiny);
           setColor(this.doc, PALETTE.silver, 'text');
           this.doc.text('Photo', x + thumbSize / 2, this.y + thumbSize / 2, { align: 'center' });
@@ -745,11 +740,20 @@ class PremiumPdfRenderer {
   async generate(request: PdfRequest, logoBase64: string | null): Promise<string> {
     console.log(`[Premium PDF] Generating ${request.type} for job ${request.jobNumber}`);
     
-    // Generate QR code for portal link
-    let qrCode: string | null = null;
-    if (request.portalUrl) {
-      qrCode = await generateQRCode(request.portalUrl);
-    }
+    // Pre-fetch QR code and all rug photos in parallel
+    const [qrCode, ...rugPhotoResults] = await Promise.all([
+      request.portalUrl ? generateQRCode(request.portalUrl) : Promise.resolve(null),
+      ...request.rugs.map(rug =>
+        rug.photos && rug.photos.length > 0
+          ? Promise.all(rug.photos.slice(0, 5).map(p => p.url ? fetchImageAsBase64(p.url).catch(() => null) : Promise.resolve(null)))
+          : Promise.resolve([])
+      ),
+    ]);
+
+    // Attach prefetched images to rugs to avoid re-fetching
+    request.rugs.forEach((rug, i) => {
+      (rug as any)._prefetchedPhotos = rugPhotoResults[i];
+    });
     
     // Draw header with logo
     await this.drawHeader(request, logoBase64);
@@ -826,23 +830,24 @@ serve(async (req) => {
     const request: PdfRequest = await req.json();
     console.log(`[Premium PDF] Request received for ${request.type}:`, request.jobNumber);
 
-    // Fetch logo if logoPath provided
-    let logoBase64: string | null = null;
-    if (request.logoPath) {
-      try {
-        // Create signed URL for logo
-        const { data: signedUrlData, error: signError } = await supabase.storage
-          .from('rug-photos')
-          .createSignedUrl(request.logoPath, 60);
-        
-        if (!signError && signedUrlData?.signedUrl) {
-          logoBase64 = await fetchImageAsBase64(signedUrlData.signedUrl);
-          console.log('[Premium PDF] Logo fetched successfully');
-        }
-      } catch (e) {
-        console.error('[Premium PDF] Failed to fetch logo:', e);
-      }
-    }
+    // Fetch logo in parallel with auth (start early)
+    const logoPromise = request.logoPath
+      ? (async () => {
+          try {
+            const { data: signedUrlData, error: signError } = await supabase.storage
+              .from('rug-photos')
+              .createSignedUrl(request.logoPath!, 60);
+            if (!signError && signedUrlData?.signedUrl) {
+              return await fetchImageAsBase64(signedUrlData.signedUrl);
+            }
+          } catch (e) {
+            console.error('[Premium PDF] Failed to fetch logo:', e);
+          }
+          return null;
+        })()
+      : Promise.resolve(null);
+
+    const logoBase64 = await logoPromise;
 
     // Generate PDF
     const renderer = new PremiumPdfRenderer();
