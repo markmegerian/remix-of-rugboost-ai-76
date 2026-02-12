@@ -4,6 +4,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { batchSignUrls } from '@/hooks/useSignedUrls';
 import { useCompany } from './useCompany';
 import { validateTenantAccess } from './useLifecycleGuards';
+import { DEFAULT_SERVICES } from '@/lib/defaultServices';
 
 export interface JobDetail {
   id: string;
@@ -167,9 +168,13 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         }
       }
 
-      const servicePrices: ServicePrice[] = (pricesResult.data || [])
-        .filter(p => !p.is_additional)
-        .map(p => ({ name: p.service_name, unitPrice: p.unit_price }));
+      const fetchedPrices = (pricesResult.data || [])
+        .filter(p => !p.is_additional);
+      
+      // Fall back to default service catalog when no prices are configured
+      const servicePrices: ServicePrice[] = fetchedPrices.length > 0
+        ? fetchedPrices.map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
+        : DEFAULT_SERVICES.map(name => ({ name, unitPrice: 0 }));
 
       const upsellServices: UpsellService[] = (pricesResult.data || [])
         .filter(p => p.is_additional)

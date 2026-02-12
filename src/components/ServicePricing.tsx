@@ -6,30 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { DollarSign, Loader2, Save } from "lucide-react";
+import { DEFAULT_SERVICES } from "@/lib/defaultServices";
 
 interface ServicePrice {
   id?: string;
   service_name: string;
   unit_price: number;
 }
-
-const DEFAULT_SERVICES = [
-  "Standard wash",
-  "Special fiber/antique wash",
-  "Limewash (moth wash)",
-  "Overnight soaking",
-  "Blocking",
-  "Sheering",
-  "Overcasting",
-  "Zenjireh",
-  "Persian Binding",
-  "Hand Fringe",
-  "Machine Fringe",
-  "Leather binding",
-  "Cotton Binding",
-  "Glue binding",
-  "Padding",
-];
 
 interface ServicePricingProps {
   userId: string;
