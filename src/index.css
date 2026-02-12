@@ -79,6 +79,9 @@
     -webkit-text-size-adjust: 100%;
     /* Smooth scrolling */
     scroll-behavior: smooth;
+    /* Ensure html is scrollable on iOS Capacitor */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
@@ -89,12 +92,13 @@
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
-    /* Prevent overscroll bounce on iOS */
-    overscroll-behavior: none;
-    /* Smooth scrolling for iOS */
+    /* Smooth scrolling for iOS WebView */
     -webkit-overflow-scrolling: touch;
-    /* Prevent pull-to-refresh on Android Chrome */
+    /* Allow normal scrolling - overscroll-behavior: none breaks iOS Capacitor scroll */
     overscroll-behavior-y: contain;
+    /* Ensure body can scroll */
+    overflow-y: auto;
+    min-height: 100vh;
   }
 
   /* Safe area aware sticky headers */
