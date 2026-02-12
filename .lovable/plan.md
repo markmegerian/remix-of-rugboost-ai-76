@@ -1,173 +1,76 @@
 
 
-# RugBoost SaaS B2B Landing Page
+# Mobile-First Dashboard Redesign
 
-## Overview
+## The Problem
 
-Create a professional, standalone landing page for RugBoost that showcases the AI-powered rug inspection and business management platform. The page will be designed to work independently from the main application, ready to be deployed on a separate VPS.
+The Dashboard jobs list uses a 7-column HTML table (Date, Job #, Client, Rugs, Status, Payment, Actions) that requires horizontal scrolling on mobile. This is the primary usability blocker -- users on phones (the majority of your user base) have to swipe left/right just to see basic job info.
 
-## Design Philosophy
+## The Solution: Card Layout on Mobile, Table on Desktop
 
-Following the existing clinical, professional aesthetic:
-- Neutral, calm color palette with clear hierarchy
-- DM Sans body font, DM Serif Display for headlines
-- Primary blue (#2174C6) and accent purple (#6E54D1) gradient accents
-- Minimal animations, decisive interactions
-- Trust-building, authority-establishing design
+Replace the table with a **responsive card list** that shows on small screens, while keeping the table for tablets and desktops. Each job becomes a tappable card that shows all critical info at a glance, no scrolling required.
 
-## Page Sections
-
-### 1. Hero Section
-- Large headline emphasizing AI-powered rug inspection
-- Subheadline focusing on business efficiency
-- CTA buttons: "Start Free Trial" and "Book Demo"
-- Hero device mockup showing the Dashboard (reusing MockDashboard)
-
-### 2. Problem/Solution Section
-- Address pain points: manual inspections, slow estimates, client communication
-- Position RugBoost as the modern solution
-
-### 3. Feature Showcase (6 Features)
-Each feature displayed in alternating layout with device mockups:
-
-| Feature | Mock Component | Headline |
-|---------|---------------|----------|
-| Job Management | MockDashboard | Manage Jobs Effortlessly |
-| AI Analysis | MockAnalysisReport | AI-Powered Inspections |
-| Photo Capture | MockPhotoCapture | Guided Photo Capture |
-| Estimates | MockEstimate | Professional Estimates |
-| Client Portal | MockClientPortal | Seamless Client Experience |
-| Analytics | MockAnalytics | Business Insights |
-
-### 4. How It Works
-Three-step process:
-1. Photograph - Guided capture process
-2. Analyze - AI identifies condition and issues
-3. Deliver - Professional reports and estimates
-
-### 5. Pricing Section
-Three tiers based on existing plan features:
-
-| Plan | Staff | Key Features |
-|------|-------|--------------|
-| Starter | 2 users | Core features, batch operations, CSV export |
-| Pro | 10 users | + Analytics, custom emails, advanced pricing |
-| Enterprise | Unlimited | + White-label, API access, priority support |
-
-### 6. Testimonials Section
-Placeholder testimonials from rug cleaning businesses
-
-### 7. FAQ Section
-Common questions about the platform
-
-### 8. Footer with CTA
-Final call-to-action and navigation links
-
-## Files to Create
+### What a mobile job card looks like:
 
 ```text
-src/pages/LandingPage.tsx          - Main landing page component
-src/components/landing/
-├── LandingHero.tsx                - Hero section with device mockup
-├── LandingProblemSolution.tsx     - Problem/solution narrative
-├── LandingFeatures.tsx            - Feature showcase with mockups
-├── LandingHowItWorks.tsx          - Three-step process
-├── LandingPricing.tsx             - Pricing tiers
-├── LandingTestimonials.tsx        - Social proof section
-├── LandingFAQ.tsx                 - Frequently asked questions
-├── LandingFooter.tsx              - Footer with CTA and links
-└── LandingNavbar.tsx              - Top navigation bar
++------------------------------------------+
+| John Smith                    In Progress |
+| Job #2024-001          Dec 15, 2024       |
+| 3 rugs                 $450 - Pending     |
++------------------------------------------+
 ```
 
-## Technical Implementation
+- Client name (bold, prominent) + status badge on the right
+- Job number + date on the second line
+- Rug count + payment info on the third line
+- The entire card is tappable (navigates to job detail)
+- No "View" button needed -- the card itself is the tap target
 
-### Reusing Existing Components
-- **DeviceFrame** - iPhone frame for feature mockups
-- **MockDashboard, MockAnalysisReport, MockEstimate, MockPhotoCapture, MockClientPortal, MockAnalytics** - App screenshots
-- **Button** - Existing button component
-- **Card** - Existing card component
-- **Accordion** - For FAQ section
+### Breakpoint strategy
 
-### Responsive Design
-- Mobile-first approach
-- Stacked layout on mobile, side-by-side on desktop
-- Device mockups scale appropriately per viewport
+- **Mobile (below `md`):** Stacked card list
+- **Tablet/Desktop (`md` and up):** Current table layout (unchanged)
 
-### Routing
-Add route `/landing` to display the landing page:
-```typescript
-// src/App.tsx
-<Route path="/landing" element={<LandingPage />} />
-```
+## Technical Changes
 
-## Standalone Export Strategy
+### 1. Create `src/components/JobCard.tsx` (new file)
 
-When ready to deploy to VPS, the landing page can be extracted as:
+A compact card component for a single job, designed for touch targets (minimum 48px height). Displays:
+- Row 1: Client name (left) + status badge (right)
+- Row 2: Job number in mono font (left) + formatted date (right)  
+- Row 3: Rug count badge (left) + payment amount and status (right)
+- Full-card `onClick` navigates to `/jobs/{id}`
+- Uses existing `getStatusBadge` and `getPaymentBadge` helpers (extracted from Dashboard)
 
-1. **Single HTML file** with inlined CSS/JS
-2. **Static build** using `npm run build`
-3. Required assets:
-   - `rugboost-logo.svg`
-   - Google Fonts (DM Sans, DM Serif Display)
-   - All mockup components (embedded)
+### 2. Modify `src/pages/Dashboard.tsx`
 
-The landing page will be self-contained without authentication or backend dependencies.
+- Extract `getStatusBadge` and `getPaymentBadge` into a shared location (or pass as props) so both the table and card can use them
+- In the Jobs section (lines 256-313), wrap the existing table in a `hidden md:block` container
+- Add a `md:hidden` container that renders `JobCard` components in a vertical stack
+- The stats grid already uses `grid-cols-2 md:grid-cols-4` which works well on mobile -- no changes needed there
 
-## Visual Layout Preview
+### 3. Minor filter improvements for mobile
 
-```text
-+--------------------------------------------------+
-|  NAVBAR: Logo | Features | Pricing | Login | CTA |
-+--------------------------------------------------+
-|                                                  |
-|  HERO                                            |
-|  [Headline]              [Device Mockup]         |
-|  [Subheadline]           (Dashboard)             |
-|  [CTA Buttons]                                   |
-|                                                  |
-+--------------------------------------------------+
-|  PROBLEM/SOLUTION                                |
-|  3-column grid of pain points                    |
-+--------------------------------------------------+
-|                                                  |
-|  FEATURES (alternating layout)                   |
-|                                                  |
-|  [Text]  <-->  [Mockup]                         |
-|  [Mockup] <--> [Text]                           |
-|  ...repeats for 6 features                      |
-|                                                  |
-+--------------------------------------------------+
-|  HOW IT WORKS                                    |
-|  [Step 1] --> [Step 2] --> [Step 3]             |
-+--------------------------------------------------+
-|  PRICING                                         |
-|  [Starter] | [Pro ★] | [Enterprise]              |
-+--------------------------------------------------+
-|  TESTIMONIALS                                    |
-|  3 customer quotes                               |
-+--------------------------------------------------+
-|  FAQ                                             |
-|  Accordion-style questions                       |
-+--------------------------------------------------+
-|  FOOTER CTA + Links                              |
-+--------------------------------------------------+
-```
+The `JobsFilter` component already uses `grid-cols-2 sm:grid-cols-4` which is reasonable, but the filter selects can feel cramped. Minor tweaks:
+- Ensure select trigger text truncates cleanly on small screens
+- Keep filter badges wrapping as they already do
 
-## Summary of Changes
+### 4. No changes to other pages
 
-| File | Action |
-|------|--------|
-| `src/pages/LandingPage.tsx` | Create |
-| `src/components/landing/LandingHero.tsx` | Create |
-| `src/components/landing/LandingProblemSolution.tsx` | Create |
-| `src/components/landing/LandingFeatures.tsx` | Create |
-| `src/components/landing/LandingHowItWorks.tsx` | Create |
-| `src/components/landing/LandingPricing.tsx` | Create |
-| `src/components/landing/LandingTestimonials.tsx` | Create |
-| `src/components/landing/LandingFAQ.tsx` | Create |
-| `src/components/landing/LandingFooter.tsx` | Create |
-| `src/components/landing/LandingNavbar.tsx` | Create |
-| `src/App.tsx` | Modify - add `/landing` route |
+- **JobDetail** already has `MobileJobActionBar` and mobile-first stacking -- it's in good shape
+- **NewJob** is already a single-column centered form -- works fine on mobile
+- **Settings** cards already stack vertically
 
-Total: 10 new files, 1 modified file
+## What stays the same
+
+- All data fetching, filtering, and routing logic
+- The desktop table view (tablet and up)
+- Stats cards (already responsive)
+- Filter bar (already responsive)
+- Mobile navigation sheet
+- All other pages
+
+## Technical Details
+
+The implementation uses Tailwind responsive utility classes (`md:hidden` / `hidden md:block`) to swap between card and table layouts with zero JavaScript overhead. The card component reuses existing badge and formatting utilities. The `useIsMobile` hook is NOT needed here since CSS handles the breakpoint switching.
 
