@@ -90,15 +90,43 @@ Deno.serve(async (req) => {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const accessTokenHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    // STEP 1: Atomically claim the token (prevents replay attacks)
-    // Look up by hash first, fall back to plain token for legacy records
-    const { data: claimedToken, error: claimError } = await supabaseAdmin
+    // STEP 1: Find the token first (by hash or legacy plain token)
+    const { data: tokenRecord, error: lookupError } = await supabaseAdmin
       .from('client_job_access')
-      .update({ consumed_at: new Date().toISOString() })
-      .or(`access_token_hash.eq.${accessTokenHash},and(access_token_hash.is.null,access_token.eq.${accessToken})`)
+      .select('id, auth_user_id, invited_email, client_id, job_id, company_id, consumed_at, access_token_hash')
+      .eq('access_token_hash', accessTokenHash)
       .is('consumed_at', null)
-      .select('id, auth_user_id, invited_email, client_id, job_id, company_id')
       .maybeSingle();
+
+    // Fallback: try legacy plain token lookup if hash match failed
+    let foundToken = tokenRecord;
+    let foundError = lookupError;
+    if (!foundToken && !lookupError) {
+      const { data: legacyToken, error: legacyError } = await supabaseAdmin
+        .from('client_job_access')
+        .select('id, auth_user_id, invited_email, client_id, job_id, company_id, consumed_at')
+        .eq('access_token', accessToken)
+        .is('access_token_hash', null)
+        .is('consumed_at', null)
+        .maybeSingle();
+      foundToken = legacyToken;
+      foundError = legacyError;
+    }
+
+    // Atomically claim the token
+    let claimedToken = null;
+    let claimError = foundError;
+    if (foundToken) {
+      const { data: claimed, error: updateError } = await supabaseAdmin
+        .from('client_job_access')
+        .update({ consumed_at: new Date().toISOString() })
+        .eq('id', foundToken.id)
+        .is('consumed_at', null)
+        .select('id, auth_user_id, invited_email, client_id, job_id, company_id')
+        .maybeSingle();
+      claimedToken = claimed;
+      claimError = updateError;
+    }
 
     if (claimError) {
       console.error(`[${requestId}] Token claim error:`, claimError.message);

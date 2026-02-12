@@ -245,7 +245,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Ensure client role exists (ONLY 'client', never 'staff')
+    // Ensure client role exists — for new users, the handle_new_user_role trigger
+    // auto-assigns 'staff', so we need to replace it with 'client' for invited clients
+    if (isNewUser) {
+      // Remove the auto-assigned staff role first
+      await supabaseAdmin
+        .from('user_roles')
+        .delete()
+        .eq('user_id', authUserId)
+        .eq('role', 'staff');
+      console.log(`[${requestId}] Removed auto-assigned staff role for new client`);
+    }
+
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({ user_id: authUserId, role: 'client' });
