@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff, Mail, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ServicePricing from "@/components/ServicePricing";
+import ServiceCatalogSettings from "@/components/ServiceCatalogSettings";
 import EmailTemplatesSettings from "@/components/EmailTemplatesSettings";
 import PaymentInfoSettings from "@/components/PaymentInfoSettings";
 import { useCachedSignedUrl } from "@/hooks/useSignedUrls";
@@ -556,6 +557,9 @@ const AccountSettings = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Service Catalog (Admin: toggle which services appear) */}
+          {user && <ServiceCatalogSettings userId={user.id} />}
 
           {/* Service Pricing */}
           {user && <ServicePricing userId={user.id} />}

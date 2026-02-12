@@ -101,6 +101,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         estimatesResult,
         paymentsResult,
         portalResult,
+        enabledServicesResult,
       ] = await Promise.all([
         supabase
           .from('jobs')
@@ -155,6 +156,12 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
           `)
           .eq('job_id', jobId)
           .maybeSingle(),
+        companyId
+          ? supabase
+              .from('company_enabled_services')
+              .select('service_name, is_enabled')
+              .eq('company_id', companyId)
+          : Promise.resolve({ data: null, error: null }),
       ]);
 
       if (jobResult.error) throw jobResult.error;
@@ -168,21 +175,38 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         }
       }
 
+      // Build enabled-services filter
+      const enabledRows = enabledServicesResult?.data || [];
+      const hasEnabledConfig = enabledRows.length > 0;
+      const enabledSet = hasEnabledConfig
+        ? new Set(enabledRows.filter(r => r.is_enabled).map(r => r.service_name))
+        : null; // null = no config, show all
+
+      const isServiceEnabled = (name: string) => !enabledSet || enabledSet.has(name);
+
       const fetchedPrices = (pricesResult.data || [])
         .filter(p => !p.is_additional);
       
       // Fall back to default service catalog when no prices are configured
       const servicePrices: ServicePrice[] = fetchedPrices.length > 0
-        ? fetchedPrices.map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
-        : DEFAULT_SERVICES.map(name => ({ name, unitPrice: 0 }));
+        ? fetchedPrices
+            .filter(p => isServiceEnabled(p.service_name))
+            .map(p => ({ name: p.service_name, unitPrice: p.unit_price }))
+        : DEFAULT_SERVICES
+            .filter(isServiceEnabled)
+            .map(name => ({ name, unitPrice: 0 }));
 
       // Include enabled variable-price services (is_additional=true) with unitPrice=0
       const enabledVariableServices = (pricesResult.data || [])
         .filter(p => p.is_additional);
       
       const variableServicePrices: ServicePrice[] = enabledVariableServices.length > 0
-        ? enabledVariableServices.map(p => ({ name: p.service_name, unitPrice: 0 }))
-        : DEFAULT_VARIABLE_SERVICES.map(name => ({ name, unitPrice: 0 }));
+        ? enabledVariableServices
+            .filter(p => isServiceEnabled(p.service_name))
+            .map(p => ({ name: p.service_name, unitPrice: 0 }))
+        : DEFAULT_VARIABLE_SERVICES
+            .filter(isServiceEnabled)
+            .map(name => ({ name, unitPrice: 0 }));
 
       // Combine fixed + variable for the full available services list
       const allServicePrices = [...servicePrices, ...variableServicePrices];
