@@ -3,7 +3,7 @@ import { FileText, DollarSign, ArrowLeft, Download, ClipboardList, RefreshCw } f
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { generatePDF } from '@/lib/pdfGenerator';
+const loadPdfGenerator = () => import('@/lib/pdfGenerator');
 import PhotoAnnotationEditor from '@/components/analysis/PhotoAnnotationEditor';
 import ReportContent from '@/components/analysis/ReportContent';
 import type { AnalysisReportProps, PhotoAnnotations } from '@/components/analysis/types';
@@ -34,6 +34,7 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
       const length = dimMatch ? parseFloat(dimMatch[1]) : null;
       const width = dimMatch ? parseFloat(dimMatch[2]) : null;
 
+      const { generatePDF } = await loadPdfGenerator();
       await generatePDF({
         id: '',
         client_name: rugInfo.clientName,

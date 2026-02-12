@@ -24,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import { generatePDF, generateJobPDF, generateJobPDFBase64, BusinessBranding, UpsellService } from '@/lib/pdfGenerator';
+import type { BusinessBranding, UpsellService } from '@/lib/pdfGenerator';
 import RugForm from '@/components/RugForm';
 import JobForm from '@/components/JobForm';
 import EditRugDialog from '@/components/EditRugDialog';
@@ -735,6 +735,7 @@ const JobDetail = () => {
     if (!job) return;
     
     try {
+      const { generatePDF } = await import('@/lib/pdfGenerator');
       await generatePDF({
         ...rug,
         client_name: job.client_name,
@@ -762,6 +763,7 @@ const JobDetail = () => {
         client_phone: job.client_phone,
       }));
 
+      const { generateJobPDF } = await import('@/lib/pdfGenerator');
       await generateJobPDF(job, rugsWithClient, branding, upsellServices);
       toast.success('Complete job report downloaded!');
     } catch (error) {
@@ -806,6 +808,7 @@ const JobDetail = () => {
         client_phone: job.client_phone,
       }));
       
+      const { generateJobPDFBase64 } = await import('@/lib/pdfGenerator');
       const pdfBase64 = await generateJobPDFBase64(job, rugsWithClient, branding, upsellServices);
       
       const rugDetails = analyzedRugs.map(rug => ({
