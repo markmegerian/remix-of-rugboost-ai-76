@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Hash, Ruler, Loader2 } from 'lucide-react';
+import { useDimensionFormat } from '@/hooks/useCompany';
+import { parseDimension } from '@/lib/rugDimensions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -63,6 +65,9 @@ const EditRugDialog: React.FC<EditRugDialogProps> = ({
   onSave,
   isLoading,
 }) => {
+  const dimensionFormat = useDimensionFormat();
+  const isFtIn = dimensionFormat === 'ft_in';
+
   const [formData, setFormData] = useState({
     rugNumber: rug?.rug_number || '',
     rugType: rug?.rug_type || '',
@@ -147,30 +152,42 @@ const EditRugDialog: React.FC<EditRugDialogProps> = ({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="length" className="flex items-center gap-1">
-                <Ruler className="h-3 w-3" /> Length (ft)
+                <Ruler className="h-3 w-3" /> Length {isFtIn ? '(ft.in)' : '(ft)'}
               </Label>
               <Input
                 id="length"
                 name="length"
-                type="number"
-                step="0.1"
+                type="text"
+                inputMode="decimal"
+                placeholder={isFtIn ? '9.06' : '9.50'}
                 value={formData.length}
                 onChange={handleInputChange}
               />
+              {isFtIn && (
+                <p className="text-[10px] text-muted-foreground">
+                  Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="width" className="flex items-center gap-1">
-                <Ruler className="h-3 w-3" /> Width (ft)
+                <Ruler className="h-3 w-3" /> Width {isFtIn ? '(ft.in)' : '(ft)'}
               </Label>
               <Input
                 id="width"
                 name="width"
-                type="number"
-                step="0.1"
+                type="text"
+                inputMode="decimal"
+                placeholder={isFtIn ? '6.08' : '6.67'}
                 value={formData.width}
                 onChange={handleInputChange}
               />
+              {isFtIn && (
+                <p className="text-[10px] text-muted-foreground">
+                  Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
+                </p>
+              )}
             </div>
           </div>
 

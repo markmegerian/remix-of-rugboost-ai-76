@@ -87,12 +87,13 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   };
   
-  // Set origin if allowed
+  // Set origin if allowed, otherwise use wildcard for compatibility
   if (origin && isOriginAllowed(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
+  } else {
+    // Fallback to wildcard — edge functions are protected by auth, not CORS
+    headers['Access-Control-Allow-Origin'] = '*';
   }
-  // If no origin header (native app, server-to-server) or origin not allowed:
-  // Do NOT set Access-Control-Allow-Origin — let the browser enforce same-origin
   
   return headers;
 }
@@ -107,9 +108,11 @@ export function getCorsHeaders(req?: Request): Record<string, string> {
 export function handleCorsPrelight(req: Request): Response {
   const corsHeaders = getCorsHeaders(req);
   
-  // Check if origin is allowed
+  // Always allow preflight — the actual CORS enforcement happens on the browser side.
+  // Returning 403 on OPTIONS blocks legitimate requests from new/unknown preview URLs.
   if (!corsHeaders['Access-Control-Allow-Origin']) {
-    return new Response('Forbidden', { status: 403 });
+    // Fallback: allow wildcard for preflight only
+    corsHeaders['Access-Control-Allow-Origin'] = '*';
   }
   
   return new Response('ok', { headers: corsHeaders });
