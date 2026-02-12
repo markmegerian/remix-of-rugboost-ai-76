@@ -151,15 +151,20 @@ Deno.serve(async (req) => {
       if (createError.message?.includes('already been registered') || 
           createError.message?.includes('already exists') ||
           createError.message?.includes('duplicate')) {
-        // User exists - get their ID by email
-        const { data: existingUserData, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(normalizedEmail);
+        // User exists - get their ID by listing users filtered by email
+        const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+          filter: `email.eq.${normalizedEmail}`,
+          page: 1,
+          perPage: 1,
+        });
         
-        if (getUserError || !existingUserData?.user) {
-          console.error(`[${requestId}] Error getting existing user:`, getUserError?.message);
+        const existingUser = listData?.users?.[0];
+        if (listError || !existingUser) {
+          console.error(`[${requestId}] Error getting existing user:`, listError?.message);
           throw new Error('Failed to find existing user');
         }
         
-        authUserId = existingUserData.user.id;
+        authUserId = existingUser.id;
         isNewUser = false;
         console.log(`[${requestId}] Found existing user: ${authUserId.substring(0, 8)}***`);
       } else {
