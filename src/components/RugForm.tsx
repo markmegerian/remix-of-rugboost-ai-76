@@ -148,6 +148,7 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
               id="length"
               name="length"
               type="number"
+              inputMode="decimal"
               step="0.1"
               placeholder="8.5"
               value={formData.length}
@@ -163,6 +164,7 @@ const RugForm: React.FC<RugFormProps> = ({ onSubmit, isLoading, rugIndex }) => {
               id="width"
               name="width"
               type="number"
+              inputMode="decimal"
               step="0.1"
               placeholder="5.5"
               value={formData.width}
