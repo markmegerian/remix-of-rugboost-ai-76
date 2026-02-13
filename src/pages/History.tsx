@@ -205,10 +205,6 @@ const History = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Back to Jobs</span>
-            </Button>
             <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden sm:flex">
               <Settings className="h-4 w-4" />
             </Button>
@@ -220,7 +216,7 @@ const History = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pb-16 md:pb-8">
         <div className="space-y-6">
           {/* Search */}
           <Card className="shadow-card">

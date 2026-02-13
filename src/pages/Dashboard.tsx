@@ -114,7 +114,7 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pb-16 md:pb-8">
         <BillingStatusBanner />
         
         <div className="space-y-6">

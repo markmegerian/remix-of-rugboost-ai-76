@@ -12,6 +12,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { CompanyGuard } from "@/components/CompanyGuard";
+import BottomTabBar from "@/components/BottomTabBar";
 
 // Skeleton fallbacks for per-route Suspense
 import DashboardSkeleton from "@/components/skeletons/DashboardSkeleton";
@@ -166,9 +167,10 @@ const App = () => (
                      <Route path="/admin/audit-log" element={<AdminAuditLog />} />
                    </Route>
 
-                   <Route path="*" element={<NotFound />} />
+                <Route path="*" element={<NotFound />} />
                  </Routes>
                 </Suspense>
+                <BottomTabBar />
               </BrowserRouter>
              </TooltipProvider>
            </AppInitializer>
