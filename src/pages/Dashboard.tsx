@@ -129,8 +129,13 @@ const Dashboard = () => {
             ];
             const renderCard = (c: typeof cards[number], i: number, extraClass?: string) => {
               const Icon = c.icon;
+              const delay = i * 50;
               return (
-                <Card key={i} className={`bg-card ${extraClass ?? ''}`}>
+                <Card
+                  key={i}
+                  className={`bg-card animate-fade-in-up ${extraClass ?? ''}`}
+                  style={delay > 0 ? { animationDelay: `${delay}ms`, opacity: 0 } : undefined}
+                >
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${c.bg}`}>
@@ -160,19 +165,21 @@ const Dashboard = () => {
           })()}
 
           {/* Filters */}
-          <JobsFilter 
-            filters={filters}
-            onFiltersChange={setFilters}
-            isAdmin={isAdmin}
-            clients={uniqueClients}
-            activeFilterCount={activeFilterCount}
-          />
+          <div className="animate-fade-in-up" style={{ animationDelay: '200ms', opacity: 0 }}>
+            <JobsFilter 
+              filters={filters}
+              onFiltersChange={setFilters}
+              isAdmin={isAdmin}
+              clients={uniqueClients}
+              activeFilterCount={activeFilterCount}
+            />
+          </div>
 
           {/* Jobs List */}
           {isLoading ? (
             <DashboardJobTableSkeleton />
           ) : (
-            <Card className="shadow-medium">
+            <Card className="shadow-medium animate-fade-in-up" style={{ animationDelay: '250ms', opacity: 0 }}>
               <CardHeader>
                 <CardTitle className="font-display text-lg flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-primary" />
