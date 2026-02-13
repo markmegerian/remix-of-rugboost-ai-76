@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,16 +12,24 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff, Mail, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import ServicePricing from "@/components/ServicePricing";
-import ServiceCatalogSettings from "@/components/ServiceCatalogSettings";
-import DimensionFormatSettings from "@/components/DimensionFormatSettings";
-import EmailTemplatesSettings from "@/components/EmailTemplatesSettings";
-import PaymentInfoSettings from "@/components/PaymentInfoSettings";
 import { useCachedSignedUrl } from "@/hooks/useSignedUrls";
-import DeleteAccountDialog from "@/components/DeleteAccountDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
 import { validatePassword, PASSWORD_REQUIREMENTS } from "@/lib/passwordValidation";
+
+// Lazy load heavy sub-components (behind tabs/toggles, not visible on initial render)
+const ServicePricing = lazy(() => import("@/components/ServicePricing"));
+const ServiceCatalogSettings = lazy(() => import("@/components/ServiceCatalogSettings"));
+const DimensionFormatSettings = lazy(() => import("@/components/DimensionFormatSettings"));
+const EmailTemplatesSettings = lazy(() => import("@/components/EmailTemplatesSettings"));
+const PaymentInfoSettings = lazy(() => import("@/components/PaymentInfoSettings"));
+const DeleteAccountDialog = lazy(() => import("@/components/DeleteAccountDialog"));
+
+const SettingsLoadingFallback = () => (
+  <div className="flex items-center justify-center py-12">
+    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+  </div>
+);
 
 interface Profile {
   id: string;
@@ -560,16 +568,28 @@ const AccountSettings = () => {
           </Card>
 
           {/* Dimension Format Setting (Admin only) */}
-          <DimensionFormatSettings />
+          <Suspense fallback={<SettingsLoadingFallback />}>
+            <DimensionFormatSettings />
+          </Suspense>
 
           {/* Service Catalog (Admin: toggle which services appear) */}
-          {user && <ServiceCatalogSettings userId={user.id} />}
+          {user && (
+            <Suspense fallback={<SettingsLoadingFallback />}>
+              <ServiceCatalogSettings userId={user.id} />
+            </Suspense>
+          )}
 
           {/* Service Pricing */}
-          {user && <ServicePricing userId={user.id} />}
+          {user && (
+            <Suspense fallback={<SettingsLoadingFallback />}>
+              <ServicePricing userId={user.id} />
+            </Suspense>
+          )}
 
           {/* Payment Information */}
-          <PaymentInfoSettings />
+          <Suspense fallback={<SettingsLoadingFallback />}>
+            <PaymentInfoSettings />
+          </Suspense>
 
           {/* Business Branding */}
           <Card>
@@ -684,7 +704,9 @@ const AccountSettings = () => {
           </Card>
 
           {/* Email Templates */}
-          <EmailTemplatesSettings />
+          <Suspense fallback={<SettingsLoadingFallback />}>
+            <EmailTemplatesSettings />
+          </Suspense>
 
           {/* Danger Zone */}
           <Card className="border-destructive/50">
@@ -705,7 +727,9 @@ const AccountSettings = () => {
                     Permanently delete your account and all associated data
                   </p>
                 </div>
-                <DeleteAccountDialog userEmail={user?.email || ''} />
+                <Suspense fallback={<SettingsLoadingFallback />}>
+                  <DeleteAccountDialog userEmail={user?.email || ''} />
+                </Suspense>
               </div>
             </CardContent>
           </Card>
