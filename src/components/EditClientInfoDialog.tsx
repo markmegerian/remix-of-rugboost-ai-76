@@ -3,14 +3,7 @@
  import { Input } from '@/components/ui/input';
  import { Label } from '@/components/ui/label';
  import { Textarea } from '@/components/ui/textarea';
- import {
-   Dialog,
-   DialogContent,
-   DialogDescription,
-   DialogFooter,
-   DialogHeader,
-   DialogTitle,
- } from '@/components/ui/dialog';
+ import ResponsiveFormSheet from '@/components/ResponsiveFormSheet';
  import { Loader2 } from 'lucide-react';
  import { z } from 'zod';
  
@@ -85,103 +78,95 @@
      await onSave(formData);
    };
  
-   return (
-     <Dialog open={open} onOpenChange={onOpenChange}>
-       <DialogContent className="sm:max-w-md">
-         <DialogHeader>
-           <DialogTitle>Edit Client Information</DialogTitle>
-           <DialogDescription>
-             Update client contact details and job notes.
-           </DialogDescription>
-         </DialogHeader>
-         <form onSubmit={handleSubmit} className="space-y-4">
-           <div className="space-y-2">
-             <Label htmlFor="clientName">Client Name *</Label>
-             <Input
-               id="clientName"
-               name="clientName"
-               value={formData.clientName}
-               onChange={handleInputChange}
-               placeholder="John Smith"
-               required
-             />
-             {errors.clientName && (
-               <p className="text-sm text-destructive">{errors.clientName}</p>
-             )}
-           </div>
- 
-           <div className="space-y-2">
-             <Label htmlFor="clientEmail">Email</Label>
-             <Input
-               id="clientEmail"
-               name="clientEmail"
-               type="email"
-               value={formData.clientEmail}
-               onChange={handleInputChange}
-               placeholder="john@example.com"
-             />
-             {errors.clientEmail && (
-               <p className="text-sm text-destructive">{errors.clientEmail}</p>
-             )}
-           </div>
- 
-           <div className="space-y-2">
-             <Label htmlFor="clientPhone">Phone</Label>
-             <Input
-               id="clientPhone"
-               name="clientPhone"
-               type="tel"
-               value={formData.clientPhone}
-               onChange={handleInputChange}
-               placeholder="(555) 123-4567"
-             />
-             {errors.clientPhone && (
-               <p className="text-sm text-destructive">{errors.clientPhone}</p>
-             )}
-           </div>
- 
-           <div className="space-y-2">
-             <Label htmlFor="notes">Job Notes</Label>
-             <Textarea
-               id="notes"
-               name="notes"
-               value={formData.notes}
-               onChange={handleInputChange}
-               placeholder="Delivery address, special instructions, etc."
-               rows={3}
-             />
-             {errors.notes && (
-               <p className="text-sm text-destructive">{errors.notes}</p>
-             )}
-             <p className="text-xs text-muted-foreground">
-               Include delivery address, special instructions, or other notes here.
-             </p>
-           </div>
- 
-           <DialogFooter className="gap-2 sm:gap-0">
-             <Button
-               type="button"
-               variant="outline"
-               onClick={() => onOpenChange(false)}
-               disabled={isLoading}
-             >
-               Cancel
-             </Button>
-             <Button type="submit" disabled={isLoading}>
-               {isLoading ? (
-                 <>
-                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                   Saving...
-                 </>
-               ) : (
-                 'Save Changes'
-               )}
-             </Button>
-           </DialogFooter>
-         </form>
-       </DialogContent>
-     </Dialog>
-   );
- };
- 
- export default EditClientInfoDialog;
+    return (
+      <ResponsiveFormSheet open={open} onOpenChange={onOpenChange} title="Edit Client Information">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="clientName">Client Name *</Label>
+            <Input
+              id="clientName"
+              name="clientName"
+              value={formData.clientName}
+              onChange={handleInputChange}
+              placeholder="John Smith"
+              required
+            />
+            {errors.clientName && (
+              <p className="text-sm text-destructive">{errors.clientName}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="clientEmail">Email</Label>
+            <Input
+              id="clientEmail"
+              name="clientEmail"
+              type="email"
+              value={formData.clientEmail}
+              onChange={handleInputChange}
+              placeholder="john@example.com"
+            />
+            {errors.clientEmail && (
+              <p className="text-sm text-destructive">{errors.clientEmail}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="clientPhone">Phone</Label>
+            <Input
+              id="clientPhone"
+              name="clientPhone"
+              type="tel"
+              value={formData.clientPhone}
+              onChange={handleInputChange}
+              placeholder="(555) 123-4567"
+            />
+            {errors.clientPhone && (
+              <p className="text-sm text-destructive">{errors.clientPhone}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Job Notes</Label>
+            <Textarea
+              id="notes"
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              placeholder="Delivery address, special instructions, etc."
+              rows={3}
+            />
+            {errors.notes && (
+              <p className="text-sm text-destructive">{errors.notes}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Include delivery address, special instructions, or other notes here.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </div>
+        </form>
+      </ResponsiveFormSheet>
+    );
+  };
+  
+  export default EditClientInfoDialog;
