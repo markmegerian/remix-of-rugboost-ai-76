@@ -1,76 +1,67 @@
+# Animated AI Analysis Loader
 
+## Problem
 
-# Mobile-First Dashboard Redesign
+The current loader shows only 3 static messages with fixed progress bar jumps. During the longest phase ("analyzing," ~20-40 seconds), the UI is completely frozen on one message, making it feel broken or stuck.
 
-## The Problem
+## Solution
 
-The Dashboard jobs list uses a 7-column HTML table (Date, Job #, Client, Rugs, Status, Payment, Actions) that requires horizontal scrolling on mobile. This is the primary usability blocker -- users on phones (the majority of your user base) have to swipe left/right just to see basic job info.
+Replace the static stage-based progress with a time-aware, auto-advancing loader that cycles through engaging messages during the analysis phase, with a smoothly animated progress bar.
 
-## The Solution: Card Layout on Mobile, Table on Desktop
+## How It Will Work
 
-Replace the table with a **responsive card list** that shows on small screens, while keeping the table for tablets and desktops. Each job becomes a tappable card that shows all critical info at a glance, no scrolling required.
+The loader will feel alive throughout the entire ~30-second wait:
 
-### What a mobile job card looks like:
+**Phase 1: Preparing (0-2s)**
 
-```text
-+------------------------------------------+
-| John Smith                    In Progress |
-| Job #2024-001          Dec 15, 2024       |
-| 3 rugs                 $450 - Pending     |
-+------------------------------------------+
-```
+- "Uploading photos..."
+- Progress bar: 0% to 15% (smooth)
 
-- Client name (bold, prominent) + status badge on the right
-- Job number + date on the second line
-- Rug count + payment info on the third line
-- The entire card is tappable (navigates to job detail)
-- No "View" button needed -- the card itself is the tap target
+**Phase 2: Analyzing (2-30s) -- the long phase**
 
-### Breakpoint strategy
+- The progress bar smoothly advances from 15% to 80% over ~28 seconds
+- Messages rotate every ~4 seconds with a fade transition:
+  1. "Examining rug construction ..."
+  2. "Identifying fiber content and weave ..."
+  3. "Inspecting fringe and edge condition..."
+  4. "Inspecting bindings..."
+  5. "Checking for stains and discoloration..."
+  6. "Assessing structural damage and wear..."
+  7. "Mapping areas that need attention..."
+  8. "Calculating restoration costs..."
+- Each message gets a matching icon (Search, Layers, Droplets, Scissors, Shield, MapPin, Calculator)
 
-- **Mobile (below `md`):** Stacked card list
-- **Tablet/Desktop (`md` and up):** Current table layout (unchanged)
+**Phase 3: Generating (30-35s)**
 
-## Technical Changes
+- "Building your detailed report..."
+- Progress: 80% to 95%
 
-### 1. Create `src/components/JobCard.tsx` (new file)
+**Phase 4: Complete**
 
-A compact card component for a single job, designed for touch targets (minimum 48px height). Displays:
-- Row 1: Client name (left) + status badge (right)
-- Row 2: Job number in mono font (left) + formatted date (right)  
-- Row 3: Rug count badge (left) + payment amount and status (right)
-- Full-card `onClick` navigates to `/jobs/{id}`
-- Uses existing `getStatusBadge` and `getPaymentBadge` helpers (extracted from Dashboard)
+- "Analysis complete!" with checkmark
+- Progress snaps to 100%
 
-### 2. Modify `src/pages/Dashboard.tsx`
+## Visual Enhancements
 
-- Extract `getStatusBadge` and `getPaymentBadge` into a shared location (or pass as props) so both the table and card can use them
-- In the Jobs section (lines 256-313), wrap the existing table in a `hidden md:block` container
-- Add a `md:hidden` container that renders `JobCard` components in a vertical stack
-- The stats grid already uses `grid-cols-2 md:grid-cols-4` which works well on mobile -- no changes needed there
+- Fade-in/fade-out transition on message text changes (using CSS opacity transition)
+- The RugBoost logo replaces the generic Loader2 spinner, with a gentle pulse animation (consistent with the branded page loader)
+- A subtle elapsed time indicator ("~15s") so users know things are moving
+- The 4 step dots at the bottom remain for stage orientation
 
-### 3. Minor filter improvements for mobile
+## Technical Approach
 
-The `JobsFilter` component already uses `grid-cols-2 sm:grid-cols-4` which is reasonable, but the filter selects can feel cramped. Minor tweaks:
-- Ensure select trigger text truncates cleanly on small screens
-- Keep filter badges wrapping as they already do
+**Changes to `src/components/AnalysisProgress.tsx`:**
 
-### 4. No changes to other pages
+- Add a `useEffect` with `setInterval` (every ~4 seconds) to cycle through analyzing sub-messages
+- Add a `useEffect` for smooth progress bar interpolation using `requestAnimationFrame` or a simple interval that increments progress by ~2% per second during the analyzing phase
+- Track `startTime` with `useRef` to calculate elapsed time
+- Add CSS transition on the message text (opacity fade)
+- Import the RugBoost logo for branding
 
-- **JobDetail** already has `MobileJobActionBar` and mobile-first stacking -- it's in good shape
-- **NewJob** is already a single-column centered form -- works fine on mobile
-- **Settings** cards already stack vertically
+**No changes needed to:**
 
-## What stays the same
+- `useJobDetailActions.ts` (stage transitions stay the same)
+- The `AnalysisStage` type (same 5 stages)
+- The props interface (same props)
 
-- All data fetching, filtering, and routing logic
-- The desktop table view (tablet and up)
-- Stats cards (already responsive)
-- Filter bar (already responsive)
-- Mobile navigation sheet
-- All other pages
-
-## Technical Details
-
-The implementation uses Tailwind responsive utility classes (`md:hidden` / `hidden md:block`) to swap between card and table layouts with zero JavaScript overhead. The card component reuses existing badge and formatting utilities. The `useIsMobile` hook is NOT needed here since CSS handles the breakpoint switching.
-
+This is a purely visual improvement -- the component stays a controlled component driven by the same `stage` prop from the parent.
