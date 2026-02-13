@@ -50,6 +50,8 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
     const compressedPhoto = await compressImage(photo);
     const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
 
+    console.log(`Uploading photo: ${fileName}, size: ${(compressedPhoto.size / 1024).toFixed(0)}KB, type: ${compressedPhoto.type}`);
+    
     const { data, error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(fileName, compressedPhoto, {
@@ -58,8 +60,15 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw new Error(`Failed to upload ${photo.name}`);
+      console.error('Upload error details:', { 
+        message: uploadError.message, 
+        name: uploadError.name,
+        fileName,
+        bucket,
+        photoSize: compressedPhoto.size,
+        photoType: compressedPhoto.type,
+      });
+      throw new Error(`Failed to upload ${photo.name}: ${uploadError.message}`);
     }
 
     // Return the storage path instead of a signed URL
