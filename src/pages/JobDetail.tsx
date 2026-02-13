@@ -13,7 +13,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { useJobDetail, useInvalidateJobDetail } from '@/hooks/useJobDetail';
-import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useUpdateJobStatus } from '@/hooks/useJobs';
 import type { Json } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
@@ -46,6 +45,7 @@ import MobileJobActionBar from '@/components/MobileJobActionBar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import EditClientInfoDialog from '@/components/EditClientInfoDialog';
 import ExpertEstimateCard from '@/components/ExpertEstimateCard';
+import { useJobDetailActions } from '@/hooks/useJobDetailActions';
 
 // Lazy load heavy dialogs for code splitting
 const AnalysisReport = lazy(() => import('@/components/AnalysisReport'));
@@ -60,16 +60,8 @@ const DialogLoadingFallback = () => (
   </div>
 );
 
-interface ClientPortalStatusData {
-  accessToken: string;
-  emailSentAt: string | null;
-  emailError: string | null;
-  firstAccessedAt: string | null;
-  passwordSetAt: string | null;
-  hasClientAccount: boolean;
-  hasServiceSelections: boolean;
-  serviceSelectionsAt: string | null;
-}
+// Types are re-exported from the hook
+import type { ClientPortalStatusData } from '@/hooks/useJobDetailActions';
 
 interface Job {
   id: string;
@@ -134,38 +126,22 @@ const JobDetail = () => {
   // Use React Query for all data fetching (parallel fetches)
   const { data: jobData, isLoading: loading, refetch } = useJobDetail(jobId, user?.id);
 
-  // Local state for UI interactions
+  // Local state for UI interactions (non-action state stays in component)
   const [isAddingRug, setIsAddingRug] = useState(false);
   const [isEditingJob, setIsEditingJob] = useState(false);
   const [editingRug, setEditingRug] = useState<Rug | null>(null);
-  const [addingRug, setAddingRug] = useState(false);
-  const [analyzingAll, setAnalyzingAll] = useState(false);
-  const [analyzingRugId, setAnalyzingRugId] = useState<string | null>(null);
-  const [reanalyzingRugId, setReanalyzingRugId] = useState<string | null>(null);
-  const [savingJob, setSavingJob] = useState(false);
-  const [savingRug, setSavingRug] = useState(false);
   const [selectedRug, setSelectedRug] = useState<Rug | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [showEstimateReview, setShowEstimateReview] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
-  const [imageAnnotations, setImageAnnotations] = useState<any[]>([]);
-  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle');
-  const [analysisRugNumber, setAnalysisRugNumber] = useState<string>('');
-  const [analysisCurrent, setAnalysisCurrent] = useState<number>(0);
-  const [analysisTotal, setAnalysisTotal] = useState<number>(0);
   const [compareRug, setCompareRug] = useState<Rug | null>(null);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
-  const [generatingPortalLink, setGeneratingPortalLink] = useState(false);
-  const [resendingInvite, setResendingInvite] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
-  const [confirmDeleteRugId, setConfirmDeleteRugId] = useState<string | null>(null);
   const statusAdvanceRef = useRef<HTMLButtonElement>(null);
   // Mutable state derived from query data
   const [localApprovedEstimates, setLocalApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [localRugs, setLocalRugs] = useState<Rug[]>([]);
   const [isEditingClientInfo, setIsEditingClientInfo] = useState(false);
-  const [savingClientInfo, setSavingClientInfo] = useState(false);
   
   // Sync query data to local state when it changes
   useEffect(() => {
@@ -199,12 +175,6 @@ const JobDetail = () => {
   // Get action states for status-based disabling (hook must be at top level)
   const actions = useJobActions(currentJobStatus, adminOverride);
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
-
   // Helper function to refresh data
   const fetchJobDetails = useCallback(() => {
     if (jobId) {
@@ -221,161 +191,67 @@ const JobDetail = () => {
     fetchJobDetails();
   }, [fetchJobDetails]);
 
-  // All data fetching is now handled by useJobDetail hook with parallel fetches
-  // Old manual fetch functions have been removed
+  // Extract all mutation/action functions into custom hook
+  const {
+    addingRug,
+    savingJob,
+    savingRug,
+    savingClientInfo,
+    analyzingAll,
+    analyzingRugId,
+    reanalyzingRugId,
+    sendingEmail,
+    generatingPortalLink,
+    resendingInvite,
+    confirmDeleteRugId,
+    setConfirmDeleteRugId,
+    analysisStage,
+    analysisRugNumber,
+    analysisCurrent,
+    analysisTotal,
+    imageAnnotations,
+    uploadProgress,
+    isUploadingPhotos,
+    resetUploadProgress,
+    performRugAnalysis,
+    handleAnalyzeAllRugs,
+    handleAddRug: handleAddRugAction,
+    handleEditJob: handleEditJobAction,
+    handleSaveClientInfo: handleSaveClientInfoAction,
+    handleEditRug: handleEditRugAction,
+    handleDeleteRug,
+    handleSendEmail: handleSendEmailAction,
+    handleDownloadPDF,
+    handleDownloadJobPDF,
+    handleOpenEmailPreview: checkEmailPreviewReady,
+    generateClientPortalLink,
+    handleResendInvite,
+  } = useJobDetailActions({
+    job,
+    rugs,
+    approvedEstimates,
+    branding,
+    upsellServices,
+    clientPortalStatus,
+    userId: user?.id,
+    jobId,
+    companyId,
+    fetchJobDetails,
+  });
 
-  const handleResendInvite = async () => {
-    if (!job || !clientPortalStatus) return;
-    
-    setResendingInvite(true);
-    try {
-      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-      const portalUrl = `${baseUrl}/client/${clientPortalStatus.accessToken}`; // Portal links always use web URL for email sharing
-      
-      const { error: inviteError } = await supabase.functions.invoke('invite-client', {
-        body: {
-          email: job.client_email,
-          fullName: job.client_name,
-          jobId: jobId,
-          accessToken: clientPortalStatus.accessToken,
-          jobNumber: job.job_number,
-          portalUrl: portalUrl,
-        },
-      });
-
-      if (inviteError) throw inviteError;
-      
-      toast.success('Invitation email resent successfully!');
-      
-      // Refresh the portal status
-      await fetchClientPortalLink();
-    } catch (error) {
-      console.error('Error resending invite:', error);
-      toast.error('Failed to resend invitation');
-    } finally {
-      setResendingInvite(false);
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
     }
-  };
+  }, [user, authLoading, navigate]);
 
-  const generateClientPortalLink = async () => {
-    if (!job || !jobId) return;
-
-    // Check if all analyzed rugs have approved estimates
-    const analyzedRugs = rugs.filter(r => r.analysis_report);
-    const approvedCount = approvedEstimates.length;
-
-    if (analyzedRugs.length === 0) {
-      toast.error('Please analyze at least one rug first');
-      return;
-    }
-
-    if (approvedCount < analyzedRugs.length) {
-      toast.error(`Please approve estimates for all analyzed rugs (${approvedCount}/${analyzedRugs.length} approved)`);
-      return;
-    }
-
-    if (!job.client_email) {
-      toast.error('Client email is required to generate portal link');
-      return;
-    }
-
-    setGeneratingPortalLink(true);
-    try {
-      // Generate a unique access token and its hash
-      const { generateSecureToken, hashToken } = await import('@/lib/tokenSecurity');
-      const accessToken = generateSecureToken();
-      const accessTokenHash = await hashToken(accessToken);
-
-      // Delete any existing pending payments for this job (to avoid duplicates when re-generating)
-      await supabase
-        .from('payments')
-        .delete()
-        .eq('job_id', jobId)
-        .eq('status', 'pending');
-
-      // Delete any existing client_job_access records for this job (to avoid duplicates)
-      await supabase
-        .from('client_job_access')
-        .delete()
-        .eq('job_id', jobId);
-
-      // Create client job access record with hashed token for security
-      const { error } = await supabase
-        .from('client_job_access')
-        .insert({
-          job_id: jobId,
-          access_token: accessToken, // Keep for legacy compatibility during migration
-          access_token_hash: accessTokenHash, // Secure hashed token for validation
-          invited_email: job.client_email,
-          company_id: companyId, // Required for RLS
-        });
-
-      if (error) throw error;
-
-      // Generate the portal URL
-      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-      const portalUrl = `${baseUrl}/client/${accessToken}`;
-
-      // Invite the client (creates user account, links to job, and sends email)
-      const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-client', {
-        body: {
-          email: job.client_email,
-          fullName: job.client_name,
-          jobId: jobId,
-          accessToken: accessToken,
-          jobNumber: job.job_number,
-          portalUrl: portalUrl,
-        },
-      });
-
-      if (inviteError) {
-        console.error('Invite error:', inviteError);
-        // Continue even if invite fails - the link will still work for login
-      }
-
-      // Update job to enable client portal
-      await supabase
-        .from('jobs')
-        .update({ 
-          client_portal_enabled: true,
-          all_estimates_approved: true 
-        })
-        .eq('id', jobId);
-
-      const link = `${baseUrl}/client/${accessToken}`;
-      
-      // Copy to clipboard
-      await navigator.clipboard.writeText(link);
-      
-      // Refresh data via React Query
-      fetchJobDetails();
-      
-      if (inviteData?.isNewUser) {
-        toast.success('Client portal link generated! Client will be prompted to set their password on first visit.');
-      } else {
-        toast.success('Client portal link generated and copied to clipboard!');
-      }
-    } catch (error) {
-      console.error('Error generating portal link:', error);
-      toast.error('Failed to generate client portal link');
-    } finally {
-      setGeneratingPortalLink(false);
-    }
-  };
-
-  // Parallel photo upload hook with progress tracking
-  const { 
-    uploadPhotos, 
-    progress: uploadProgress, 
-    isUploading: isUploadingPhotos,
-    reset: resetUploadProgress 
-  } = usePhotoUpload({ batchSize: 4 });
-
-  const handleStatusChange = (newStatus: string) => {
-    if (!job) return;
-    
-    // Use optimistic update - UI updates instantly, server sync in background
-    updateJobStatus.mutate({ jobId: job.id, status: newStatus });
+  // Wrapper handlers that manage local UI state alongside the hook actions
+  const handleAddRug = async (
+    formData: { rugNumber: string; length: string; width: string; rugType: string; notes: string },
+    photos: File[]
+  ) => {
+    const success = await handleAddRugAction(formData, photos);
+    if (success) setIsAddingRug(false);
   };
 
   const handleEditJob = async (formData: {
@@ -385,32 +261,8 @@ const JobDetail = () => {
     clientPhone: string;
     notes: string;
   }) => {
-    if (!job) return;
-
-    setSavingJob(true);
-    try {
-      const { error } = await supabase
-        .from('jobs')
-        .update({
-          job_number: formData.jobNumber,
-          client_name: formData.clientName,
-          client_email: formData.clientEmail || null,
-          client_phone: formData.clientPhone || null,
-          notes: formData.notes || null,
-        })
-        .eq('id', job.id);
-
-      if (error) throw error;
-
-      toast.success('Job updated successfully!');
-      setIsEditingJob(false);
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Update job error:', error);
-      toast.error('Failed to update job');
-    } finally {
-      setSavingJob(false);
-    }
+    const success = await handleEditJobAction(formData);
+    if (success) setIsEditingJob(false);
   };
 
   const handleSaveClientInfo = async (data: {
@@ -419,318 +271,44 @@ const JobDetail = () => {
     clientPhone: string;
     notes: string;
   }) => {
-    if (!job) return;
-
-    setSavingClientInfo(true);
-    try {
-      const { error } = await supabase
-        .from('jobs')
-        .update({
-          client_name: data.clientName,
-          client_email: data.clientEmail || null,
-          client_phone: data.clientPhone || null,
-          notes: data.notes || null,
-        })
-        .eq('id', job.id);
-
-      if (error) throw error;
-
-      toast.success('Client information updated!');
-      setIsEditingClientInfo(false);
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Update client info error:', error);
-      toast.error('Failed to update client information');
-    } finally {
-      setSavingClientInfo(false);
-    }
+    const success = await handleSaveClientInfoAction(data);
+    if (success) setIsEditingClientInfo(false);
   };
 
   const handleEditRug = async (
     rugId: string,
     formData: { rugNumber: string; rugType: string; length: string; width: string; notes: string }
   ) => {
-    setSavingRug(true);
-    try {
-      const { error } = await supabase
-        .from('inspections')
-        .update({
-          rug_number: formData.rugNumber,
-          rug_type: formData.rugType,
-          length: formData.length ? parseFloat(formData.length) : null,
-          width: formData.width ? parseFloat(formData.width) : null,
-          notes: formData.notes || null,
-        })
-        .eq('id', rugId);
-
-      if (error) throw error;
-
-      toast.success('Rug updated successfully!');
-      setEditingRug(null);
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Update rug error:', error);
-      toast.error('Failed to update rug');
-    } finally {
-      setSavingRug(false);
-    }
+    const success = await handleEditRugAction(rugId, formData);
+    if (success) setEditingRug(null);
   };
 
-  const handleAddRug = async (
-    formData: { rugNumber: string; length: string; width: string; rugType: string; notes: string },
-    photos: File[]
-  ) => {
-    if (!user || !job) return;
-
-    setAddingRug(true);
-    resetUploadProgress();
-    
-    try {
-      const photoUrls = await uploadPhotos(photos, user.id);
-
-      // Just save the rug without AI analysis
-      const { error: insertError } = await supabase.from('inspections').insert({
-        user_id: user.id,
-        job_id: job.id,
-        client_name: job.client_name,
-        rug_number: formData.rugNumber,
-        rug_type: formData.rugType,
-        length: formData.length ? parseFloat(formData.length) : null,
-        width: formData.width ? parseFloat(formData.width) : null,
-        notes: formData.notes || null,
-        photo_urls: photoUrls,
-        analysis_report: null // No analysis yet
-      });
-
-      if (insertError) throw insertError;
-
-      toast.success('Rug added to job!');
-      setIsAddingRug(false);
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Add rug failed:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add rug');
-    } finally {
-      setAddingRug(false);
-      resetUploadProgress();
-    }
+  const handleSendEmail = async (subject: string, message: string) => {
+    const success = await handleSendEmailAction(subject, message);
+    if (success) setShowEmailPreview(false);
   };
 
-  const analyzeRug = async (rug: Rug) => {
-    if (!job) return;
-
-    setAnalyzingRugId(rug.id);
-    setAnalysisRugNumber(rug.rug_number);
-    setAnalysisStage('preparing');
-    
-    try {
-      // Stage 1: Preparing
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setAnalysisStage('analyzing');
-      
-      const { data, error } = await supabase.functions.invoke('analyze-rug', {
-        body: {
-          photos: rug.photo_urls || [],
-          rugInfo: {
-            clientName: job.client_name,
-            rugNumber: rug.rug_number,
-            rugType: rug.rug_type,
-            length: rug.length?.toString() || '',
-            width: rug.width?.toString() || '',
-            notes: rug.notes || ''
-          },
-          userId: user?.id
-        }
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      // Stage 3: Generating report
-      setAnalysisStage('generating');
-      
-      // Store image annotations and edge suggestions if provided
-      const annotations = data.imageAnnotations || [];
-      const edgeSuggs = data.edgeSuggestions || [];
-      setImageAnnotations(annotations);
-
-      // Update the rug with analysis, annotations, and edge suggestions
-      const { error: updateError } = await supabase
-        .from('inspections')
-        .update({ 
-          analysis_report: data.report,
-          image_annotations: annotations,
-          system_services: { edgeSuggestions: edgeSuggs },
-        })
-        .eq('id', rug.id);
-
-      if (updateError) throw updateError;
-
-      setAnalysisStage('complete');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      toast.success(`${rug.rug_number} analyzed!`);
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      toast.error(error instanceof Error ? error.message : `Failed to analyze ${rug.rug_number}`);
-    } finally {
-      setAnalyzingRugId(null);
-      setAnalysisStage('idle');
-      setAnalysisRugNumber('');
+  const handleOpenEmailPreview = () => {
+    if (checkEmailPreviewReady()) {
+      setShowEmailPreview(true);
     }
   };
 
   const handleReanalyzeRug = async (rug: Rug) => {
-    if (!job) return;
-
-    setReanalyzingRugId(rug.id);
-    setAnalysisRugNumber(rug.rug_number);
-    setAnalysisStage('preparing');
-    
-    try {
-      // Clear existing analysis first
-      await supabase
-        .from('inspections')
-        .update({ analysis_report: null })
-        .eq('id', rug.id);
-
-      setAnalysisStage('analyzing');
-
-      const { data, error } = await supabase.functions.invoke('analyze-rug', {
-        body: {
-          photos: rug.photo_urls || [],
-          rugInfo: {
-            clientName: job.client_name,
-            rugNumber: rug.rug_number,
-            rugType: rug.rug_type,
-            length: rug.length?.toString() || '',
-            width: rug.width?.toString() || '',
-            notes: rug.notes || ''
-          },
-          userId: user?.id
-        }
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      setAnalysisStage('generating');
-
-      // Store image annotations and edge suggestions if provided
-      const annotations = data.imageAnnotations || [];
-      const edgeSuggs = data.edgeSuggestions || [];
-      setImageAnnotations(annotations);
-
-      // Update the rug with new analysis, annotations, and edge suggestions
-      const { error: updateError } = await supabase
-        .from('inspections')
-        .update({ 
-          analysis_report: data.report,
-          image_annotations: annotations,
-          system_services: { edgeSuggestions: edgeSuggs },
-        })
-        .eq('id', rug.id);
-
-      if (updateError) throw updateError;
-
-      // Update local state to reflect the new report and annotations
-      setSelectedRug(prev => prev ? { 
-        ...prev, 
-        analysis_report: data.report,
-        image_annotations: annotations,
-        system_services: { edgeSuggestions: edgeSuggs },
+    const result = await performRugAnalysis(rug, true);
+    if (result) {
+      // Update the selected rug in local state to reflect new analysis
+      setSelectedRug(prev => prev ? {
+        ...prev,
+        analysis_report: result.report,
+        image_annotations: result.annotations,
+        system_services: { edgeSuggestions: result.edgeSuggestions },
       } : null);
-
-      setAnalysisStage('complete');
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      toast.success(`${rug.rug_number} re-analyzed!`);
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Re-analysis failed:', error);
-      toast.error(error instanceof Error ? error.message : `Failed to re-analyze ${rug.rug_number}`);
-    } finally {
-      setReanalyzingRugId(null);
-      setAnalysisStage('idle');
-      setAnalysisRugNumber('');
     }
   };
 
-  const handleAnalyzeAllRugs = async () => {
-    if (!job) return;
-
-    const pendingRugs = rugs.filter(r => !r.analysis_report);
-    if (pendingRugs.length === 0) {
-      toast.info('All rugs have already been analyzed');
-      return;
-    }
-
-    setAnalyzingAll(true);
-    setAnalysisTotal(pendingRugs.length);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const rug of pendingRugs) {
-      try {
-        setAnalysisCurrent(successCount + errorCount + 1);
-        setAnalysisRugNumber(rug.rug_number);
-        setAnalysisStage('preparing');
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setAnalysisStage('analyzing');
-        
-        const { data, error } = await supabase.functions.invoke('analyze-rug', {
-          body: {
-            photos: rug.photo_urls || [],
-            rugInfo: {
-              clientName: job.client_name,
-              rugNumber: rug.rug_number,
-              rugType: rug.rug_type,
-              length: rug.length?.toString() || '',
-              width: rug.width?.toString() || '',
-              notes: rug.notes || ''
-            },
-            userId: user?.id
-          }
-        });
-
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
-
-        setAnalysisStage('generating');
-
-        await supabase
-          .from('inspections')
-          .update({ 
-            analysis_report: data.report,
-            image_annotations: data.imageAnnotations || [],
-            system_services: { edgeSuggestions: data.edgeSuggestions || [] },
-          })
-          .eq('id', rug.id);
-
-        successCount++;
-      } catch (error) {
-        console.error(`Analysis failed for ${rug.rug_number}:`, error);
-        errorCount++;
-      }
-    }
-
-    setAnalysisStage('complete');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    setAnalyzingAll(false);
-    setAnalysisStage('idle');
-    setAnalysisRugNumber('');
-    setAnalysisCurrent(0);
-    setAnalysisTotal(0);
-    fetchJobDetails();
-
-    if (errorCount === 0) {
-      toast.success(`All ${successCount} rugs analyzed successfully!`);
-    } else {
-      toast.warning(`Analyzed ${successCount} rugs, ${errorCount} failed`);
-    }
+  const analyzeRug = async (rug: Rug) => {
+    await performRugAnalysis(rug, false);
   };
 
   const handleViewReport = (rug: Rug) => {
@@ -738,138 +316,9 @@ const JobDetail = () => {
     setShowReport(true);
   };
 
-  const handleDownloadPDF = async (rug: Rug) => {
+  const handleStatusChange = (newStatus: string) => {
     if (!job) return;
-    
-    try {
-      const { generatePDF } = await import('@/lib/pdfGenerator');
-      await generatePDF({
-        ...rug,
-        client_name: job.client_name,
-        client_email: job.client_email,
-        client_phone: job.client_phone,
-      }, branding);
-      toast.success('PDF downloaded successfully!');
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
-    }
-  };
-
-  const handleDownloadJobPDF = async () => {
-    if (!job || rugs.length === 0) {
-      toast.error('No rugs to include in the report');
-      return;
-    }
-
-    try {
-      const rugsWithClient = rugs.map(rug => ({
-        ...rug,
-        client_name: job.client_name,
-        client_email: job.client_email,
-        client_phone: job.client_phone,
-      }));
-
-      const { generateJobPDF } = await import('@/lib/pdfGenerator');
-      await generateJobPDF(job, rugsWithClient, branding, upsellServices);
-      toast.success('Complete job report downloaded!');
-    } catch (error) {
-      console.error('Job PDF generation error:', error);
-      toast.error('Failed to generate job report');
-    }
-  };
-
-  const handleOpenEmailPreview = () => {
-    if (!job || rugs.length === 0) {
-      toast.error('No rugs to include in the report');
-      return;
-    }
-
-    if (!job.client_email) {
-      toast.error('Client email is required to send report');
-      return;
-    }
-
-    const analyzedRugs = rugs.filter(r => r.analysis_report);
-    if (analyzedRugs.length === 0) {
-      toast.error('Please analyze at least one rug before sending the report');
-      return;
-    }
-
-    setShowEmailPreview(true);
-  };
-
-  const handleSendEmail = async (subject: string, message: string) => {
-    if (!job || !job.client_email) return;
-
-    const analyzedRugs = rugs.filter(r => r.analysis_report);
-    
-    setSendingEmail(true);
-    try {
-      toast.info('Generating PDF report...');
-      
-      const rugsWithClient = analyzedRugs.map(rug => ({
-        ...rug,
-        client_name: job.client_name,
-        client_email: job.client_email,
-        client_phone: job.client_phone,
-      }));
-      
-      const { generateJobPDFBase64 } = await import('@/lib/pdfGenerator');
-      const pdfBase64 = await generateJobPDFBase64(job, rugsWithClient, branding, upsellServices);
-      
-      const rugDetails = analyzedRugs.map(rug => ({
-        rugNumber: rug.rug_number,
-        rugType: rug.rug_type,
-        dimensions: rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
-      }));
-
-      toast.info('Sending email...');
-      
-      const { data, error } = await supabase.functions.invoke('send-report-email', {
-        body: {
-          to: job.client_email,
-          clientName: job.client_name,
-          jobNumber: job.job_number,
-          rugDetails,
-          pdfBase64,
-          subject,
-          customMessage: message,
-          businessName: branding?.business_name,
-          businessEmail: branding?.business_email,
-          businessPhone: branding?.business_phone,
-        }
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      toast.success(`Report sent to ${job.client_email}!`);
-      setShowEmailPreview(false);
-    } catch (error) {
-      console.error('Email send error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send email');
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
-  const handleDeleteRug = async (rugId: string) => {
-    try {
-      const { error } = await supabase
-        .from('inspections')
-        .delete()
-        .eq('id', rugId);
-
-      if (error) throw error;
-      toast.success('Rug deleted');
-      fetchJobDetails();
-    } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Failed to delete rug');
-    } finally {
-      setConfirmDeleteRugId(null);
-    }
+    updateJobStatus.mutate({ jobId: job.id, status: newStatus });
   };
 
 
@@ -1027,7 +476,6 @@ const JobDetail = () => {
                     
                     if (error) throw error;
                     
-                    setImageAnnotations(newAnnotations);
                     // Update the rug in local state
                     setLocalRugs(prev => prev.map(r => 
                       r.id === selectedRug.id 
