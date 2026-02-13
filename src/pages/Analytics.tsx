@@ -124,20 +124,27 @@ const Analytics = () => {
       const startStr = start.toISOString();
       const endStr = end.toISOString();
 
+      // Build company-scoped queries
+      const jobsQuery = supabase
+        .from("jobs")
+        .select("id, created_at, status, payment_status, client_portal_enabled")
+        .gte("created_at", startStr)
+        .lte("created_at", endStr)
+        .order("created_at", { ascending: true });
+      if (companyId) jobsQuery.eq("company_id", companyId);
+
+      const clientAccessQuery = supabase
+        .from("client_job_access")
+        .select("id, job_id, first_accessed_at, password_set_at, created_at")
+        .gte("created_at", startStr)
+        .lte("created_at", endStr);
+      if (companyId) clientAccessQuery.eq("company_id", companyId);
+
       // Parallel fetch all data
       const [jobsResult, clientAccessResult, paymentsResult, estimatesResult, prevJobsResult, prevPaymentsResult] = await Promise.all([
-        supabase
-          .from("jobs")
-          .select("id, created_at, status, payment_status, client_portal_enabled")
-          .gte("created_at", startStr)
-          .lte("created_at", endStr)
-          .order("created_at", { ascending: true }),
+        jobsQuery,
         
-        supabase
-          .from("client_job_access")
-          .select("id, job_id, first_accessed_at, password_set_at, created_at")
-          .gte("created_at", startStr)
-          .lte("created_at", endStr),
+        clientAccessQuery,
         
         supabase
           .from("payments")
@@ -157,11 +164,13 @@ const Analytics = () => {
           const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
           const prevStart = new Date(start);
           prevStart.setDate(prevStart.getDate() - daysDiff);
-          return supabase
+          const q = supabase
             .from("jobs")
             .select("id")
             .gte("created_at", prevStart.toISOString())
             .lt("created_at", startStr);
+          if (companyId) q.eq("company_id", companyId);
+          return q;
         })(),
         
         (() => {

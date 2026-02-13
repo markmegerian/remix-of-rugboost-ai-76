@@ -38,8 +38,7 @@ export const useJobs = () => {
   return useQuery({
     queryKey: queryKeys.jobs.list(companyId),
     queryFn: async (): Promise<Job[]> => {
-      // RLS handles company scoping via get_user_company_id()
-      const { data, error } = await supabase
+      let query = supabase
         .from('jobs')
         .select(`
           id,
@@ -55,6 +54,13 @@ export const useJobs = () => {
           inspections:inspections(count)
         `)
         .order('created_at', { ascending: false });
+
+      // Explicitly scope to user's company so admins only see their own data
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

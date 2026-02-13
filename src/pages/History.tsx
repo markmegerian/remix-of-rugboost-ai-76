@@ -71,7 +71,7 @@ const History = () => {
     queryKey: queryKeys.history.list(companyId),
     queryFn: async (): Promise<HistoryJob[]> => {
       // Fetch completed jobs with their rugs in a single query
-      const { data: jobsData, error: jobsError } = await supabase
+      let query = supabase
         .from('jobs')
         .select(`
           id,
@@ -87,6 +87,13 @@ const History = () => {
         `)
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
+
+      // Explicitly scope to user's company so admins only see their own data
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data: jobsData, error: jobsError } = await query;
 
       if (jobsError) throw jobsError;
 
