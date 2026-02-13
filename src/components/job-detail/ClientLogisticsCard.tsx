@@ -38,14 +38,14 @@ const ClientLogisticsCard: React.FC<ClientLogisticsCardProps> = ({ job, onEditCl
           <div className="flex items-start gap-2">
             <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
             <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-muted-foreground">Client</p>
+              <p className="text-xs text-muted-foreground">Client</p>
               <p className="text-sm font-medium truncate">{job.client_name}</p>
             </div>
           </div>
           <div className="flex items-start gap-2">
             <Phone className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
             <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-muted-foreground">Phone</p>
+              <p className="text-xs text-muted-foreground">Phone</p>
               {job.client_phone ? (
                 <a href={`tel:${job.client_phone}`} className="text-sm font-medium text-primary truncate block">
                   {job.client_phone}
@@ -58,7 +58,7 @@ const ClientLogisticsCard: React.FC<ClientLogisticsCardProps> = ({ job, onEditCl
           <div className="flex items-start gap-2">
             <Mail className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
             <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-muted-foreground">Email</p>
+              <p className="text-xs text-muted-foreground">Email</p>
               {job.client_email ? (
                 <a href={`mailto:${job.client_email}`} className="text-sm font-medium text-primary truncate block">
                   {job.client_email}
@@ -71,7 +71,7 @@ const ClientLogisticsCard: React.FC<ClientLogisticsCardProps> = ({ job, onEditCl
           <div className="flex items-start gap-2">
             <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
             <div className="min-w-0">
-              <p className="text-[10px] md:text-xs text-muted-foreground">Created</p>
+              <p className="text-xs text-muted-foreground">Created</p>
               <p className="text-sm font-medium">{format(new Date(job.created_at), 'MMM d')}</p>
             </div>
           </div>
