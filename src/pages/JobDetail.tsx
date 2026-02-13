@@ -1066,6 +1066,7 @@ const JobDetail = () => {
                 size="icon" 
                 className="shrink-0 md:hidden h-9 w-9"
                 onClick={() => navigate('/dashboard')}
+                aria-label="Go back"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -1333,6 +1334,7 @@ const JobDetail = () => {
                             size="sm" 
                             onClick={() => handleDownloadPDF(rug)}
                             className="h-9 w-9 p-0"
+                            aria-label="Download PDF"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -1360,6 +1362,7 @@ const JobDetail = () => {
                             }} 
                             disabled={!!analyzingRugId || analyzingAll}
                             showLockIcon={false}
+                            aria-label="Compare models"
                           >
                             <FlaskConical className="h-3 w-3" />
                           </StatusGatedButton>
@@ -1371,6 +1374,7 @@ const JobDetail = () => {
                         size="sm" 
                         onClick={() => setEditingRug(rug)}
                         showLockIcon={false}
+                        aria-label="Edit rug"
                       >
                         <Edit2 className="h-3 w-3" />
                       </StatusGatedButton>
@@ -1381,6 +1385,7 @@ const JobDetail = () => {
                         onClick={() => setConfirmDeleteRugId(rug.id)} 
                         className="text-destructive hover:text-destructive"
                         showLockIcon={false}
+                        aria-label="Delete rug"
                       >
                         <Trash2 className="h-3 w-3" />
                       </StatusGatedButton>
