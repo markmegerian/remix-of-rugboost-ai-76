@@ -120,12 +120,6 @@ interface Payment {
 // Import service categories from centralized module
 import { SERVICE_CATEGORIES, categorizeService } from '@/lib/serviceCategories';
 
-// Legacy status options (for backwards compatibility with existing Select)
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active', icon: PlayCircle, color: 'bg-blue-500' },
-  { value: 'in-progress', label: 'In Progress', icon: Clock, color: 'bg-yellow-500' },
-  { value: 'completed', label: 'Completed', icon: CheckCircle, color: 'bg-green-500' },
-];
 
 const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
@@ -875,24 +869,6 @@ const JobDetail = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
-    const Icon = statusConfig.icon;
-    
-    return (
-      <Badge 
-        variant="outline" 
-        className={`gap-1 ${
-          status === 'completed' ? 'border-green-500 text-green-600' :
-          status === 'in-progress' ? 'border-yellow-500 text-yellow-600' :
-          'border-blue-500 text-blue-600'
-        }`}
-      >
-        <Icon className="h-3 w-3" />
-        {statusConfig.label}
-      </Badge>
-    );
-  };
 
   if (authLoading || loading) {
     return (
