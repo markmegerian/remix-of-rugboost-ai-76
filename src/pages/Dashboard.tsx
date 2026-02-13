@@ -118,64 +118,46 @@ const Dashboard = () => {
         <BillingStatusBanner />
         
         <div className="space-y-6">
-          {/* Stats Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-card">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Briefcase className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.totalJobs}</p>
-                    <p className="text-xs text-muted-foreground">Total Jobs</p>
-                  </div>
+          {/* Stats Summary - Mobile: horizontal scroll, Desktop: grid */}
+          {(() => {
+            const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+            const cards = [
+              { icon: Briefcase, bg: 'bg-primary/10', color: 'text-primary', value: stats.totalJobs, label: 'Total Jobs' },
+              { icon: CheckCircle, bg: 'bg-success/10', color: 'text-success', value: stats.completedJobs, label: 'Completed' },
+              { icon: DollarSign, bg: 'bg-warning/10', color: 'text-warning', value: stats.pendingPayments, label: 'Pending Payment' },
+              { icon: TrendingUp, bg: 'bg-info/10', color: 'text-info', value: currencyFmt.format(stats.collectedRevenue), label: 'Collected', raw: true },
+            ];
+            const renderCard = (c: typeof cards[number], i: number, extraClass?: string) => {
+              const Icon = c.icon;
+              return (
+                <Card key={i} className={`bg-card ${extraClass ?? ''}`}>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${c.bg}`}>
+                        <Icon className={`h-5 w-5 ${c.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{c.raw ? c.value : c.value}</p>
+                        <p className="text-xs text-muted-foreground">{c.label}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            };
+            return (
+              <>
+                {/* Mobile: horizontal scroll strip */}
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory md:hidden -mx-4 px-4">
+                  {cards.map((c, i) => renderCard(c, i, 'min-w-[160px] flex-shrink-0 snap-start'))}
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-success/10">
-                    <CheckCircle className="h-5 w-5 text-success" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.completedJobs}</p>
-                    <p className="text-xs text-muted-foreground">Completed</p>
-                  </div>
+                {/* Desktop: grid */}
+                <div className="hidden md:grid md:grid-cols-4 gap-4">
+                  {cards.map((c, i) => renderCard(c, i))}
                 </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-warning/10">
-                    <DollarSign className="h-5 w-5 text-warning" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{stats.pendingPayments}</p>
-                    <p className="text-xs text-muted-foreground">Pending Payment</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-card">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">${stats.collectedRevenue.toFixed(0)}</p>
-                    <p className="text-xs text-muted-foreground">Collected</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </>
+            );
+          })()}
 
           {/* Filters */}
           <JobsFilter 
