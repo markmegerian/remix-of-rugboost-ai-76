@@ -44,6 +44,7 @@ import JobBreadcrumb from '@/components/JobBreadcrumb';
 import MobileJobActionBar from '@/components/MobileJobActionBar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import EditClientInfoDialog from '@/components/EditClientInfoDialog';
+import ResponsiveFormSheet from '@/components/ResponsiveFormSheet';
 import ExpertEstimateCard from '@/components/ExpertEstimateCard';
 import { useJobDetailActions } from '@/hooks/useJobDetailActions';
 import ClientLogisticsCard from '@/components/job-detail/ClientLogisticsCard';
@@ -800,25 +801,20 @@ const JobDetail = () => {
         </Suspense>
       )}
       
-      {/* Add Rug Dialog - Moved outside for mobile access */}
-      <Dialog open={isAddingRug} onOpenChange={setIsAddingRug}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl">Add Rug to Job</DialogTitle>
-          </DialogHeader>
-          {isUploadingPhotos && (
-            <PhotoUploadProgress 
-              progress={uploadProgress} 
-              isUploading={isUploadingPhotos} 
-            />
-          )}
-          <RugForm
-            onSubmit={handleAddRug}
-            isLoading={addingRug}
-            rugIndex={rugs.length}
+      {/* Add Rug - Drawer on mobile, Dialog on desktop */}
+      <ResponsiveFormSheet open={isAddingRug} onOpenChange={setIsAddingRug} title="Add Rug to Job">
+        {isUploadingPhotos && (
+          <PhotoUploadProgress 
+            progress={uploadProgress} 
+            isUploading={isUploadingPhotos} 
           />
-        </DialogContent>
-      </Dialog>
+        )}
+        <RugForm
+          onSubmit={handleAddRug}
+          isLoading={addingRug}
+          rugIndex={rugs.length}
+        />
+      </ResponsiveFormSheet>
       
       {/* Edit Client Info Dialog */}
       {job && (
