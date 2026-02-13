@@ -15,19 +15,22 @@ export default {
   	extend: {
 		fontFamily: {
 			display: [
-				'Inter',
+				'Plus Jakarta Sans Variable',
+				'Plus Jakarta Sans',
 				'ui-sans-serif',
 				'system-ui',
 				'sans-serif'
 			],
 			body: [
-				'Inter',
+				'Plus Jakarta Sans Variable',
+				'Plus Jakarta Sans',
 				'ui-sans-serif',
 				'system-ui',
 				'sans-serif'
 			],
 			sans: [
-				'Inter',
+				'Plus Jakarta Sans Variable',
+				'Plus Jakarta Sans',
 				'ui-sans-serif',
 				'system-ui',
 				'sans-serif',
@@ -35,12 +38,6 @@ export default {
 				'Segoe UI Emoji',
 				'Segoe UI Symbol',
 				'Noto Color Emoji'
-			],
-			serif: [
-				'Inter',
-				'ui-sans-serif',
-				'system-ui',
-				'sans-serif'
 			],
 			mono: [
 				'ui-monospace',
