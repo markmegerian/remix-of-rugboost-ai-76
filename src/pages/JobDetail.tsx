@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
@@ -160,6 +160,7 @@ const JobDetail = () => {
   const [resendingInvite, setResendingInvite] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
   const [confirmDeleteRugId, setConfirmDeleteRugId] = useState<string | null>(null);
+  const statusAdvanceRef = useRef<HTMLButtonElement>(null);
   // Mutable state derived from query data
   const [localApprovedEstimates, setLocalApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [localRugs, setLocalRugs] = useState<Rug[]>([]);
@@ -1154,6 +1155,7 @@ const JobDetail = () => {
               isAdmin={isAdmin}
               onOverrideChange={setAdminOverride}
               className="border-primary/20"
+              advanceButtonRef={statusAdvanceRef}
             />
           );
         })()}
@@ -1697,9 +1699,7 @@ const JobDetail = () => {
         onAnalyzeAll={handleAnalyzeAllRugs}
         onSendToClient={generateClientPortalLink}
         onAdvanceStatus={() => {
-          // Trigger status advance - handled by JobStatusControl
-          const statusControl = document.querySelector('[data-status-advance]');
-          if (statusControl) (statusControl as HTMLButtonElement).click();
+          statusAdvanceRef.current?.click();
         }}
         nextStatusLabel={(() => {
           const next = getNextStatus(currentJobStatus);

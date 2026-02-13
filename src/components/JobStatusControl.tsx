@@ -30,6 +30,7 @@ interface JobStatusControlProps {
   isAdmin?: boolean;
   onOverrideChange?: (enabled: boolean) => void;
   className?: string;
+  advanceButtonRef?: React.RefObject<HTMLButtonElement>;
 }
 
 const JobStatusControl: React.FC<JobStatusControlProps> = ({
@@ -39,6 +40,7 @@ const JobStatusControl: React.FC<JobStatusControlProps> = ({
   isAdmin = false,
   onOverrideChange,
   className,
+  advanceButtonRef,
 }) => {
   const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -136,11 +138,11 @@ const JobStatusControl: React.FC<JobStatusControlProps> = ({
                 </div>
               </div>
               <Button
+                ref={advanceButtonRef}
                 size="sm"
                 onClick={handleAdvance}
                 disabled={!canAdvance && !overrideEnabled}
                 className="gap-1"
-                data-status-advance
               >
                 Advance
                 <ChevronRight className="h-3 w-3" />
