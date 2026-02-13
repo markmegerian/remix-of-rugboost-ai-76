@@ -100,8 +100,7 @@
     padding-right: env(safe-area-inset-right);
     /* Smooth scrolling for iOS WebView */
     -webkit-overflow-scrolling: touch;
-    /* Allow normal scrolling - overscroll-behavior: none breaks iOS Capacitor scroll */
-    overscroll-behavior-y: contain;
+    /* overscroll-behavior-y removed to fix desktop scroll wheel in iframe */
     /* Ensure body can scroll */
     overflow-y: auto;
     min-height: 100vh;
