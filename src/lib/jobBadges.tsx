@@ -6,21 +6,21 @@ export const getStatusBadge = (status: string) => {
   switch (status) {
     case 'completed':
       return (
-        <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
+        <Badge variant="outline" className="gap-1 border-success text-success">
           <CheckCircle className="h-3 w-3" />
           Completed
         </Badge>
       );
     case 'in-progress':
       return (
-        <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600">
+        <Badge variant="outline" className="gap-1 border-warning text-warning">
           <Clock className="h-3 w-3" />
           In Progress
         </Badge>
       );
     default:
       return (
-        <Badge variant="outline" className="gap-1 border-blue-500 text-blue-600">
+        <Badge variant="outline" className="gap-1 border-primary text-primary">
           <PlayCircle className="h-3 w-3" />
           Active
         </Badge>
@@ -35,7 +35,7 @@ export const getPaymentBadge = (paymentStatus: string | null, totalAmount: numbe
 
   if (paymentStatus === 'paid') {
     return (
-      <Badge variant="outline" className="gap-1 border-green-500 text-green-600">
+      <Badge variant="outline" className="gap-1 border-success text-success">
         <CheckCircle className="h-3 w-3" />
         Paid
       </Badge>
@@ -43,7 +43,7 @@ export const getPaymentBadge = (paymentStatus: string | null, totalAmount: numbe
   }
 
   return (
-    <Badge variant="outline" className="gap-1 border-yellow-500 text-yellow-600">
+    <Badge variant="outline" className="gap-1 border-warning text-warning">
       <DollarSign className="h-3 w-3" />
       Pending
     </Badge>

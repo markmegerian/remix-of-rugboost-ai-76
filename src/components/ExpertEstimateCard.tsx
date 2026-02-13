@@ -191,8 +191,8 @@
                      {groupedServices.recommended.length > 0 && (
                        <div className={groupedServices.required.length > 0 ? 'pt-3 border-t' : 'pt-4'}>
                          <div className="flex items-center gap-2 mb-2">
-                           <AlertTriangle className="h-4 w-4 text-amber-600" />
-                           <p className="text-sm font-semibold text-amber-600">
+                            <AlertTriangle className="h-4 w-4 text-warning" />
+                            <p className="text-sm font-semibold text-warning">
                              {SERVICE_CATEGORIES.recommended.label}
                            </p>
                          </div>

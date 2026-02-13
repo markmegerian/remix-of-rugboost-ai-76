@@ -329,7 +329,7 @@ const ClientHistory = () => {
                                       <div className="text-right">
                                         <Badge 
                                           variant="outline" 
-                                          className="border-green-500 text-green-600"
+                                          className="border-success text-success"
                                         >
                                           <CheckCircle className="h-3 w-3 mr-1" />
                                           Completed

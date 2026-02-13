@@ -43,8 +43,8 @@ interface ServiceCompletionCardProps {
 
 const PRIORITY_COLORS = {
   high: 'bg-red-100 text-red-800 border-red-200',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  low: 'bg-green-100 text-green-800 border-green-200',
+  medium: 'bg-warning/10 text-warning border-warning/30',
+  low: 'bg-success/10 text-success border-success/30',
 };
 
 const ServiceCompletionCard: React.FC<ServiceCompletionCardProps> = ({
@@ -120,7 +120,7 @@ const ServiceCompletionCard: React.FC<ServiceCompletionCardProps> = ({
           </CardTitle>
           <Badge 
             variant={isPaid ? "default" : "secondary"}
-            className={isPaid ? "bg-green-600 hover:bg-green-700" : ""}
+            className={isPaid ? "bg-success hover:bg-success/90" : ""}
           >
             {isPaid ? (
               <>
@@ -147,13 +147,13 @@ const ServiceCompletionCard: React.FC<ServiceCompletionCardProps> = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium">Completion Progress</span>
-            <span className={progressPercent === 100 ? 'text-green-600 font-bold' : 'text-muted-foreground'}>
+            <span className={progressPercent === 100 ? 'text-success font-bold' : 'text-muted-foreground'}>
               {completedServices}/{totalServices} services ({progressPercent}%)
             </span>
           </div>
           <Progress value={progressPercent} className="h-3" />
           {progressPercent === 100 && (
-            <p className="text-sm text-green-600 font-medium flex items-center gap-1">
+            <p className="text-sm text-success font-medium flex items-center gap-1">
               <CheckCircle className="h-4 w-4" />
               All services completed! Ready for pickup/delivery.
             </p>
@@ -188,7 +188,7 @@ const ServiceCompletionCard: React.FC<ServiceCompletionCardProps> = ({
                     <div 
                       key={service.id}
                       className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
-                        completed ? 'bg-green-50 dark:bg-green-950/20 border-green-200' : 'hover:bg-muted/50'
+                        completed ? 'bg-success/5 border-success/30' : 'hover:bg-muted/50'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -209,7 +209,7 @@ const ServiceCompletionCard: React.FC<ServiceCompletionCardProps> = ({
                             {service.name}
                           </span>
                           {completionDate && (
-                            <p className="text-xs text-green-600">
+                            <p className="text-xs text-success">
                               Completed {format(new Date(completionDate), 'MMM d, h:mm a')}
                             </p>
                           )}

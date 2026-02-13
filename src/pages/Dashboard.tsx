@@ -137,8 +137,8 @@ const Dashboard = () => {
             <Card className="bg-card">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-500/10">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div className="p-2 rounded-lg bg-success/10">
+                    <CheckCircle className="h-5 w-5 text-success" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.completedJobs}</p>
@@ -151,8 +151,8 @@ const Dashboard = () => {
             <Card className="bg-card">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-yellow-500/10">
-                    <DollarSign className="h-5 w-5 text-yellow-600" />
+                  <div className="p-2 rounded-lg bg-warning/10">
+                    <DollarSign className="h-5 w-5 text-warning" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stats.pendingPayments}</p>

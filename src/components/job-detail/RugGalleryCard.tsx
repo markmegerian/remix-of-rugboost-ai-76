@@ -124,7 +124,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                     <p className="text-xs text-muted-foreground">{rug.rug_type}</p>
                   </div>
                   {rug.analysis_report ? (
-                    <Badge variant="outline" className="border-green-500 text-green-600 gap-1">
+                    <Badge variant="outline" className="border-success text-success gap-1">
                       <CheckCircle className="h-3 w-3" />
                       Analyzed
                     </Badge>

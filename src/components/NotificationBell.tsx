@@ -26,7 +26,7 @@ interface Notification {
 const getNotificationIcon = (type: string) => {
   switch (type) {
     case 'payment_received':
-      return <DollarSign className="h-4 w-4 text-green-500" />;
+      return <DollarSign className="h-4 w-4 text-success" />;
     case 'estimate_approved':
       return <Check className="h-4 w-4 text-blue-500" />;
     case 'client_portal_accessed':

@@ -369,8 +369,8 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
           <DialogHeader>
             {resetEmailSent ? (
               <>
-                <div className="mx-auto mb-2 rounded-full bg-green-100 p-3 w-fit">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
+                <div className="mx-auto mb-2 rounded-full bg-success/10 p-3 w-fit">
+                  <CheckCircle className="h-6 w-6 text-success" />
                 </div>
                 <DialogTitle className="text-center">Check Your Email</DialogTitle>
                 <DialogDescription className="text-center">
