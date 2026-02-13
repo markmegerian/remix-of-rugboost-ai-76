@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; 
  import { Button } from '@/components/ui/button';
  import { Separator } from '@/components/ui/separator';
@@ -257,8 +257,22 @@ function generateConditionSummary(services: Service[]): string {
      });
    };
  
-   return (
-     <div className="space-y-6">
+    const paymentButtonRef = useRef<HTMLButtonElement>(null);
+    const [showStickyBar, setShowStickyBar] = useState(false);
+
+    useEffect(() => {
+      const el = paymentButtonRef.current;
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => setShowStickyBar(!entry.isIntersecting),
+        { threshold: 0 }
+      );
+      observer.observe(el);
+      return () => observer.disconnect();
+    }, []);
+
+    return (
+      <div className="space-y-6 pb-20 md:pb-0">
       {/* 1. Header Section - Trust Establishment */}
       <Card className="border-border bg-card">
          <CardHeader>
@@ -597,20 +611,21 @@ function generateConditionSummary(services: Service[]): string {
          </CardContent>
        </Card>
  
-      {/* 8. Primary CTA - One Action */}
-      <div className="space-y-4">
-         <Button 
-           onClick={() => onApprove(declinedServices)}
-           disabled={isProcessing}
-          className="w-full h-14 text-lg font-medium"
-           size="lg"
-         >
-           {isProcessing ? (
-            <span className="animate-pulse">Processing Authorization...</span>
-           ) : (
-            'Approve & Authorize Work'
-           )}
-         </Button>
+       {/* 8. Primary CTA - One Action */}
+       <div className="space-y-4">
+          <Button
+            ref={paymentButtonRef}
+            onClick={() => onApprove(declinedServices)}
+            disabled={isProcessing}
+           className="w-full h-14 text-lg font-medium"
+            size="lg"
+          >
+            {isProcessing ? (
+             <span className="animate-pulse">Processing Authorization...</span>
+            ) : (
+             'Approve & Authorize Work'
+            )}
+          </Button>
          
         <p className="text-xs text-center text-muted-foreground">
           {declinedServices.size > 0 
@@ -811,9 +826,32 @@ function generateConditionSummary(services: Service[]): string {
           )}
         </div>
       )}
-     </div>
-   );
- };
+       {/* Sticky bottom payment bar - mobile only */}
+       {showStickyBar && (
+         <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-background/95 backdrop-blur-md border-t border-border px-4 py-3 pb-safe-bottom">
+           <div className="space-y-1">
+             {declinedServices.size > 0 && (
+               <p className="text-xs text-muted-foreground text-center">
+                 {declinedServices.size} service{declinedServices.size > 1 ? 's' : ''} declined
+               </p>
+             )}
+             <div className="flex items-center gap-3">
+               <div className="text-lg font-bold">${finalTotal.toFixed(2)}</div>
+               <Button
+                 onClick={() => onApprove(declinedServices)}
+                 disabled={isProcessing}
+                 className="flex-1 h-12"
+                 size="lg"
+               >
+                 {isProcessing ? 'Processing...' : 'Approve & Pay'}
+               </Button>
+             </div>
+           </div>
+         </div>
+       )}
+      </div>
+    );
+  };
 
 // Service Line Item Component
 interface ServiceLineItemProps {
