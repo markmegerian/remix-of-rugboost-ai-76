@@ -9,7 +9,7 @@
     --background: 30 25% 97%;
     --foreground: 20 15% 15%;
 
-    --card: 30 30% 99%;
+    --card: 0 0% 100%;
     --card-foreground: 20 15% 15%;
 
     --popover: 30 30% 99%;
@@ -29,6 +29,13 @@
 
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 70% 45%;
+    --info-foreground: 0 0% 100%;
 
     --border: 220 20% 88%;
     --input: 220 20% 88%;
