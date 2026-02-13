@@ -13,6 +13,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { CompanyGuard } from "@/components/CompanyGuard";
 import BottomTabBar from "@/components/BottomTabBar";
+import rugboostLogo from "@/assets/rugboost-logo.svg";
 
 // Skeleton fallbacks for per-route Suspense
 import DashboardSkeleton from "@/components/skeletons/DashboardSkeleton";
@@ -69,8 +70,9 @@ const History = lazy(() => import("./pages/History"));
 
 // Loading fallback component - iOS safe area aware
 const PageLoader = () => (
-  <div className="min-h-screen-safe flex items-center justify-center safe-y">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  <div className="min-h-screen-safe flex flex-col items-center justify-center safe-y gap-3">
+    <img src={rugboostLogo} alt="RugBoost" className="h-12 w-12 animate-pulse" />
+    <p className="text-sm text-muted-foreground">Loading...</p>
   </div>
 );
 
