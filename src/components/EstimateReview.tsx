@@ -652,6 +652,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                           <Label>Quantity</Label>
                           <Input
                             type="number"
+                            inputMode="numeric"
                             min="1"
                             value={service.quantity}
                             onChange={(e) => handleUpdateService(service.id, { quantity: parseInt(e.target.value) || 1 })}
@@ -661,6 +662,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                           <Label>Unit Price ($)</Label>
                           <Input
                             type="number"
+                            inputMode="decimal"
                             min="0"
                             step="0.01"
                             value={service.unitPrice}
