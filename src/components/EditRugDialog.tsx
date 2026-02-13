@@ -13,12 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import ResponsiveFormSheet from '@/components/ResponsiveFormSheet';
 import { toast } from 'sonner';
 
 const RUG_TYPES = [
@@ -111,115 +106,110 @@ const EditRugDialog: React.FC<EditRugDialogProps> = ({
   if (!rug) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">Edit Rug</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="rugNumber">Rug Number *</Label>
-              <Input
-                id="rugNumber"
-                name="rugNumber"
-                value={formData.rugNumber}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="rugType">Rug Type *</Label>
-              <Select 
-                value={formData.rugType} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, rugType: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RUG_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="length" className="flex items-center gap-1">
-                <Ruler className="h-3 w-3" /> Length {isFtIn ? '(ft.in)' : '(ft)'}
-              </Label>
-              <Input
-                id="length"
-                name="length"
-                type="text"
-                inputMode="decimal"
-                placeholder={isFtIn ? '9.06' : '9.50'}
-                value={formData.length}
-                onChange={handleInputChange}
-              />
-              {isFtIn && (
-                <p className="text-[10px] text-muted-foreground">
-                  Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="width" className="flex items-center gap-1">
-                <Ruler className="h-3 w-3" /> Width {isFtIn ? '(ft.in)' : '(ft)'}
-              </Label>
-              <Input
-                id="width"
-                name="width"
-                type="text"
-                inputMode="decimal"
-                placeholder={isFtIn ? '6.08' : '6.67'}
-                value={formData.width}
-                onChange={handleInputChange}
-              />
-              {isFtIn && (
-                <p className="text-[10px] text-muted-foreground">
-                  Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
-                </p>
-              )}
-            </div>
-          </div>
-
+    <ResponsiveFormSheet open={open} onOpenChange={onOpenChange} title="Edit Rug Details">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
+            <Label htmlFor="rugNumber">Rug Number *</Label>
+            <Input
+              id="rugNumber"
+              name="rugNumber"
+              value={formData.rugNumber}
               onChange={handleInputChange}
-              rows={3}
+              required
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                'Save Changes'
-              )}
-            </Button>
+          <div className="space-y-2">
+            <Label htmlFor="rugType">Rug Type *</Label>
+            <Select 
+              value={formData.rugType} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, rugType: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {RUG_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="length" className="flex items-center gap-1">
+              <Ruler className="h-3 w-3" /> Length {isFtIn ? '(ft.in)' : '(ft)'}
+            </Label>
+            <Input
+              id="length"
+              name="length"
+              type="text"
+              inputMode="decimal"
+              placeholder={isFtIn ? '9.06' : '9.50'}
+              value={formData.length}
+              onChange={handleInputChange}
+            />
+            {isFtIn && (
+              <p className="text-[10px] text-muted-foreground">
+                Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="width" className="flex items-center gap-1">
+              <Ruler className="h-3 w-3" /> Width {isFtIn ? '(ft.in)' : '(ft)'}
+            </Label>
+            <Input
+              id="width"
+              name="width"
+              type="text"
+              inputMode="decimal"
+              placeholder={isFtIn ? '6.08' : '6.67'}
+              value={formData.width}
+              onChange={handleInputChange}
+            />
+            {isFtIn && (
+              <p className="text-[10px] text-muted-foreground">
+                Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea
+            id="notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleInputChange}
+            rows={3}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
+        </div>
+      </form>
+    </ResponsiveFormSheet>
   );
 };
 
