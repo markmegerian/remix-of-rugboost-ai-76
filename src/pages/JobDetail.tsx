@@ -127,7 +127,7 @@ const JobDetail = () => {
   const updateJobStatus = useUpdateJobStatus();
   
   // Use React Query for all data fetching (parallel fetches)
-  const { data: jobData, isLoading: loading, refetch } = useJobDetail(jobId, user?.id);
+  const { data: jobData, isLoading: loading, isError, error: queryError, refetch } = useJobDetail(jobId, user?.id);
 
   // Local state for UI interactions (non-action state stays in component)
   const [isAddingRug, setIsAddingRug] = useState(false);
@@ -333,7 +333,31 @@ const JobDetail = () => {
     );
   }
 
-  if (!job) return null;
+  if (isError || !job) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 rounded-full bg-destructive/10 p-3 w-fit">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <CardTitle className="text-xl">Job Not Found</CardTitle>
+            <CardDescription>
+              {queryError?.message?.includes('tenant')
+                ? 'You don\'t have access to this job. It belongs to a different organization.'
+                : 'This job could not be loaded. It may have been deleted or you may not have permission to view it.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/dashboard')} className="w-full gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (showEstimateReview && selectedRug) {
     const squareFootage = selectedRug.length && selectedRug.width 
