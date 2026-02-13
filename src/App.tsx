@@ -100,7 +100,7 @@ const App = () => (
                    <Route path="/privacy" element={<PrivacyPolicy />} />
                    <Route path="/terms-of-service" element={<TermsOfService />} />
                    <Route path="/support" element={<Support />} />
-                   <Route path="/screenshots" element={<ScreenshotGenerator />} />
+                   {import.meta.env.DEV && <Route path="/screenshots" element={<ScreenshotGenerator />} />}
 
                    {/* ===== CLIENT TOKEN-BASED ROUTES — no auth guard (uses access tokens) ===== */}
                    <Route path="/client/auth" element={<ClientAuth />} />
