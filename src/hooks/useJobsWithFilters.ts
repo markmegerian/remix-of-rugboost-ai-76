@@ -58,8 +58,11 @@ export const useJobsWithFilters = (filters: JobFilters) => {
         `)
         .order('created_at', { ascending: false });
 
-      // RLS will handle the scoping, but we can be explicit for company context
-      // The database trigger auto-sets company_id, so RLS policies do the filtering
+      // Explicitly scope to the user's company so admins only see their own
+      // company's jobs on the regular dashboard (not all tenant data)
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
 
       const { data, error } = await query;
 
