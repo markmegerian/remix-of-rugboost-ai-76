@@ -295,8 +295,7 @@ const Analytics = () => {
               <p className="text-xs text-muted-foreground">Job Performance Metrics</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
@@ -307,15 +306,10 @@ const Analytics = () => {
                 <SelectItem value="12m">Last 12 months</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => navigate("/dashboard")} className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Jobs
-            </Button>
-          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pb-16 md:pb-8">
         {!hasAnalytics ? (
           <Card className="border-dashed border-muted-foreground/30">
             <CardContent className="py-12 text-center">

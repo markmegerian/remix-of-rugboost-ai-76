@@ -341,15 +341,7 @@ const AccountSettings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-3xl py-8 px-4">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/dashboard")}
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
+      <div className="container max-w-3xl py-8 px-4 pb-16 md:pb-8">
 
         <div className="space-y-6">
           <div>
