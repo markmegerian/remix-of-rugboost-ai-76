@@ -81,7 +81,7 @@ const Dashboard = () => {
             )}
             <div>
               <h1 className="text-lg md:text-xl font-bold text-foreground font-sans">{displayName}</h1>
-              <p className="text-xs text-muted-foreground hidden sm:block">Jobs</p>
+              <p className="text-xs text-muted-foreground hidden md:block">Jobs</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -93,19 +93,19 @@ const Dashboard = () => {
               title={!canCreateJobs ? 'Subscription required to create new jobs' : undefined}
             >
               <Plus className="h-4 w-4" />
-              <span className="hidden xs:inline">New Job</span>
+              <span className="hidden sm:inline">New Job</span>
             </Button>
             {isAdmin && (
-              <Button onClick={() => navigate('/admin/users')} variant="outline" size="sm" className="gap-2 hidden sm:flex">
+              <Button onClick={() => navigate('/admin/users')} variant="outline" size="sm" className="gap-2 hidden md:flex">
                 <Users className="h-4 w-4" />
                 Users
               </Button>
             )}
             <NotificationBell />
-            <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden sm:flex">
+            <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden md:flex">
               <Settings className="h-4 w-4" />
             </Button>
-            <Button onClick={handleSignOut} variant="ghost" size="icon" className="hidden sm:flex">
+            <Button onClick={handleSignOut} variant="ghost" size="icon" className="hidden md:flex">
               <LogOut className="h-4 w-4" />
             </Button>
             <MobileNav isAdmin={isAdmin} onSignOut={handleSignOut} />

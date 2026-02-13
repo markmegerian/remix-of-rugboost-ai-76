@@ -28,7 +28,7 @@ const MobileNav = ({ isAdmin = false, onSignOut }: MobileNavProps) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="sm:hidden">
+        <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />
           <span className="sr-only">Open menu</span>
         </Button>
