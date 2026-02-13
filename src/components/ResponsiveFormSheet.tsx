@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Dialog,
@@ -27,8 +27,15 @@ const ResponsiveFormSheet: React.FC<ResponsiveFormSheetProps> = ({
   children,
 }) => {
   const isMobile = useIsMobile();
+  // Lock the layout mode when the sheet opens to prevent remounts
+  // from keyboard-triggered viewport changes
+  const lockedModeRef = useRef(isMobile);
+  if (!open) {
+    lockedModeRef.current = isMobile;
+  }
+  const useMobileLayout = lockedModeRef.current;
 
-  if (isMobile) {
+  if (useMobileLayout) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="max-h-[85vh]">

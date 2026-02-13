@@ -132,6 +132,7 @@ const JobDetail = () => {
 
   // Local state for UI interactions (non-action state stays in component)
   const [isAddingRug, setIsAddingRug] = useState(false);
+  const [addRugIndex, setAddRugIndex] = useState(0);
   const [isEditingJob, setIsEditingJob] = useState(false);
   const [editingRug, setEditingRug] = useState<Rug | null>(null);
   const [selectedRug, setSelectedRug] = useState<Rug | null>(null);
@@ -651,7 +652,7 @@ const JobDetail = () => {
           onDownloadPDF={handleDownloadPDF}
           onEditRug={setEditingRug}
           onDeleteRug={(rugId) => setConfirmDeleteRugId(rugId)}
-          onAddRug={() => setIsAddingRug(true)}
+          onAddRug={() => { setAddRugIndex(rugs.length); setIsAddingRug(true); }}
           onCompareRug={(rug) => {
             setCompareRug(rug);
             setShowCompareDialog(true);
@@ -812,7 +813,7 @@ const JobDetail = () => {
         <RugForm
           onSubmit={handleAddRug}
           isLoading={addingRug}
-          rugIndex={rugs.length}
+          rugIndex={addRugIndex}
         />
       </ResponsiveFormSheet>
       
@@ -841,7 +842,7 @@ const JobDetail = () => {
         hasClientPortalLink={!!clientPortalLink}
         isAnalyzing={analyzingAll}
         isGeneratingLink={generatingPortalLink}
-        onAddRug={() => setIsAddingRug(true)}
+        onAddRug={() => { setAddRugIndex(rugs.length); setIsAddingRug(true); }}
         onAnalyzeAll={handleAnalyzeAllRugs}
         onSendToClient={generateClientPortalLink}
         onAdvanceStatus={() => {
