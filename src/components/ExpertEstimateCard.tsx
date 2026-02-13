@@ -102,7 +102,7 @@
            </div>
            <div className="flex items-center justify-between sm:justify-end sm:text-right gap-4">
              <div>
-               <p className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wide">
+               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                  Total Investment
                </p>
                <p className="text-xl md:text-2xl font-bold text-primary">
