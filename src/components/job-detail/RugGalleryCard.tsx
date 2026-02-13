@@ -143,12 +143,12 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                         key={idx}
                         filePath={url}
                         alt={`${rug.rug_number} photo ${idx + 1}`}
-                        className="w-16 h-16 object-cover rounded border flex-shrink-0"
-                        loadingClassName="w-16 h-16"
+                        className="w-20 h-20 object-cover rounded border flex-shrink-0"
+                        loadingClassName="w-20 h-20"
                       />
                     ))}
                     {rug.photo_urls.length > 4 && (
-                      <div className="w-16 h-16 rounded border bg-muted flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
+                      <div className="w-20 h-20 rounded border bg-muted flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
                         +{rug.photo_urls.length - 4}
                       </div>
                     )}
@@ -162,7 +162,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                         variant="outline" 
                         size="sm" 
                         onClick={() => onViewReport(rug)} 
-                        className="flex-1 h-9 gap-1.5"
+                        className="flex-1 min-h-[44px] gap-1.5"
                       >
                         <Eye className="h-4 w-4" />
                         <span className="hidden xs:inline">View</span> Report
@@ -171,7 +171,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                         variant="ghost" 
                         size="sm" 
                         onClick={() => onDownloadPDF(rug)}
-                        className="h-9 w-9 p-0"
+                        className="min-h-[44px] min-w-[44px] p-0"
                         aria-label="Download PDF"
                       >
                         <Download className="h-4 w-4" />
@@ -185,7 +185,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                         size="sm" 
                         onClick={() => onAnalyzeRug(rug)} 
                         disabled={!!analyzingRugId || analyzingAll} 
-                        className="flex-1 gap-1"
+                        className="flex-1 min-h-[44px] gap-1"
                       >
                         <Sparkles className="h-3 w-3" />
                         Analyze
@@ -197,6 +197,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                         onClick={() => onCompareRug(rug)} 
                         disabled={!!analyzingRugId || analyzingAll}
                         showLockIcon={false}
+                        className="min-h-[44px] min-w-[44px]"
                         aria-label="Compare models"
                       >
                         <FlaskConical className="h-3 w-3" />
@@ -209,6 +210,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                     size="sm" 
                     onClick={() => onEditRug(rug)}
                     showLockIcon={false}
+                    className="min-h-[44px] min-w-[44px]"
                     aria-label="Edit rug"
                   >
                     <Edit2 className="h-3 w-3" />
@@ -218,7 +220,7 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
                     variant="ghost" 
                     size="sm" 
                     onClick={() => onDeleteRug(rug.id)} 
-                    className="text-destructive hover:text-destructive"
+                    className="text-destructive hover:text-destructive min-h-[44px] min-w-[44px]"
                     showLockIcon={false}
                     aria-label="Delete rug"
                   >
