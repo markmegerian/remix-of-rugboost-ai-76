@@ -74,12 +74,12 @@ const STATUS_CONFIG = {
   pending: { 
     label: 'Pending', 
     icon: Clock, 
-    className: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
+    className: 'bg-warning/10 text-warning border-warning/30' 
   },
   completed: { 
     label: 'Paid', 
     icon: CheckCircle, 
-    className: 'bg-green-100 text-green-800 border-green-200' 
+    className: 'bg-success/10 text-success border-success/30'
   },
   failed: { 
     label: 'Failed', 
@@ -217,22 +217,22 @@ const PaymentTracking: React.FC<PaymentTrackingProps> = ({
       <CardContent className="space-y-4">
         {/* Summary Cards */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 border border-green-200 dark:border-green-800">
+          <div className="bg-success/5 rounded-lg p-3 border border-success/30">
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800 dark:text-green-300">Collected</span>
+              <CheckCircle className="h-4 w-4 text-success" />
+              <span className="text-sm font-medium text-success">Collected</span>
             </div>
-            <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+            <div className="text-2xl font-bold text-success">
               ${totalPaid.toFixed(2)}
             </div>
           </div>
           
-          <div className="bg-yellow-50 dark:bg-yellow-950/30 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
+          <div className="bg-warning/5 rounded-lg p-3 border border-warning/30">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Outstanding</span>
+              <Clock className="h-4 w-4 text-warning" />
+              <span className="text-sm font-medium text-warning">Outstanding</span>
             </div>
-            <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
+            <div className="text-2xl font-bold text-warning">
               ${totalPending.toFixed(2)}
             </div>
           </div>

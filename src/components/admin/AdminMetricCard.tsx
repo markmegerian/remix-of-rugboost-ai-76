@@ -35,7 +35,7 @@ export const AdminMetricCard = ({
             {trend && (
               <p className={cn(
                 "text-xs font-medium",
-                trend.isPositive ? "text-green-600" : "text-red-600"
+                trend.isPositive ? "text-success" : "text-destructive"
               )}>
                 {trend.isPositive ? "+" : ""}{trend.value}% from last period
               </p>

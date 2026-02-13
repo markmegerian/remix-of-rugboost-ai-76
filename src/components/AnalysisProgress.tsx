@@ -37,7 +37,7 @@ const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
             {stage !== 'complete' ? (
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             ) : (
-              Icon && <Icon className="h-6 w-6 text-green-500" />
+              Icon && <Icon className="h-6 w-6 text-success" />
             )}
             <span className="text-lg font-medium">
               {rugNumber ? `Analyzing ${rugNumber}` : 'Analyzing...'}
