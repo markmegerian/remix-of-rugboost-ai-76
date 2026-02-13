@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
@@ -158,6 +159,7 @@ const JobDetail = () => {
   const [generatingPortalLink, setGeneratingPortalLink] = useState(false);
   const [resendingInvite, setResendingInvite] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
+  const [confirmDeleteRugId, setConfirmDeleteRugId] = useState<string | null>(null);
   // Mutable state derived from query data
   const [localApprovedEstimates, setLocalApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [localRugs, setLocalRugs] = useState<Rug[]>([]);
@@ -852,8 +854,6 @@ const JobDetail = () => {
   };
 
   const handleDeleteRug = async (rugId: string) => {
-    if (!confirm('Are you sure you want to delete this rug?')) return;
-
     try {
       const { error } = await supabase
         .from('inspections')
@@ -866,6 +866,8 @@ const JobDetail = () => {
     } catch (error) {
       console.error('Delete error:', error);
       toast.error('Failed to delete rug');
+    } finally {
+      setConfirmDeleteRugId(null);
     }
   };
 
@@ -1376,7 +1378,7 @@ const JobDetail = () => {
                         actionState={actions.deleteRug}
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => handleDeleteRug(rug.id)} 
+                        onClick={() => setConfirmDeleteRugId(rug.id)} 
                         className="text-destructive hover:text-destructive"
                         showLockIcon={false}
                       >
@@ -1699,6 +1701,26 @@ const JobDetail = () => {
           return next ? JOB_STATUSES.find(s => s.value === next)?.label : undefined;
         })()}
       />
+      {/* Delete Rug Confirmation Dialog */}
+      <AlertDialog open={!!confirmDeleteRugId} onOpenChange={(open) => !open && setConfirmDeleteRugId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this rug?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The rug and all its photos and analysis data will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteRugId && handleDeleteRug(confirmDeleteRugId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </>
   );
