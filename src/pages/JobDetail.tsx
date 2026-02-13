@@ -46,6 +46,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import EditClientInfoDialog from '@/components/EditClientInfoDialog';
 import ExpertEstimateCard from '@/components/ExpertEstimateCard';
 import { useJobDetailActions } from '@/hooks/useJobDetailActions';
+import ClientLogisticsCard from '@/components/job-detail/ClientLogisticsCard';
+import RugGalleryCard from '@/components/job-detail/RugGalleryCard';
+import ClientApprovalCard from '@/components/job-detail/ClientApprovalCard';
 
 // Lazy load heavy dialogs for code splitting
 const AnalysisReport = lazy(() => import('@/components/AnalysisReport'));
@@ -608,244 +611,27 @@ const JobDetail = () => {
           );
         })()}
 
-        {/* Section A: Client & Logistics - Collapsible on mobile */}
-        <Card>
-          <CardHeader className="pb-2 md:pb-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-base md:text-lg flex items-center gap-2 mb-0">
-              <User className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-              Client & Logistics
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => setIsEditingClientInfo(true)}
-            >
-              <Edit2 className="h-4 w-4" />
-              <span className="sr-only">Edit client info</span>
-            </Button>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {/* Mobile: 2-column compact grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              <div className="flex items-start gap-2">
-                <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] md:text-xs text-muted-foreground">Client</p>
-                  <p className="text-sm font-medium truncate">{job.client_name}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Phone className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] md:text-xs text-muted-foreground">Phone</p>
-                  {job.client_phone ? (
-                    <a href={`tel:${job.client_phone}`} className="text-sm font-medium text-primary truncate block">
-                      {job.client_phone}
-                    </a>
-                  ) : (
-                    <p className="text-sm font-medium text-muted-foreground">—</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Mail className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] md:text-xs text-muted-foreground">Email</p>
-                  {job.client_email ? (
-                    <a href={`mailto:${job.client_email}`} className="text-sm font-medium text-primary truncate block">
-                      {job.client_email}
-                    </a>
-                  ) : (
-                    <p className="text-sm font-medium text-muted-foreground">—</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Calendar className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] md:text-xs text-muted-foreground">Created</p>
-                  <p className="text-sm font-medium">{format(new Date(job.created_at), 'MMM d')}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Section A: Client & Logistics */}
+        <ClientLogisticsCard job={job} onEditClientInfo={() => setIsEditingClientInfo(true)} />
 
-        {/* Section B: Photos/Scan Assets - Mobile optimized */}
-        <Card>
-          <CardHeader className="pb-2 md:pb-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                <Image className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                <span className="truncate">
-                  Rugs ({rugs.length}) • {rugs.reduce((acc, r) => acc + (r.photo_urls?.length || 0), 0)} photos
-                </span>
-              </CardTitle>
-              {/* Mobile: Actions in a row, hidden on mobile (in bottom bar) */}
-              <div className="hidden md:flex items-center gap-2">
-                {rugs.length > 0 && rugs.some(r => !r.analysis_report) && (
-                  <StatusGatedButton 
-                    actionState={actions.analyzeRug}
-                    variant="warm"
-                    size="sm"
-                    className="gap-2"
-                    onClick={handleAnalyzeAllRugs}
-                    disabled={analyzingAll || !actions.analyzeRug.enabled}
-                  >
-                    {analyzingAll ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Analyze All
-                      </>
-                    )}
-                  </StatusGatedButton>
-                )}
-                <StatusGatedButton 
-                  actionState={actions.addRug}
-                  size="sm" 
-                  className="gap-1"
-                  onClick={() => actions.addRug.enabled && setIsAddingRug(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Rug
-                </StatusGatedButton>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {rugs.length === 0 ? (
-              <div className="text-center py-6 md:py-8 text-muted-foreground">
-                <Image className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-3 md:mb-4 opacity-50" />
-                <p className="text-sm md:text-base">No rugs added yet</p>
-                <p className="text-xs md:text-sm mt-1">Tap the + button to add your first rug</p>
-              </div>
-            ) : (
-              /* Mobile: Full-width stacked cards, Desktop: Grid */
-              <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4">
-                {rugs.map((rug) => (
-                  <div key={rug.id} className="border rounded-lg p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{rug.rug_number}</p>
-                        <p className="text-xs text-muted-foreground">{rug.rug_type}</p>
-                      </div>
-                      {rug.analysis_report ? (
-                        <Badge variant="outline" className="border-green-500 text-green-600 gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          Analyzed
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground gap-1">
-                          <Clock className="h-3 w-3" />
-                          Pending
-                        </Badge>
-                      )}
-                    </div>
-                    {/* Photo thumbnails */}
-                    {rug.photo_urls && rug.photo_urls.length > 0 && (
-                      <div className="flex gap-1 overflow-x-auto">
-                        {rug.photo_urls.slice(0, 4).map((url, idx) => (
-                          <RugPhoto
-                            key={idx}
-                            filePath={url}
-                            alt={`${rug.rug_number} photo ${idx + 1}`}
-                            className="w-16 h-16 object-cover rounded border flex-shrink-0"
-                            loadingClassName="w-16 h-16"
-                          />
-                        ))}
-                        {rug.photo_urls.length > 4 && (
-                          <div className="w-16 h-16 rounded border bg-muted flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
-                            +{rug.photo_urls.length - 4}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Actions - Mobile touch-friendly */}
-                    <div className="flex items-center gap-2 pt-2">
-                      {rug.analysis_report ? (
-                        <>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleViewReport(rug)} 
-                            className="flex-1 h-9 gap-1.5"
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="hidden xs:inline">View</span> Report
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleDownloadPDF(rug)}
-                            className="h-9 w-9 p-0"
-                            aria-label="Download PDF"
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <StatusGatedButton 
-                            actionState={actions.analyzeRug}
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => analyzeRug(rug)} 
-                            disabled={!!analyzingRugId || analyzingAll} 
-                            className="flex-1 gap-1"
-                          >
-                            <Sparkles className="h-3 w-3" />
-                            Analyze
-                          </StatusGatedButton>
-                          <StatusGatedButton 
-                            actionState={actions.analyzeRug}
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => {
-                              setCompareRug(rug);
-                              setShowCompareDialog(true);
-                            }} 
-                            disabled={!!analyzingRugId || analyzingAll}
-                            showLockIcon={false}
-                            aria-label="Compare models"
-                          >
-                            <FlaskConical className="h-3 w-3" />
-                          </StatusGatedButton>
-                        </>
-                      )}
-                      <StatusGatedButton 
-                        actionState={actions.editRug}
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setEditingRug(rug)}
-                        showLockIcon={false}
-                        aria-label="Edit rug"
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </StatusGatedButton>
-                      <StatusGatedButton 
-                        actionState={actions.deleteRug}
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setConfirmDeleteRugId(rug.id)} 
-                        className="text-destructive hover:text-destructive"
-                        showLockIcon={false}
-                        aria-label="Delete rug"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </StatusGatedButton>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Section B: Photos/Scan Assets */}
+        <RugGalleryCard
+          rugs={rugs}
+          actions={actions}
+          analyzingAll={analyzingAll}
+          analyzingRugId={analyzingRugId}
+          onAnalyzeAll={handleAnalyzeAllRugs}
+          onAnalyzeRug={analyzeRug}
+          onViewReport={handleViewReport}
+          onDownloadPDF={handleDownloadPDF}
+          onEditRug={setEditingRug}
+          onDeleteRug={(rugId) => setConfirmDeleteRugId(rugId)}
+          onAddRug={() => setIsAddingRug(true)}
+          onCompareRug={(rug) => {
+            setCompareRug(rug);
+            setShowCompareDialog(true);
+          }}
+        />
 
         {/* Section C: Inspection Notes */}
         {job.notes && (
@@ -909,130 +695,22 @@ const JobDetail = () => {
         )}
 
         {/* Section E: Client Approval & Payment */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              Client Approval & Payment
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Portal Link Status */}
-            {clientPortalLink && clientPortalStatus ? (
-              <ClientPortalStatus
-                portalLink={clientPortalLink}
-                emailSentAt={clientPortalStatus.emailSentAt}
-                emailError={clientPortalStatus.emailError}
-                firstAccessedAt={clientPortalStatus.firstAccessedAt}
-                passwordSetAt={clientPortalStatus.passwordSetAt}
-                hasClientAccount={clientPortalStatus.hasClientAccount}
-                hasServiceSelections={clientPortalStatus.hasServiceSelections}
-                serviceSelectionsAt={clientPortalStatus.serviceSelectionsAt}
-                onResendInvite={handleResendInvite}
-                isResending={resendingInvite}
-              />
-            ) : approvedEstimates.length > 0 ? (
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-500" />
-                  <div>
-                    <p className="font-medium">Ready to send Expert Inspection Report</p>
-                    <p className="text-sm text-muted-foreground">
-                      Client will receive the expert assessment for approval and payment
-                    </p>
-                  </div>
-                </div>
-                <StatusGatedButton 
-                  actionState={actions.sendToClient}
-                  variant="default"
-                  onClick={generateClientPortalLink}
-                  disabled={generatingPortalLink || approvedEstimates.length < rugs.filter(r => r.analysis_report).length}
-                  className="gap-2"
-                >
-                  {generatingPortalLink ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Link className="h-4 w-4" />
-                      Send to Client
-                    </>
-                  )}
-                </StatusGatedButton>
-              </div>
-            ) : rugs.some(r => r.analysis_report) ? (
-              <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                <AlertCircle className="h-5 w-5 text-amber-500" />
-                <div>
-                  <p className="font-medium">Confirm expert assessment first</p>
-                  <p className="text-sm text-muted-foreground">
-                    Review and confirm the expert assessment for each rug before sending to client
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-muted-foreground">No rugs analyzed yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Add rugs and run AI analysis to generate estimates
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Payment Tracking */}
-            {payments.length > 0 && (
-              <div className="pt-4 border-t">
-                <PaymentTracking
-                  payments={payments}
-                  jobNumber={job.job_number}
-                  clientName={job.client_name}
-                  branding={branding}
-                  rugs={approvedEstimates.map(ae => {
-                    const rug = rugs.find(r => r.id === ae.inspection_id);
-                    return {
-                      rugNumber: rug?.rug_number || 'Unknown',
-                      rugType: rug?.rug_type || 'Unknown',
-                      dimensions: rug?.length && rug?.width ? `${rug.length}' × ${rug.width}'` : 'N/A',
-                      services: ae.services,
-                      total: ae.total_amount,
-                    };
-                  })}
-                />
-              </div>
-            )}
-            
-            {/* Service Completion - Only show when paid */}
-            {payments.some(p => p.status === 'completed') && approvedEstimates.length > 0 && (
-              <div className="pt-4 border-t">
-                <ServiceCompletionCard
-                  rugs={approvedEstimates.map(ae => {
-                    const rug = rugs.find(r => r.id === ae.inspection_id);
-                    return {
-                      rugId: ae.inspection_id,
-                      rugNumber: rug?.rug_number || 'Unknown',
-                      rugType: rug?.rug_type || 'Unknown',
-                      dimensions: rug?.length && rug?.width 
-                        ? `${rug.length}' × ${rug.width}'` 
-                        : 'N/A',
-                      estimateId: ae.id,
-                      services: ae.services,
-                      total: ae.total_amount,
-                    };
-                  })}
-                  completions={serviceCompletions}
-                  clientApprovedAt={job.client_approved_at || null}
-                  isPaid={true}
-                  onCompletionChange={fetchServiceCompletions}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ClientApprovalCard
+          job={job}
+          rugs={rugs}
+          approvedEstimates={approvedEstimates}
+          payments={payments}
+          serviceCompletions={serviceCompletions}
+          clientPortalLink={clientPortalLink}
+          clientPortalStatus={clientPortalStatus}
+          branding={branding}
+          actions={actions}
+          generatingPortalLink={generatingPortalLink}
+          resendingInvite={resendingInvite}
+          onGeneratePortalLink={generateClientPortalLink}
+          onResendInvite={handleResendInvite}
+          onServiceCompletionChange={fetchServiceCompletions}
+        />
       </main>
 
       {/* Edit Rug Dialog */}
