@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import type { AnalysisStage } from '@/components/AnalysisProgress';
 import type { BusinessBranding, UpsellService } from '@/lib/pdfGenerator';
 
@@ -98,6 +99,9 @@ export function useJobDetailActions({
 
   // Annotation state (set during analysis)
   const [imageAnnotations, setImageAnnotations] = useState<any[]>([]);
+
+  // Offline sync hook
+  const { queueRugSubmission } = useOfflineSync();
 
   // Photo upload hook
   const {
@@ -279,6 +283,26 @@ export function useJobDetailActions({
   ) => {
     if (!userId || !job) return;
 
+    // If offline, queue for later sync
+    if (!navigator.onLine) {
+      try {
+        await queueRugSubmission({
+          jobId: job.id,
+          jobNumber: job.job_number,
+          clientName: job.client_name,
+          userId,
+          companyId: companyId || null,
+          formData,
+          photos,
+        });
+        return true;
+      } catch (error) {
+        console.error('Failed to queue offline:', error);
+        toast.error('Failed to save offline. Please try again.');
+        return false;
+      }
+    }
+
     setAddingRug(true);
     resetUploadProgress();
 
@@ -302,8 +326,25 @@ export function useJobDetailActions({
 
       toast.success('Rug added to job!');
       fetchJobDetails();
-      return true; // Signal success so caller can close dialog
+      return true;
     } catch (error) {
+      // If it failed due to network, queue offline
+      if (!navigator.onLine) {
+        try {
+          await queueRugSubmission({
+            jobId: job.id,
+            jobNumber: job.job_number,
+            clientName: job.client_name,
+            userId,
+            companyId: companyId || null,
+            formData,
+            photos,
+          });
+          return true;
+        } catch (offlineError) {
+          console.error('Failed to queue offline:', offlineError);
+        }
+      }
       console.error('Add rug failed:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to add rug');
       return false;
@@ -311,7 +352,7 @@ export function useJobDetailActions({
       setAddingRug(false);
       resetUploadProgress();
     }
-  }, [userId, job, uploadPhotos, resetUploadProgress, fetchJobDetails]);
+  }, [userId, job, companyId, uploadPhotos, resetUploadProgress, fetchJobDetails, queueRugSubmission]);
 
   const handleEditJob = useCallback(async (formData: {
     jobNumber: string;

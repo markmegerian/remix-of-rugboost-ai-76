@@ -1,8 +1,9 @@
 import React from 'react';
-import { WifiOff, Wifi, RefreshCw } from 'lucide-react';
+import { WifiOff, Wifi, RefreshCw, CloudUpload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useOfflineStatus } from '@/hooks/useOfflineStatus';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 interface OfflineBannerProps {
   className?: string;
@@ -10,6 +11,7 @@ interface OfflineBannerProps {
 
 const OfflineBanner: React.FC<OfflineBannerProps> = ({ className }) => {
   const { isOffline, wasOffline, checkConnection } = useOfflineStatus();
+  const { pendingCount, isSyncing, triggerSync } = useOfflineSync();
   const [isChecking, setIsChecking] = React.useState(false);
 
   const handleRetry = async () => {
@@ -35,6 +37,43 @@ const OfflineBanner: React.FC<OfflineBannerProps> = ({ className }) => {
       >
         <Wifi className="h-4 w-4" />
         You're back online!
+        {pendingCount > 0 && (
+          <span className="opacity-90">— Syncing {pendingCount} queued items...</span>
+        )}
+      </div>
+    );
+  }
+
+  // Show pending sync banner when online but items queued
+  if (!isOffline && pendingCount > 0) {
+    return (
+      <div
+        className={cn(
+          "fixed top-0 left-0 right-0 z-[100]",
+          "bg-amber-500 text-white py-2 px-4",
+          "flex items-center justify-center gap-3 text-sm",
+          "animate-in slide-in-from-top fade-in duration-300",
+          className
+        )}
+      >
+        <CloudUpload className="h-4 w-4 flex-shrink-0" />
+        <span className="font-medium">
+          {isSyncing
+            ? `Syncing ${pendingCount} queued item${pendingCount !== 1 ? 's' : ''}...`
+            : `${pendingCount} item${pendingCount !== 1 ? 's' : ''} waiting to sync`}
+        </span>
+        {!isSyncing && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={triggerSync}
+            className="ml-2 h-7 px-2 text-xs"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Sync now
+          </Button>
+        )}
+        {isSyncing && <RefreshCw className="h-3 w-3 animate-spin" />}
       </div>
     );
   }
@@ -54,7 +93,8 @@ const OfflineBanner: React.FC<OfflineBannerProps> = ({ className }) => {
       <WifiOff className="h-4 w-4 flex-shrink-0" />
       <span className="font-medium">You're offline</span>
       <span className="hidden sm:inline opacity-90">
-        — Some features may not be available
+        — Forms will be saved locally
+        {pendingCount > 0 && ` (${pendingCount} queued)`}
       </span>
       <Button
         size="sm"
