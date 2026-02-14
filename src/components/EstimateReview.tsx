@@ -15,8 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import TeachAIDialog from './TeachAIDialog';
-import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
-import UnsavedChangesDialog from './UnsavedChangesDialog';
 import { categorizeService, SERVICE_CATEGORIES, canStaffEditService, type ServiceCategory } from '@/lib/serviceCategories';
 import { LockedIndicator } from '@/components/LifecycleErrorState';
 import { LIFECYCLE_ERRORS } from '@/lib/lifecycleStateMachine';
@@ -121,8 +119,6 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   // Track if services have been modified for unsaved changes warning
   const [hasModifications, setHasModifications] = useState(false);
   
-  // Handle unsaved changes warning
-  const { isBlocked, confirmNavigation, cancelNavigation } = useUnsavedChanges(hasModifications);
 
   // Load existing approved estimate or parse from report
   useEffect(() => {
@@ -881,12 +877,6 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         correctedPrice={pendingFeedback?.correctedPrice}
       />
 
-      {/* Unsaved Changes Dialog */}
-      <UnsavedChangesDialog
-        open={isBlocked}
-        onConfirm={confirmNavigation}
-        onCancel={cancelNavigation}
-      />
 
       {/* Add Staff Service Modal */}
       <AddStaffServiceModal
