@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/imageCompression';
+import { extractErrorMessage } from '@/lib/errorHandler';
 import {
   getPendingSubmissions,
   getPhotosForSubmission,
@@ -145,7 +146,7 @@ class OfflineSyncService {
       await updateSubmissionStatus(submission.id, 'uploaded');
       console.log(`[OfflineSync] Successfully synced submission ${submission.id}`);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
+      const msg = extractErrorMessage(error);
       console.error(`[OfflineSync] Failed to sync ${submission.id}:`, msg);
       await updateSubmissionStatus(submission.id, 'failed', msg);
     }
