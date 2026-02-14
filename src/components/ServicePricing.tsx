@@ -232,37 +232,6 @@ const ServicePricingComponent = ({ userId }: ServicePricingProps) => {
         </CardContent>
       </Card>
 
-      {/* Variable Price Services */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5" />
-            Variable Price Services
-          </CardTitle>
-          <CardDescription>
-            Enable services where pricing varies per rug. Staff will enter the price each time these are added to an estimate.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {DEFAULT_VARIABLE_SERVICES.map((service) => (
-            <div
-              key={service}
-              className="flex items-center justify-between py-2 px-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={enabledVariableServices[service] || false}
-                  onCheckedChange={() => toggleVariableService(service)}
-                />
-                <span className="text-sm font-medium">{service}</span>
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
-                Price per rug
-              </Badge>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
 
       {/* Save Button */}
       <div className="flex justify-end">
