@@ -13,8 +13,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Upload, Building2, Save, Loader2, Lock, Bell, Eye, EyeOff, Mail, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCachedSignedUrl } from "@/hooks/useSignedUrls";
-import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
-import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
 import { validatePassword, PASSWORD_REQUIREMENTS } from "@/lib/passwordValidation";
 
 // Lazy load heavy sub-components (behind tabs/toggles, not visible on initial render)
@@ -99,8 +97,6 @@ const AccountSettings = () => {
   // Check if form has unsaved changes
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialFormData);
   
-  // Handle unsaved changes warning
-  const { isBlocked, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -740,12 +736,6 @@ const AccountSettings = () => {
         </div>
       </div>
 
-      {/* Unsaved Changes Dialog */}
-      <UnsavedChangesDialog
-        open={isBlocked}
-        onConfirm={confirmNavigation}
-        onCancel={cancelNavigation}
-      />
     </div>
   );
 };

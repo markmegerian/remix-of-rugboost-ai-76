@@ -6,8 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import ClientSearch from './ClientSearch';
-import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
-import UnsavedChangesDialog from './UnsavedChangesDialog';
 
 interface JobFormData {
   jobNumber: string;
@@ -46,8 +44,6 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mod
   // Check if form is dirty (has unsaved changes)
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialValues);
 
-  // Handle unsaved changes warning - custom implementation (NO useBlocker)
-  const { isBlocked, confirmNavigation, cancelNavigation } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
     if (initialData) {
@@ -206,12 +202,6 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mod
         </Button>
       </div>
 
-      {/* Unsaved Changes Dialog */}
-      <UnsavedChangesDialog
-        open={isBlocked}
-        onConfirm={confirmNavigation}
-        onCancel={cancelNavigation}
-      />
     </form>
   );
 };
