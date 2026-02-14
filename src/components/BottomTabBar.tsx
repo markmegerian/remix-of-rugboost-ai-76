@@ -24,6 +24,7 @@ const BottomTabBar: React.FC = () => {
 
   return (
     <nav
+      aria-label="Main navigation"
       className={cn(
         'fixed bottom-0 left-0 right-0 z-40 md:hidden',
         'bg-background/95 backdrop-blur-md border-t border-border',
@@ -37,13 +38,15 @@ const BottomTabBar: React.FC = () => {
             <Link
               key={path}
               to={path}
+              aria-label={label}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[48px] pt-2 pb-1 transition-colors',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-xs">{label}</span>
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              <span className="text-xs font-medium">{label}</span>
             </Link>
           );
         })}
