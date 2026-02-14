@@ -24,19 +24,21 @@ class OfflineSyncService {
 
   /** Start watching for connectivity and periodically syncing */
   start() {
-    // Listen for online events
     window.addEventListener('online', this.onOnline);
+    window.addEventListener('offline', this.onOffline);
 
-    // Periodic check
-    this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
+    // Only run interval when online to avoid wasted CPU
+    if (navigator.onLine) {
+      this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
+    }
 
-    // Initial sync attempt
     this.refreshCount();
     this.trySync();
   }
 
   stop() {
     window.removeEventListener('online', this.onOnline);
+    window.removeEventListener('offline', this.onOffline);
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -63,7 +65,19 @@ class OfflineSyncService {
 
   private onOnline = () => {
     console.log('[OfflineSync] Device came online, triggering sync');
+    // Restart periodic interval
+    if (!this.intervalId) {
+      this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
+    }
     this.trySync();
+  };
+
+  private onOffline = () => {
+    console.log('[OfflineSync] Device went offline, pausing interval');
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
   };
 
   /** Manually trigger a sync attempt */
@@ -90,6 +104,15 @@ class OfflineSyncService {
       }
 
       await this.syncSubmission(submission);
+    }
+
+    // Remove permanently failed submissions
+    const staleSubmissions = await getPendingSubmissions();
+    for (const sub of staleSubmissions) {
+      if (sub.retryCount >= MAX_RETRIES) {
+        await deleteSubmission(sub.id);
+        console.warn(`[OfflineSync] Permanently failed submission ${sub.id} removed after ${MAX_RETRIES} retries`);
+      }
     }
 
     // Clean up completed
