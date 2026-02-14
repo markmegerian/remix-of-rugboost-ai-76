@@ -72,7 +72,7 @@ const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
         // 80→95% over 5s
         setSmoothProgress(80 + Math.min(15, (sec / 5) * 15));
       }
-    }, 50);
+    }, 100);
 
     return () => clearInterval(interval);
   }, [stage]);
@@ -127,7 +127,7 @@ const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
   const currentStageIdx = stageOrder.indexOf(stage);
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div role="dialog" aria-modal="true" aria-label="Rug analysis in progress" aria-busy={stage !== 'complete'} className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
       <div className="bg-card border border-border rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
         <div className="space-y-4">
           {/* Branded logo + title */}
@@ -148,10 +148,11 @@ const AnalysisProgress: React.FC<AnalysisProgressProps> = ({
             </p>
           )}
 
-          <Progress value={smoothProgress} className="h-2" />
+          <Progress value={smoothProgress} className="h-2" aria-label={displayLabel} />
 
           {/* Rotating message with fade */}
           <div
+            aria-live="polite"
             className="flex items-center justify-center gap-2 text-sm text-muted-foreground min-h-[24px] transition-opacity duration-250"
             style={{ opacity: messageFade ? 1 : 0 }}
           >
