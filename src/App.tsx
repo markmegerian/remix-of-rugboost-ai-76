@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { CompanyGuard } from "@/components/CompanyGuard";
 import BottomTabBar from "@/components/BottomTabBar";
 import rugboostLogo from "@/assets/rugboost-logo.svg";
+import { offlineSyncService } from "@/lib/offlineSyncService";
 
 // Skeleton fallbacks for per-route Suspense
 import DashboardSkeleton from "@/components/skeletons/DashboardSkeleton";
@@ -76,7 +77,14 @@ const PageLoader = () => (
   </div>
 );
 
-const App = () => (
+const App = () => {
+  // Start offline sync service on mount
+  useEffect(() => {
+    offlineSyncService.start();
+    return () => offlineSyncService.stop();
+  }, []);
+
+  return (
   <ErrorBoundary>
      <QueryClientProvider client={queryClient}>
        <AuthProvider>
@@ -179,7 +187,8 @@ const App = () => (
          </CompanyProvider>
         </AuthProvider>
       </QueryClientProvider>
-   </ErrorBoundary>
-);
+    </ErrorBoundary>
+  );
+};
 
 export default App;
