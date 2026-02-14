@@ -102,7 +102,7 @@ const MobileJobActionBarComponent: React.FC<MobileJobActionBarProps> = ({
 
   return (
     <div className={cn(
-      "fixed bottom-0 left-0 right-0 z-40 md:hidden",
+      "fixed bottom-0 left-0 right-0 z-50 md:hidden",
       "bg-background/95 backdrop-blur-md border-t border-border",
       "px-4 py-3 pb-safe-bottom",
       className
