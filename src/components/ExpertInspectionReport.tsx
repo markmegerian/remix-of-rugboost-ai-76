@@ -1,30 +1,13 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; 
  import { Button } from '@/components/ui/button';
- import { Separator } from '@/components/ui/separator';
  import { Badge } from '@/components/ui/badge';
  import { 
   ChevronDown, ChevronUp, 
   FileText, ImageIcon, Lock, MessageSquare, Shield, ClipboardCheck,
-  AlertTriangle, X, Check, ZoomIn, ChevronLeft, ChevronRight, UserPlus
+  AlertTriangle, Check
  } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
- import {
-   Tooltip,
-   TooltipContent,
-   TooltipProvider,
-   TooltipTrigger,
- } from '@/components/ui/tooltip';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
  import { 
    SERVICE_CATEGORIES, 
    categorizeService, 
@@ -33,28 +16,14 @@ import {
  } from '@/lib/serviceCategories';
  import RugPhoto from '@/components/RugPhoto';
  import LazyPhotoGallery from '@/components/LazyPhotoGallery';
- 
+ import { ServiceLineItem, type Service } from '@/components/inspection/ServiceLineItem';
+ import { PhotoLightbox } from '@/components/inspection/PhotoLightbox';
+ import { DeclineConfirmDialog } from '@/components/inspection/DeclineConfirmDialog';
+
 // Check if service is significant value (threshold: $100)
 function isSignificantValue(service: Service): boolean {
   return service.adjustedTotal >= 100;
 }
- 
- interface Service {
-   id: string;
-   name: string;
-   quantity: number;
-   unitPrice: number;
-   priority?: string;
-  adjustedTotal: number; // Final price after risk/severity adjustments
-  pricingFactors?: string[]; // Internal tags (not shown to clients)
-  rugNumber?: string; // Which rug this service belongs to
-  // Staff addition tracking
-  source?: 'ai' | 'staff';
-  addedBy?: string;
-  addedByName?: string;
-  addedAt?: string;
-  reasonNote?: string;
- }
  
  interface PhotoAnnotations {
    photoIndex: number;
@@ -112,7 +81,7 @@ function isSignificantValue(service: Service): boolean {
 function calculateCategoryTotal(services: Service[], useAdjusted = true): number {
   return services.reduce((sum, s) => sum + (useAdjusted ? s.adjustedTotal : s.quantity * s.unitPrice), 0);
  }
- 
+
 // Generate condition summary based on services
 function generateConditionSummary(services: Service[]): string {
   const hasStainRemoval = services.some(s => s.name.toLowerCase().includes('stain'));
@@ -150,7 +119,6 @@ function generateConditionSummary(services: Service[]): string {
   const [lightboxImages, setLightboxImages] = useState<string[] | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxAnnotations, setLightboxAnnotations] = useState<PhotoAnnotations[] | null>(null);
-  const [tappedAnnotation, setTappedAnnotation] = useState<number | null>(null);
    
    // Aggregate services across all rugs, adding rug identification
    const allServices = rugs.flatMap(r => 
@@ -236,15 +204,8 @@ function generateConditionSummary(services: Service[]): string {
     setLightboxImages(null);
     setLightboxIndex(0);
     setLightboxAnnotations(null);
-    setTappedAnnotation(null);
   };
-
-  // Clear tapped annotation when changing photos
-  const handleLightboxNav = (newIndex: number) => {
-    setLightboxIndex(newIndex);
-    setTappedAnnotation(null);
-  };
-  
+   
    const toggleRug = (rugId: string) => {
      setExpandedRugs(prev => {
        const newSet = new Set(prev);
@@ -273,7 +234,7 @@ function generateConditionSummary(services: Service[]): string {
 
     return (
       <div className="space-y-6 pb-20 md:pb-0">
-      {/* 1. Header Section - Trust Establishment */}
+      {/* 1. Header Section */}
       <Card className="border-border bg-card">
          <CardHeader>
            <div className="flex items-start gap-3">
@@ -303,19 +264,15 @@ function generateConditionSummary(services: Service[]): string {
          </CardContent>
        </Card>
  
-      {/* 2. Rug Assessments - Context, Not Choice */}
+      {/* 2. Rug Assessments */}
        {rugs.map((rug) => {
-         const groupedServices = groupServicesByCategory(rug.services);
          const isExpanded = expandedRugs.has(rug.id);
          const isShowingReport = showReport === rug.id;
         const conditionSummary = generateConditionSummary(rug.services);
          
          return (
           <Card key={rug.id} className="overflow-hidden">
-             <Collapsible
-               open={isExpanded}
-               onOpenChange={() => toggleRug(rug.id)}
-             >
+             <Collapsible open={isExpanded} onOpenChange={() => toggleRug(rug.id)}>
                <CollapsibleTrigger asChild>
                 <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors pb-3">
                    <div className="flex items-center justify-between">
@@ -352,14 +309,10 @@ function generateConditionSummary(services: Service[]): string {
                
                <CollapsibleContent>
                  <CardContent className="pt-0 space-y-4">
-                  {/* Condition Summary */}
                   <div className="bg-muted/30 rounded-lg p-3">
-                    <p className="text-sm text-muted-foreground italic">
-                      {conditionSummary}
-                    </p>
+                    <p className="text-sm text-muted-foreground italic">{conditionSummary}</p>
                   </div>
 
-                   {/* Photos - Lazy Loading */}
                    {rug.photo_urls && rug.photo_urls.length > 0 && (
                      <LazyPhotoGallery
                        photoUrls={rug.photo_urls}
@@ -370,7 +323,6 @@ function generateConditionSummary(services: Service[]): string {
                      />
                    )}
                    
-                   {/* View Report Toggle */}
                    {rug.analysis_report && (
                      <Button
                        variant="ghost"
@@ -386,7 +338,6 @@ function generateConditionSummary(services: Service[]): string {
                      </Button>
                    )}
                    
-                   {/* Analysis Report */}
                    {isShowingReport && rug.analysis_report && (
                      <div className="bg-muted/30 rounded-lg p-4 text-sm">
                        <pre className="whitespace-pre-wrap font-sans leading-relaxed">
@@ -401,7 +352,7 @@ function generateConditionSummary(services: Service[]): string {
          );
        })}
  
-      {/* 3. Services Required for Proper Care - Non-Interactive, Locked */}
+      {/* 3. Required Services */}
       {allGrouped.required.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -421,9 +372,7 @@ function generateConditionSummary(services: Service[]): string {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{service.name}</p>
                     {rugs.length > 1 && service.rugNumber && (
-                      <p className="text-[10px] text-muted-foreground font-medium">
-                        {service.rugNumber}
-                      </p>
+                      <p className="text-[10px] text-muted-foreground font-medium">{service.rugNumber}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       ${(service.quantity * service.unitPrice).toFixed(2)}
@@ -436,7 +385,7 @@ function generateConditionSummary(services: Service[]): string {
         </Card>
       )}
 
-      {/* 4. Expert-Recommended Services - Individually Declinable */}
+      {/* 4. Recommended Services */}
       {allGrouped.recommended.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -464,7 +413,7 @@ function generateConditionSummary(services: Service[]): string {
         </Card>
       )}
 
-      {/* 5. Structural / High-Impact Services - Stronger Disclaimers */}
+      {/* 5. Structural / High-Impact Services */}
       {allGrouped.high_cost.length > 0 && (
         <Card className="border-2 border-primary/30">
           <CardHeader className="pb-3">
@@ -499,7 +448,7 @@ function generateConditionSummary(services: Service[]): string {
         </Card>
       )}
 
-      {/* 6. Preventative / Longevity Services - Soft Visual, Individually Declinable */}
+      {/* 6. Preventative Care */}
       {allGrouped.preventative.length > 0 && (
         <Card className="border-dashed">
           <CardHeader className="pb-3">
@@ -564,7 +513,7 @@ function generateConditionSummary(services: Service[]): string {
         </Card>
       )}
 
-      {/* 6. Risk & Disclosure Section */}
+      {/* Risk & Disclosure */}
       <div className="bg-muted/30 rounded-lg p-4 border border-dashed">
         <p className="text-xs text-muted-foreground leading-relaxed">
           <span className="font-medium text-foreground">Professional Notice:</span>{' '}
@@ -575,14 +524,14 @@ function generateConditionSummary(services: Service[]): string {
         </p>
       </div>
 
-      {/* Pricing Context Statement */}
+      {/* Pricing Context */}
       <div className="bg-muted/30 rounded-lg p-4 border border-dashed mb-4">
         <p className="text-xs text-muted-foreground italic leading-relaxed">
           Pricing reflects the material, condition, and recommended care identified during professional inspection.
         </p>
       </div>
 
-      {/* 7. Total Investment - Single Moment */}
+      {/* Total Investment */}
       <Card className="border-foreground/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -611,7 +560,7 @@ function generateConditionSummary(services: Service[]): string {
          </CardContent>
        </Card>
  
-       {/* 8. Primary CTA - One Action */}
+       {/* Primary CTA */}
        <div className="space-y-4">
           <Button
             ref={paymentButtonRef}
@@ -647,185 +596,23 @@ function generateConditionSummary(services: Service[]): string {
          )}
        </div>
 
-      {/* Decline Confirmation Modal */}
-      <AlertDialog open={!!confirmDecline} onOpenChange={() => setConfirmDecline(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              Decline Service
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                You are declining: <strong>{confirmDecline?.name}</strong>
-              </p>
-              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                <p className="text-sm text-destructive">
-                  {confirmDecline && getServiceDeclineConsequence(confirmDecline.name, categorizeService(confirmDecline.name))}
-                </p>
-              </div>
-              <p className="text-sm">
-                This service will not be performed. You may restore it before final approval.
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Service</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmDeclineService}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Decline Service
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Decline Confirmation Dialog */}
+      <DeclineConfirmDialog
+        isOpen={!!confirmDecline}
+        onClose={() => setConfirmDecline(null)}
+        onConfirm={confirmDeclineService}
+        serviceName={confirmDecline?.name || ''}
+      />
 
       {/* Photo Lightbox */}
-      {lightboxImages && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
-          onClick={closeLightbox}
-        >
-          {/* Close button */}
-          <button 
-            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
-            onClick={closeLightbox}
-          >
-            <X className="h-6 w-6" />
-          </button>
-          
-          {/* Photo counter */}
-          <div className="absolute top-4 left-4 text-white/80 text-sm">
-            {lightboxIndex + 1} / {lightboxImages.length}
-          </div>
-          
-          {/* Navigation - Previous */}
-          {lightboxImages.length > 1 && (
-            <button
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLightboxNav((lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length);
-              }}
-            >
-              <ChevronLeft className="h-8 w-8" />
-            </button>
-          )}
-          
-          {/* Main Image with Annotations */}
-          <div 
-            className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <RugPhoto
-              filePath={lightboxImages[lightboxIndex]}
-              alt={`Photo ${lightboxIndex + 1}`}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg"
-              loadingClassName="w-64 h-64"
-            />
-            {/* Annotation markers on lightbox image - tap to reveal on mobile */}
-            {lightboxAnnotations && (() => {
-              const currentAnnotation = lightboxAnnotations.find(a => a.photoIndex === lightboxIndex);
-              const markers = currentAnnotation?.annotations || [];
-              return markers.map((annotation, annIdx) => {
-                const isSelected = tappedAnnotation === annIdx;
-                return (
-                  <div
-                    key={annIdx}
-                    className="absolute z-10"
-                    style={{
-                      left: `${annotation.x}%`,
-                      top: `${annotation.y}%`,
-                      transform: 'translate(-50%, -50%)',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Toggle tooltip on tap for mobile
-                      setTappedAnnotation(isSelected ? null : annIdx);
-                    }}
-                  >
-                    <div className="relative cursor-pointer group">
-                      <div className={`w-8 h-8 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-sm font-bold shadow-lg border-2 transition-all ${isSelected ? 'border-white ring-2 ring-white/50 scale-110' : 'border-white'}`}>
-                        {annIdx + 1}
-                      </div>
-                      {/* Tooltip - shows on hover (desktop) or when tapped (mobile) */}
-                      <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 pointer-events-none transition-opacity ${isSelected ? 'block' : 'hidden md:group-hover:block'}`}>
-                        <div className="bg-white text-foreground px-3 py-2 rounded-md shadow-lg text-sm whitespace-normal border border-border max-w-[200px] sm:max-w-[250px]">
-                          {annotation.label}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-          
-          {/* Navigation - Next */}
-          {lightboxImages.length > 1 && (
-            <button
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLightboxNav((lightboxIndex + 1) % lightboxImages.length);
-              }}
-            >
-              <ChevronRight className="h-8 w-8" />
-            </button>
-          )}
-          {/* Annotation Legend */}
-          {lightboxAnnotations && (() => {
-            const currentAnnotation = lightboxAnnotations.find(a => a.photoIndex === lightboxIndex);
-            const markers = currentAnnotation?.annotations || [];
-            if (markers.length === 0) return null;
-            return (
-              <div 
-                className="absolute bottom-20 left-1/2 -translate-x-1/2 max-w-[90vw] bg-black/70 backdrop-blur-sm rounded-lg p-3"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex flex-wrap gap-3 justify-center">
-                  {markers.map((annotation, annIdx) => (
-                    <div key={annIdx} className="flex items-center gap-2 text-white text-sm">
-                      <span className="w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold">
-                        {annIdx + 1}
-                      </span>
-                      <span className="max-w-[150px] truncate">{annotation.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-          
-          {/* Thumbnail strip */}
-          {lightboxImages.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 max-w-[90vw] overflow-x-auto p-2">
-              {lightboxImages.map((url, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleLightboxNav(idx);
-                  }}
-                  className={`flex-shrink-0 rounded border-2 transition-all ${
-                    idx === lightboxIndex 
-                      ? 'border-white opacity-100' 
-                      : 'border-transparent opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  <RugPhoto
-                    filePath={url}
-                    alt={`Thumbnail ${idx + 1}`}
-                    className="w-12 h-12 object-cover rounded"
-                    loadingClassName="w-12 h-12"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <PhotoLightbox
+        photos={lightboxImages || []}
+        initialIndex={lightboxIndex}
+        isOpen={!!lightboxImages}
+        onClose={closeLightbox}
+        annotations={lightboxAnnotations}
+      />
+
        {/* Sticky bottom payment bar - mobile only */}
        {showStickyBar && (
          <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-background/95 backdrop-blur-md border-t border-border px-4 py-3 pb-safe-bottom">
@@ -852,125 +639,5 @@ function generateConditionSummary(services: Service[]): string {
       </div>
     );
   };
-
-// Service Line Item Component
-interface ServiceLineItemProps {
-  service: Service;
-  category: ServiceCategory;
-  isDeclined: boolean;
-  onDecline: () => void;
-  onRestore: () => void;
-  isSignificant: boolean;
-  showRugLabel?: boolean; // Show rug number when there are multiple rugs
-}
-
-const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
-  service,
-  category,
-  isDeclined,
-  onDecline,
-  onRestore,
-  isSignificant,
-  showRugLabel = false,
-}) => {
-  const cost = service.adjustedTotal;
-  
-  if (isDeclined) {
-    return (
-      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 opacity-60">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <X className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground line-through">{service.name}</span>
-          </div>
-          {showRugLabel && service.rugNumber && (
-            <p className="text-[10px] text-muted-foreground ml-6 mt-0.5">
-              {service.rugNumber}
-            </p>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs text-primary"
-          onClick={onRestore}
-        >
-          <Check className="h-3 w-3 mr-1" />
-          Restore
-        </Button>
-      </div>
-    );
-  }
-  
-  return (
-    <div className={`py-2 px-3 rounded-lg border ${
-      category === 'high_cost' 
-        ? 'border-primary/40 bg-primary/5' 
-        : isSignificant 
-          ? 'border-primary/20 bg-muted/30' 
-          : 'border-border bg-background'
-    }`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Check className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="text-sm font-medium">{service.name}</span>
-            {category === 'high_cost' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
-                Structural
-              </span>
-            )}
-            {category !== 'high_cost' && isSignificant && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                High Value
-              </span>
-            )}
-            {/* Staff-added badge for clients */}
-            {service.source === 'staff' && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="outline" className="text-[10px] gap-1 border-primary/50">
-                      <UserPlus className="h-3 w-3" />
-                      Added after review
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    {service.reasonNote ? (
-                      <p className="text-xs">{service.reasonNote}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Added by staff after initial assessment</p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-          {showRugLabel && service.rugNumber && (
-            <p className="text-[10px] text-muted-foreground ml-6 mt-0.5 font-medium">
-              {service.rugNumber}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground ml-6">
-            ${cost.toFixed(2)}
-          </p>
-          {(category === 'high_cost' || isSignificant) && (
-            <p className="text-xs text-muted-foreground ml-6 mt-1 italic">
-              {getServiceDeclineConsequence(service.name, category).split('.')[0]}.
-            </p>
-          )}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs text-muted-foreground hover:text-destructive"
-          onClick={onDecline}
-        >
-          Decline
-        </Button>
-      </div>
-    </div>
-  );
-};
  
  export default ExpertInspectionReport;
