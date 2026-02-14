@@ -18,6 +18,7 @@ const JobCard = ({ job }: JobCardProps) => {
       onClick={() => navigate(`/jobs/${job.id}`)}
       role="button"
       tabIndex={0}
+      aria-label={`Job ${job.job_number} for ${job.client_name}, ${job.rug_count} rugs, status ${job.status}`}
       onKeyDown={(e) => e.key === 'Enter' && navigate(`/jobs/${job.id}`)}
     >
       {/* Row 1: Client name + status */}

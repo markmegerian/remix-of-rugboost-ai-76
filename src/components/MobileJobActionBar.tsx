@@ -116,6 +116,7 @@ const MobileJobActionBarComponent: React.FC<MobileJobActionBarProps> = ({
             size="lg"
             className="h-12 w-12 p-0 shrink-0"
             onClick={onAddRug}
+            aria-label="Add rug"
           >
             <Plus className="h-5 w-5" />
           </StatusGatedButton>

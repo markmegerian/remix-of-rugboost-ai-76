@@ -27,6 +27,7 @@ const OfflineBanner: React.FC<OfflineBannerProps> = ({ className }) => {
   if (wasOffline && !isOffline) {
     return (
       <div
+        role="alert"
         className={cn(
           "fixed top-0 left-0 right-0 z-[100]",
           "bg-green-500 text-white py-2 px-4",
@@ -48,6 +49,7 @@ const OfflineBanner: React.FC<OfflineBannerProps> = ({ className }) => {
   if (!isOffline && pendingCount > 0) {
     return (
       <div
+        role="alert"
         className={cn(
           "fixed top-0 left-0 right-0 z-[100]",
           "bg-amber-500 text-white py-2 px-4",
@@ -81,7 +83,8 @@ const OfflineBanner: React.FC<OfflineBannerProps> = ({ className }) => {
   if (!isOffline) return null;
 
   return (
-    <div
+      <div
+        role="alert"
       className={cn(
         "fixed top-0 left-0 right-0 z-[100]",
         "bg-destructive text-destructive-foreground py-2 px-4",
