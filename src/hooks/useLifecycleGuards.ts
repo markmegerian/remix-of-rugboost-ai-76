@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import { useCompany } from './useCompany';
 import { useAuth } from './useAuth';
 import { useAdminAuth } from './useAdminAuth';
+import { useAuditLog } from './useAuditLog';
 import {
   LifecycleStatus,
   JobAction,
@@ -56,6 +57,8 @@ export function useLifecycleGuards(
   const { user } = useAuth();
   const { isAdmin } = useAdminAuth();
   const { companyId, loading: companyLoading } = useCompany();
+  const { logAction } = useAuditLog();
+  const loggedActionsRef = useRef<Set<string>>(new Set());
 
   // Determine user role
   const role = useMemo<UserRole>(() => {
@@ -72,6 +75,26 @@ export function useLifecycleGuards(
     isApproved: isApproved(currentStatus),
     isPaid: isPaid(currentStatus),
   }), [currentStatus]);
+
+  // Log admin override usage
+  const logOverride = useCallback((action: string) => {
+    const key = `${action}-${currentStatus}`;
+    if (loggedActionsRef.current.has(key)) return;
+    loggedActionsRef.current.add(key);
+
+    console.warn('[AdminOverride]', {
+      action,
+      status: currentStatus,
+      userId: user?.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    logAction({
+      action: 'admin_override',
+      entity_type: 'job',
+      details: { overriddenAction: action, jobStatus: currentStatus },
+    });
+  }, [currentStatus, user?.id, logAction]);
 
   // Permission check function
   const canPerform = useMemo(() => {
@@ -94,10 +117,14 @@ export function useLifecycleGuards(
 
       // Use admin role if override is enabled
       const effectiveRole = isAdminOverride ? 'admin' : role;
+
+      if (isAdminOverride) {
+        logOverride(action);
+      }
       
       return canPerformAction(action, effectiveRole, currentStatus);
     };
-  }, [currentStatus, role, isAdminOverride, companyId, companyLoading]);
+  }, [currentStatus, role, isAdminOverride, companyId, companyLoading, logOverride]);
 
   // Transition validation
   const canTransitionTo = useMemo(() => {
