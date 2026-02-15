@@ -56,7 +56,7 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
             <span className="text-sm text-muted-foreground line-through">{service.name}</span>
           </div>
           {showRugLabel && service.rugNumber && (
-            <p className="text-[10px] text-muted-foreground ml-6 mt-0.5">
+            <p className="text-xs text-muted-foreground ml-6 mt-0.5">
               {service.rugNumber}
             </p>
           )}
@@ -88,12 +88,12 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
             <Check className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="text-sm font-medium">{service.name}</span>
             {category === 'high_cost' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
                 Structural
               </span>
             )}
             {category !== 'high_cost' && isSignificant && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 High Value
               </span>
             )}
@@ -101,7 +101,7 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className="text-[10px] gap-1 border-primary/50">
+                    <Badge variant="outline" className="text-xs gap-1 border-primary/50">
                       <UserPlus className="h-3 w-3" />
                       Added after review
                     </Badge>
@@ -118,7 +118,7 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
             )}
           </div>
           {showRugLabel && service.rugNumber && (
-            <p className="text-[10px] text-muted-foreground ml-6 mt-0.5 font-medium">
+            <p className="text-xs text-muted-foreground ml-6 mt-0.5 font-medium">
               {service.rugNumber}
             </p>
           )}

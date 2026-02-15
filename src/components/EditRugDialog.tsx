@@ -155,7 +155,7 @@ const EditRugDialog: React.FC<EditRugDialogProps> = ({
               onChange={handleInputChange}
             />
             {isFtIn && (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
               </p>
             )}
@@ -175,7 +175,7 @@ const EditRugDialog: React.FC<EditRugDialogProps> = ({
               onChange={handleInputChange}
             />
             {isFtIn && (
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
               </p>
             )}
