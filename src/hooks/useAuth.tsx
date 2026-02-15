@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // 2. User already has any roles (prevents role accumulation)
       if (hasClientRole || hasAnyRole) {
         // User is a client or already has roles - do NOT assign staff
-        console.log('User has existing roles, skipping staff assignment');
+        console.debug('User has existing roles, skipping staff assignment');
       } else if (!hasStaffRole) {
         // Only assign staff if user has ZERO roles (true new internal user)
         const { error: insertError } = await supabase
@@ -111,17 +111,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           // Defer to avoid deadlock - ensure setup for new signups (especially OAuth)
           setTimeout(async () => {
-            // For new signups or OAuth, ensure user has required records
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              const fullName = session.user.user_metadata?.full_name || 
-                               session.user.user_metadata?.name ||
-                               session.user.email?.split('@')[0];
-              await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+            try {
+              if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                const fullName = session.user.user_metadata?.full_name || 
+                                 session.user.user_metadata?.name ||
+                                 session.user.email?.split('@')[0];
+                await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+              }
+              
+              const userRoles = await fetchUserRoles(session.user.id);
+              setRoles(userRoles);
+            } catch (err) {
+              console.error('[Auth] Error in onAuthStateChange:', err);
+              setRoles([]);
+            } finally {
+              setLoading(false);
             }
-            
-            const userRoles = await fetchUserRoles(session.user.id);
-            setRoles(userRoles);
-            setLoading(false);
           }, 0);
         } else {
           setRoles([]);
@@ -145,6 +150,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userRoles = await fetchUserRoles(session.user.id);
         setRoles(userRoles);
       }
+      setLoading(false);
+    }).catch((err) => {
+      console.warn('[Auth] getSession failed:', err?.name || err);
       setLoading(false);
     });
 
