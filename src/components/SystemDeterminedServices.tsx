@@ -66,17 +66,17 @@ const ServiceRow: React.FC<{
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{service.name}</span>
           {!service.canDecline && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+            <Badge variant="destructive" className="text-xs px-1.5 py-0">
               Required
             </Badge>
           )}
           {service.category === 'high_cost' && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/50 text-primary">
+            <Badge variant="outline" className="text-xs px-1.5 py-0 border-primary/50 text-primary">
               Structural
             </Badge>
           )}
           {service.isOverridden && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-accent/50">
+            <Badge variant="outline" className="text-xs px-1.5 py-0 bg-accent/50">
               Adjusted
             </Badge>
           )}
@@ -86,7 +86,7 @@ const ServiceRow: React.FC<{
         {showPricingFactors && service.pricingFactors && service.pricingFactors.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
             {service.pricingFactors.map(factor => (
-              <Badge key={factor} variant="secondary" className="text-[10px]">
+              <Badge key={factor} variant="secondary" className="text-xs">
                 {factor}
               </Badge>
             ))}
@@ -104,7 +104,7 @@ const ServiceRow: React.FC<{
             {showPricingFactors && service.riskMultiplier !== 1 && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1 justify-end cursor-help">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1 justify-end cursor-help">
                     <Info className="h-2.5 w-2.5" />
                     {service.riskMultiplier.toFixed(2)}×
                   </div>

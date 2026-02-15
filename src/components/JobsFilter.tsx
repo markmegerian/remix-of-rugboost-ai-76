@@ -224,7 +224,7 @@ const JobsFilter = ({
               >
                 <Filter className="h-4 w-4" />
                 {hasActiveFilters && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
                     {activeFilterCount}
                   </span>
                 )}
