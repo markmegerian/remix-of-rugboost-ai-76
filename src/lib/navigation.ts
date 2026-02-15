@@ -56,7 +56,7 @@ export const openExternalUrl = async (url: string, options?: {
       // For critical flows (Stripe), we may need to listen for the app URL
       // when the user returns from the external browser
       if (critical) {
-        console.log('[Navigation] Opened critical flow in browser:', url.substring(0, 50) + '...');
+        console.debug('[Navigation] Opened critical flow in browser:', url.substring(0, 50) + '...');
       }
     } catch (error) {
       console.error('[Navigation] Browser.open failed, falling back to location:', error);
@@ -166,7 +166,7 @@ export const isInternalUrl = (url: string): boolean => {
  * Uses Browser.open on native to ensure proper redirect handling
  */
 export const navigateToStripeCheckout = async (checkoutUrl: string): Promise<void> => {
-  console.log('[Navigation] Initiating Stripe checkout redirect');
+  console.debug('[Navigation] Initiating Stripe checkout redirect');
   
   await openExternalUrl(checkoutUrl, { 
     critical: true, 
