@@ -30,6 +30,26 @@ interface BatchItem {
   session_label: string;
 }
 
+interface PhotoAnnotation {
+  label: string;
+  location: string;
+  x: number;
+  y: number;
+}
+
+interface ImageAnnotation {
+  photoIndex: number;
+  annotations: PhotoAnnotation[];
+}
+
+interface StructuredResult {
+  report: string;
+  imageAnnotations: ImageAnnotation[];
+  edgeSuggestions?: any[];
+  modelUsed?: string;
+  processingTimeMs?: number;
+}
+
 interface CorrectionForm {
   correction_type: string;
   original_value: string;
@@ -42,6 +62,16 @@ interface Session {
   label: string;
   items: BatchItem[];
   status: string; // derived: pending, analyzing, analyzed, reviewed, error, mixed
+}
+
+/** Try to parse analysis_result as structured JSON, fall back to plain text */
+function parseAnalysisResult(raw: string | null): StructuredResult | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed.report) return parsed as StructuredResult;
+  } catch { /* not JSON */ }
+  return { report: raw, imageAnnotations: [] };
 }
 
 function deriveSessionStatus(items: BatchItem[]): string {
@@ -202,12 +232,20 @@ export const BatchTrainingTab = () => {
 
       if (error) throw error;
 
-      const report = data?.report || data?.analysis || JSON.stringify(data);
+      // Store the FULL structured response (report + imageAnnotations + metadata) as JSON
+      const structuredResult: StructuredResult = {
+        report: data?.report || data?.analysis || JSON.stringify(data),
+        imageAnnotations: data?.imageAnnotations || [],
+        edgeSuggestions: data?.edgeSuggestions || [],
+        modelUsed: data?.modelUsed,
+        processingTimeMs: data?.processingTimeMs,
+      };
+      const resultJson = JSON.stringify(structuredResult);
 
-      // Store the consolidated report on ALL items in the session
+      // Store the consolidated result on ALL items in the session
       for (const item of allItems) {
         await supabase.from('ai_batch_training_items')
-          .update({ status: 'analyzed', analysis_result: report })
+          .update({ status: 'analyzed', analysis_result: resultJson })
           .eq('id', item.id);
       }
 
@@ -475,43 +513,100 @@ export const BatchTrainingTab = () => {
               </div>
 
               {/* Expanded Session Content — consolidated view */}
-              {expandedSession === session.label && (
+              {expandedSession === session.label && (() => {
+                const structured = parseAnalysisResult(session.items[0]?.analysis_result);
+                const annotations = structured?.imageAnnotations || [];
+
+                return (
                 <CardContent className="pt-0 space-y-4">
                   <Separator />
 
-                  {/* Photo Gallery — all session photos as thumbnails */}
+                  {/* Metadata bar */}
+                  {structured?.modelUsed && (
+                    <div className="flex gap-3 text-xs text-muted-foreground">
+                      <span>Model: {structured.modelUsed}</span>
+                      {structured.processingTimeMs && <span>· {(structured.processingTimeMs / 1000).toFixed(1)}s</span>}
+                      <span>· {annotations.reduce((sum, a) => sum + a.annotations.length, 0)} annotations</span>
+                    </div>
+                  )}
+
+                  {/* Photo Gallery with annotation markers */}
                   <div>
                     <Label className="text-sm font-medium mb-2 block">
                       Photos ({session.items.length}) — analyzed together as one rug
                     </Label>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                      {session.items.map((item, idx) => (
-                        <div key={item.id} className="relative aspect-square rounded-lg border overflow-hidden bg-muted">
-                          {signedUrls.has(item.photo_path) ? (
-                            <img
-                              src={signedUrls.get(item.photo_path)}
-                              alt={`Photo ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {session.items.map((item, idx) => {
+                        const photoAnnotations = annotations.find(a => a.photoIndex === idx)?.annotations || [];
+                        return (
+                          <div key={item.id} className="space-y-1">
+                            <div className="relative aspect-square rounded-lg border overflow-hidden bg-muted group">
+                              {signedUrls.has(item.photo_path) ? (
+                                <img
+                                  src={signedUrls.get(item.photo_path)}
+                                  alt={`Photo ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                              )}
+                              {/* Annotation markers overlaid on photo */}
+                              {photoAnnotations.map((ann, annIdx) => (
+                                <div
+                                  key={annIdx}
+                                  className="absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full bg-destructive/90 text-destructive-foreground text-[9px] font-bold flex items-center justify-center ring-2 ring-white shadow-lg cursor-default"
+                                  style={{ left: `${ann.x}%`, top: `${ann.y}%` }}
+                                  title={ann.label}
+                                >
+                                  {annIdx + 1}
+                                </div>
+                              ))}
+                              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 text-center">
+                                Photo {idx + 1}{photoAnnotations.length > 0 ? ` · ${photoAnnotations.length} issues` : ''}
+                              </div>
                             </div>
-                          )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 text-center">
-                            Photo {idx + 1}
+                            {/* Annotation labels below each photo */}
+                            {photoAnnotations.length > 0 && (
+                              <div className="space-y-0.5">
+                                {photoAnnotations.map((ann, annIdx) => (
+                                  <div key={annIdx} className="flex items-start gap-1.5 text-[11px]">
+                                    <span className="shrink-0 w-4 h-4 rounded-full bg-destructive/90 text-destructive-foreground text-[9px] font-bold flex items-center justify-center mt-0.5">
+                                      {annIdx + 1}
+                                    </span>
+                                    <span className="text-muted-foreground leading-tight">{ann.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
+
+                  {/* Edge Suggestions */}
+                  {structured?.edgeSuggestions && structured.edgeSuggestions.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Edge-Specific Decisions</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {structured.edgeSuggestions.map((es: any, idx: number) => (
+                          <div key={idx} className="text-xs p-2 rounded-lg border bg-muted/30 space-y-0.5">
+                            <div className="font-medium capitalize">{es.serviceType}: {es.edges?.join(', ')}</div>
+                            <div className="text-muted-foreground">{es.rationale}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Consolidated AI Analysis Report */}
                   <div>
                     <Label className="text-sm font-medium mb-2 block">AI Analysis & Reasoning</Label>
-                    {session.items[0]?.analysis_result ? (
+                    {structured?.report ? (
                       <div className="text-sm bg-muted/50 rounded-lg p-4 max-h-[600px] overflow-y-auto whitespace-pre-wrap border leading-relaxed">
-                        {session.items[0].analysis_result}
+                        {structured.report}
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 border">
@@ -621,7 +716,8 @@ export const BatchTrainingTab = () => {
                     </div>
                   )}
                 </CardContent>
-              )}
+                );
+              })()}
             </Card>
           ))}
         </div>
