@@ -20,7 +20,7 @@ interface PhotoLightboxProps {
   annotations?: PhotoAnnotations[] | null;
 }
 
-export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
+const PhotoLightboxComponent: React.FC<PhotoLightboxProps> = ({
   photos,
   initialIndex,
   isOpen,
@@ -211,3 +211,5 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     </div>
   );
 };
+
+export const PhotoLightbox = React.memo(PhotoLightboxComponent);

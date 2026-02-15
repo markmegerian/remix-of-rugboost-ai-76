@@ -19,7 +19,7 @@ interface DeclineConfirmDialogProps {
   serviceName: string;
 }
 
-export const DeclineConfirmDialog: React.FC<DeclineConfirmDialogProps> = ({
+const DeclineConfirmDialogComponent: React.FC<DeclineConfirmDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
@@ -60,3 +60,5 @@ export const DeclineConfirmDialog: React.FC<DeclineConfirmDialogProps> = ({
     </AlertDialog>
   );
 };
+
+export const DeclineConfirmDialog = React.memo(DeclineConfirmDialogComponent);
