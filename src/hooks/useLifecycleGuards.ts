@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { useCompany } from './useCompany';
 import { useAuth } from './useAuth';
 import { useAdminAuth } from './useAdminAuth';
+import { useAuditLog } from './useAuditLog';
 import {
   LifecycleStatus,
   JobAction,
@@ -56,6 +57,28 @@ export function useLifecycleGuards(
   const { user } = useAuth();
   const { isAdmin } = useAdminAuth();
   const { companyId, loading: companyLoading } = useCompany();
+  const { logAction } = useAuditLog();
+  const loggedOverrides = useRef<Set<string>>(new Set());
+
+  const logAdminOverride = useCallback((action: string, jobId?: string) => {
+    const key = `${action}-${jobId ?? 'unknown'}`;
+    if (loggedOverrides.current.has(key)) return;
+    loggedOverrides.current.add(key);
+
+    console.warn('[AdminOverride]', {
+      action,
+      jobId,
+      userId: user?.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    logAction({
+      action: 'admin_override',
+      entity_type: 'job',
+      entity_id: jobId,
+      details: { overridden_action: action, status: currentStatus },
+    });
+  }, [user?.id, currentStatus, logAction]);
 
   // Determine user role
   const role = useMemo<UserRole>(() => {
@@ -94,17 +117,23 @@ export function useLifecycleGuards(
 
       // Use admin role if override is enabled
       const effectiveRole = isAdminOverride ? 'admin' : role;
+      if (isAdminOverride) {
+        logAdminOverride(action);
+      }
       
       return canPerformAction(action, effectiveRole, currentStatus);
     };
-  }, [currentStatus, role, isAdminOverride, companyId, companyLoading]);
+  }, [currentStatus, role, isAdminOverride, companyId, companyLoading, logAdminOverride]);
 
   // Transition validation
   const canTransitionTo = useMemo(() => {
     return (targetStatus: LifecycleStatus, context: TransitionContext) => {
+      if (isAdminOverride) {
+        logAdminOverride(`transition_to_${targetStatus}`);
+      }
       return validateTransition(currentStatus, targetStatus, context, isAdminOverride);
     };
-  }, [currentStatus, isAdminOverride]);
+  }, [currentStatus, isAdminOverride, logAdminOverride]);
 
   const nextStatus = useMemo(() => getNextStatus(currentStatus), [currentStatus]);
 
