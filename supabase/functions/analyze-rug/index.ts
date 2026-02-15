@@ -447,6 +447,46 @@ Deno.serve(async (req) => {
           }
         }
       }
+
+      // Fetch few-shot training examples for quality benchmarking
+      let trainingExamplesContext = "";
+      try {
+        const rugTypeLower = (rugInfo.rugType || "").toLowerCase();
+        
+        // Try category match first
+        let { data: examples } = await supabase
+          .from("ai_training_examples")
+          .select("*")
+          .eq("is_active", true)
+          .ilike("rug_category", `%${rugTypeLower.split(/[\s_-]/)[0]}%`)
+          .limit(2);
+
+        // Fallback to most recent if no category match
+        if (!examples || examples.length === 0) {
+          const { data: fallback } = await supabase
+            .from("ai_training_examples")
+            .select("*")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1);
+          examples = fallback;
+        }
+
+        if (examples && examples.length > 0) {
+          trainingExamplesContext = "\n\nREFERENCE EXAMPLES (use these as quality benchmarks):\n";
+          for (const ex of examples) {
+            trainingExamplesContext += `\n--- Example: ${ex.rug_description || ex.rug_category} ---\n`;
+            if (ex.key_learnings) trainingExamplesContext += `Key lessons: ${ex.key_learnings}\n`;
+            if (ex.photo_descriptions) trainingExamplesContext += `Photos showed: ${ex.photo_descriptions}\n`;
+            if (ex.example_output) {
+              const shortened = ex.example_output.substring(0, 500);
+              trainingExamplesContext += `Gold-standard output (excerpt): ${shortened}${ex.example_output.length > 500 ? "..." : ""}\n`;
+            }
+          }
+        }
+      } catch (exErr) {
+        console.error("Error fetching training examples:", exErr);
+      }
     } catch (priceError) {
       console.error("Error fetching user data:", priceError);
     }
@@ -530,7 +570,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
         messages: [
           {
             role: "system",
-            content: getSystemPrompt(businessName, businessPhone, businessAddress) + globalCorrectionsContext + feedbackContext,
+            content: getSystemPrompt(businessName, businessPhone, businessAddress) + trainingExamplesContext + globalCorrectionsContext + feedbackContext,
           },
           {
             role: "user",
