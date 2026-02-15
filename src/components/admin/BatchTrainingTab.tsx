@@ -206,18 +206,20 @@ export const BatchTrainingTab = () => {
 
     setAnalyzing(true);
     const allItems = session.items;
+    const allIds = allItems.map(i => i.id);
     const allPaths = allItems.map(i => i.photo_path);
 
-    // Mark all as analyzing
-    for (const item of allItems) {
-      await supabase.from('ai_batch_training_items')
-        .update({ status: 'analyzing', error_message: null })
-        .eq('id', item.id);
-    }
+    // Batch mark all as analyzing in one query
+    await supabase.from('ai_batch_training_items')
+      .update({ status: 'analyzing', error_message: null })
+      .in('id', allIds);
     queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
 
     try {
-      // Send ALL photos together — exactly like the real platform
+      // Add timeout — 3 minutes max for AI analysis
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180_000);
+
       const { data, error } = await supabase.functions.invoke('analyze-rug', {
         body: {
           photos: allPaths,
@@ -230,9 +232,11 @@ export const BatchTrainingTab = () => {
         },
       });
 
+      clearTimeout(timeout);
+
       if (error) throw error;
 
-      // Store the FULL structured response (report + imageAnnotations + metadata) as JSON
+      // Store the FULL structured response as JSON
       const structuredResult: StructuredResult = {
         report: data?.report || data?.analysis || JSON.stringify(data),
         imageAnnotations: data?.imageAnnotations || [],
@@ -242,21 +246,23 @@ export const BatchTrainingTab = () => {
       };
       const resultJson = JSON.stringify(structuredResult);
 
-      // Store the consolidated result on ALL items in the session
-      for (const item of allItems) {
-        await supabase.from('ai_batch_training_items')
-          .update({ status: 'analyzed', analysis_result: resultJson })
-          .eq('id', item.id);
-      }
+      // Batch update all items to analyzed in one query
+      await supabase.from('ai_batch_training_items')
+        .update({ status: 'analyzed', analysis_result: resultJson })
+        .in('id', allIds);
 
       toast.success('Session analysis complete!');
     } catch (err: any) {
-      for (const item of allItems) {
-        await supabase.from('ai_batch_training_items')
-          .update({ status: 'error', error_message: err?.message || 'Analysis failed' })
-          .eq('id', item.id);
-      }
-      toast.error('Analysis failed: ' + (err?.message || 'Unknown error'));
+      const errorMsg = err?.name === 'AbortError'
+        ? 'Analysis timed out after 3 minutes. Try with fewer photos.'
+        : (err?.message || 'Analysis failed');
+
+      // Batch update all to error in one query
+      await supabase.from('ai_batch_training_items')
+        .update({ status: 'error', error_message: errorMsg })
+        .in('id', allIds);
+
+      toast.error('Analysis failed: ' + errorMsg);
     }
 
     setAnalyzing(false);
@@ -266,11 +272,12 @@ export const BatchTrainingTab = () => {
   // Delete an entire session
   const deleteSessionMutation = useMutation({
     mutationFn: async (session: Session) => {
-      for (const item of session.items) {
-        await supabase.from('ai_batch_training_items').delete().eq('id', item.id);
-        // Also delete the photo from storage
-        await supabase.storage.from('rug-photos').remove([item.photo_path]);
-      }
+      const allIds = session.items.map(i => i.id);
+      const allPaths = session.items.map(i => i.photo_path);
+      // Batch delete DB rows
+      await supabase.from('ai_batch_training_items').delete().in('id', allIds);
+      // Batch delete storage files
+      await supabase.storage.from('rug-photos').remove(allPaths);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
@@ -282,27 +289,28 @@ export const BatchTrainingTab = () => {
   // Save corrections as global corrections
   const saveCorrectionsMutation = useMutation({
     mutationFn: async ({ session, corrections }: { session: Session; corrections: CorrectionForm[] }) => {
-      for (const correction of corrections) {
-        if (!correction.corrected_value) continue;
-        const { error } = await supabase.from('ai_global_corrections').insert({
-          correction_type: correction.correction_type || 'service_correction',
-          original_value: correction.original_value || null,
-          corrected_value: correction.corrected_value || null,
-          context: correction.context || null,
-          rug_category: correction.rug_category || null,
-          priority: 1,
-          is_active: true,
-          created_by: user!.id,
-        });
+      const validCorrections = corrections.filter(c => c.corrected_value);
+      if (validCorrections.length > 0) {
+        const { error } = await supabase.from('ai_global_corrections').insert(
+          validCorrections.map(c => ({
+            correction_type: c.correction_type || 'service_correction',
+            original_value: c.original_value || null,
+            corrected_value: c.corrected_value || null,
+            context: c.context || null,
+            rug_category: c.rug_category || null,
+            priority: 1,
+            is_active: true,
+            created_by: user!.id,
+          }))
+        );
         if (error) throw error;
       }
 
-      // Mark all items as reviewed
-      for (const item of session.items) {
-        await supabase.from('ai_batch_training_items')
-          .update({ status: 'reviewed', corrections_applied: true })
-          .eq('id', item.id);
-      }
+      // Batch mark all items as reviewed
+      const allIds = session.items.map(i => i.id);
+      await supabase.from('ai_batch_training_items')
+        .update({ status: 'reviewed', corrections_applied: true })
+        .in('id', allIds);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
@@ -315,11 +323,10 @@ export const BatchTrainingTab = () => {
   // Revert session to analyzed
   const revertSessionMutation = useMutation({
     mutationFn: async (session: Session) => {
-      for (const item of session.items) {
-        await supabase.from('ai_batch_training_items')
-          .update({ status: 'analyzed', corrections_applied: false })
-          .eq('id', item.id);
-      }
+      const allIds = session.items.map(i => i.id);
+      await supabase.from('ai_batch_training_items')
+        .update({ status: 'analyzed', corrections_applied: false })
+        .in('id', allIds);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
@@ -701,11 +708,10 @@ export const BatchTrainingTab = () => {
                           variant="outline"
                           size="sm"
                           onClick={async () => {
-                            for (const item of session.items) {
-                              await supabase.from('ai_batch_training_items')
-                                .update({ status: 'reviewed' })
-                                .eq('id', item.id);
-                            }
+                            const allIds = session.items.map(i => i.id);
+                            await supabase.from('ai_batch_training_items')
+                              .update({ status: 'reviewed' })
+                              .in('id', allIds);
                             queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
                             toast.success('Marked as reviewed (no corrections needed)');
                           }}
