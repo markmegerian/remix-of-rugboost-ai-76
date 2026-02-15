@@ -111,24 +111,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           const currentUser = session.user;
 
-          try {
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              console.debug('[Auth] Running ensureUserSetup for', event);
-              await ensureUserSetup(currentUser.id, currentUser.email || '',
-                currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
-              console.debug('[Auth] ensureUserSetup complete');
-            }
-
-            console.debug('[Auth] Fetching roles from onAuthStateChange');
-            const userRoles = await fetchUserRoles(currentUser.id);
-            console.debug('[Auth] Roles fetched:', userRoles);
-            setRoles(userRoles);
-          } catch (err) {
-            console.error('[Auth] Error in onAuthStateChange:', err);
-            setRoles([]);
-          } finally {
-            setLoading(false);
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            const fullName = currentUser.user_metadata?.full_name || 
+                             currentUser.user_metadata?.name ||
+                             currentUser.email?.split('@')[0];
+            await ensureUserSetup(currentUser.id, currentUser.email || '', fullName);
           }
+
+          const userRoles = await fetchUserRoles(currentUser.id);
+          setRoles(userRoles);
+          setLoading(false);
         } else {
           setRoles([]);
           setLoading(false);
@@ -142,25 +134,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        try {
-          const fullName = session.user.user_metadata?.full_name || 
-                           session.user.user_metadata?.name ||
-                           session.user.email?.split('@')[0];
-          await ensureUserSetup(session.user.id, session.user.email || '', fullName);
-          
-          const userRoles = await fetchUserRoles(session.user.id);
-          setRoles(userRoles);
-        } catch (err) {
-          console.error('[Auth] Error in getSession:', err);
-          setRoles([]);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
+        // Ensure user setup on initial load too
+        const fullName = session.user.user_metadata?.full_name || 
+                         session.user.user_metadata?.name ||
+                         session.user.email?.split('@')[0];
+        await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+        
+        const userRoles = await fetchUserRoles(session.user.id);
+        setRoles(userRoles);
       }
-    }).catch((err) => {
-      console.error('[Auth] getSession failed:', err);
       setLoading(false);
     });
 

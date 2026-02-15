@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { handleMutationError } from '@/lib/errorHandler';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { categorizeService, getServiceDeclineConsequence } from '@/lib/serviceCategories';
 import { openExternalUrl } from '@/lib/navigation';
@@ -142,7 +142,8 @@ export function useClientPayment({
         throw new Error('No checkout URL returned');
       }
     } catch (error) {
-      handleMutationError(error, 'ClientPayment');
+      console.error('Payment error:', error);
+      toast.error('Failed to process payment. Please try again.');
       setIsProcessing(false);
     }
   };

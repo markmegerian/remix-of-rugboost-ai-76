@@ -390,37 +390,6 @@ Deno.serve(async (req) => {
         businessAddress = profile.business_address || "";
       }
 
-      // Fetch GLOBAL corrections first (apply to all analyses)
-      let globalCorrectionsContext = "";
-      const { data: globalCorrections, error: globalError } = await supabase
-        .from("ai_global_corrections")
-        .select("*")
-        .eq("is_active", true)
-        .order("priority", { ascending: false })
-        .limit(25);
-
-      if (!globalError && globalCorrections && globalCorrections.length > 0) {
-        globalCorrectionsContext = "\n\nGLOBAL QUALITY STANDARDS (apply to all analyses):\n";
-        for (const gc of globalCorrections) {
-          if (gc.correction_type === "price_correction" && gc.original_value && gc.corrected_value) {
-            globalCorrectionsContext += `- Price: "${gc.original_value}" should be "${gc.corrected_value}"`;
-          } else if (gc.correction_type === "service_correction" && gc.original_value && gc.corrected_value) {
-            globalCorrectionsContext += `- Service "${gc.original_value}" should be "${gc.corrected_value}"`;
-          } else if (gc.correction_type === "identification_error" && gc.original_value && gc.corrected_value) {
-            globalCorrectionsContext += `- Identification: "${gc.original_value}" is actually "${gc.corrected_value}"`;
-          } else if (gc.correction_type === "missed_issue" && gc.corrected_value) {
-            globalCorrectionsContext += `- Commonly missed: ${gc.corrected_value}`;
-          } else if (gc.correction_type === "false_positive" && gc.original_value) {
-            globalCorrectionsContext += `- Avoid recommending "${gc.original_value}" incorrectly`;
-          } else {
-            continue;
-          }
-          if (gc.context) globalCorrectionsContext += ` (${gc.context})`;
-          if (gc.rug_category) globalCorrectionsContext += ` [category: ${gc.rug_category}]`;
-          globalCorrectionsContext += "\n";
-        }
-      }
-
       // Fetch recent AI feedback corrections for this user (AI Learning System)
       const { data: recentFeedback, error: feedbackError } = await supabase
         .from("ai_analysis_feedback")
@@ -446,46 +415,6 @@ Deno.serve(async (req) => {
             feedbackContext += `- "${fb.original_service_name}" was incorrectly recommended - be more careful with this\n`;
           }
         }
-      }
-
-      // Fetch few-shot training examples for quality benchmarking
-      let trainingExamplesContext = "";
-      try {
-        const rugTypeLower = (rugInfo.rugType || "").toLowerCase();
-        
-        // Try category match first
-        let { data: examples } = await supabase
-          .from("ai_training_examples")
-          .select("*")
-          .eq("is_active", true)
-          .ilike("rug_category", `%${rugTypeLower.split(/[\s_-]/)[0]}%`)
-          .limit(2);
-
-        // Fallback to most recent if no category match
-        if (!examples || examples.length === 0) {
-          const { data: fallback } = await supabase
-            .from("ai_training_examples")
-            .select("*")
-            .eq("is_active", true)
-            .order("created_at", { ascending: false })
-            .limit(1);
-          examples = fallback;
-        }
-
-        if (examples && examples.length > 0) {
-          trainingExamplesContext = "\n\nREFERENCE EXAMPLES (use these as quality benchmarks):\n";
-          for (const ex of examples) {
-            trainingExamplesContext += `\n--- Example: ${ex.rug_description || ex.rug_category} ---\n`;
-            if (ex.key_learnings) trainingExamplesContext += `Key lessons: ${ex.key_learnings}\n`;
-            if (ex.photo_descriptions) trainingExamplesContext += `Photos showed: ${ex.photo_descriptions}\n`;
-            if (ex.example_output) {
-              const shortened = ex.example_output.substring(0, 500);
-              trainingExamplesContext += `Gold-standard output (excerpt): ${shortened}${ex.example_output.length > 500 ? "..." : ""}\n`;
-            }
-          }
-        }
-      } catch (exErr) {
-        console.error("Error fetching training examples:", exErr);
       }
     } catch (priceError) {
       console.error("Error fetching user data:", priceError);
@@ -570,7 +499,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
         messages: [
           {
             role: "system",
-            content: getSystemPrompt(businessName, businessPhone, businessAddress) + trainingExamplesContext + globalCorrectionsContext + feedbackContext,
+            content: getSystemPrompt(businessName, businessPhone, businessAddress) + feedbackContext,
           },
           {
             role: "user",

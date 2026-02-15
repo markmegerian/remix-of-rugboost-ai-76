@@ -6,7 +6,6 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { PlatformFeeSettings } from '@/components/admin/PlatformFeeSettings';
 import { AdminNotificationSettings } from '@/components/admin/AdminNotificationSettings';
 import { AdminEmailTemplates } from '@/components/admin/AdminEmailTemplates';
-import { AITrainingManager } from '@/components/admin/AITrainingManager';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { Loader2 } from 'lucide-react';
 
@@ -48,19 +47,14 @@ const AdminSettings = () => {
         </div>
 
         <Tabs defaultValue="fees" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="fees">Platform Fees</TabsTrigger>
-            <TabsTrigger value="ai-training">AI Training</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="emails">Email Templates</TabsTrigger>
           </TabsList>
 
           <TabsContent value="fees" className="space-y-6">
             <PlatformFeeSettings />
-          </TabsContent>
-
-          <TabsContent value="ai-training" className="space-y-6">
-            <AITrainingManager />
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-6">

@@ -144,7 +144,7 @@ export function useJobDetailActions({
           });
           return true;
         } catch (offlineError) {
-          handleMutationError(offlineError, 'JobDetailActions.offlineFallback');
+          console.error('Failed to queue offline:', offlineError);
         }
       }
       handleMutationError(error, 'JobDetail.addRug');
