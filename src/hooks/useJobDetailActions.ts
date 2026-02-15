@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { handleMutationError, extractErrorMessage } from '@/lib/errorHandler';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import type { AnalysisStage } from '@/components/AnalysisProgress';
@@ -181,12 +182,8 @@ export function useJobDetailActions({
       // Return data for callers that need it (e.g. to update selectedRug)
       return { report: data.report, annotations, edgeSuggestions: edgeSuggs };
     } catch (error) {
-      console.error(`${isReanalysis ? 'Re-analysis' : 'Analysis'} failed:`, error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to ${isReanalysis ? 're-analyze' : 'analyze'} ${rug.rug_number}`
-      );
+      const verb = isReanalysis ? 're-analyze' : 'analyze';
+      handleMutationError(error, 'JobDetailActions', extractErrorMessage(error, `Failed to ${verb} ${rug.rug_number}`));
       return null;
     } finally {
       if (isReanalysis) {
@@ -253,7 +250,7 @@ export function useJobDetailActions({
 
         successCount++;
       } catch (error) {
-        console.error(`Analysis failed for ${rug.rug_number}:`, error);
+        console.error(`[JobDetailActions] Analysis failed for ${rug.rug_number}:`, error);
         errorCount++;
       }
     }
@@ -297,7 +294,7 @@ export function useJobDetailActions({
         });
         return true;
       } catch (error) {
-        console.error('Failed to queue offline:', error);
+        console.error('[JobDetailActions] Failed to queue offline:', error);
         toast.error('Failed to save offline. Please try again.');
         return false;
       }
@@ -342,11 +339,10 @@ export function useJobDetailActions({
           });
           return true;
         } catch (offlineError) {
-          console.error('Failed to queue offline:', offlineError);
+          console.error('[JobDetailActions] Failed to queue offline:', offlineError);
         }
       }
-      console.error('Add rug failed:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add rug');
+      handleMutationError(error, 'JobDetailActions', extractErrorMessage(error, 'Failed to add rug'));
       return false;
     } finally {
       setAddingRug(false);
@@ -382,8 +378,7 @@ export function useJobDetailActions({
       fetchJobDetails();
       return true;
     } catch (error) {
-      console.error('Update job error:', error);
-      toast.error('Failed to update job');
+      handleMutationError(error, 'JobDetailActions', 'Failed to update job');
       return false;
     } finally {
       setSavingJob(false);
@@ -416,8 +411,7 @@ export function useJobDetailActions({
       fetchJobDetails();
       return true;
     } catch (error) {
-      console.error('Update client info error:', error);
-      toast.error('Failed to update client information');
+      handleMutationError(error, 'JobDetailActions', 'Failed to update client information');
       return false;
     } finally {
       setSavingClientInfo(false);
@@ -447,8 +441,7 @@ export function useJobDetailActions({
       fetchJobDetails();
       return true;
     } catch (error) {
-      console.error('Update rug error:', error);
-      toast.error('Failed to update rug');
+      handleMutationError(error, 'JobDetailActions', 'Failed to update rug');
       return false;
     } finally {
       setSavingRug(false);
@@ -466,8 +459,7 @@ export function useJobDetailActions({
       toast.success('Rug deleted');
       fetchJobDetails();
     } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Failed to delete rug');
+      handleMutationError(error, 'JobDetailActions', 'Failed to delete rug');
     } finally {
       setConfirmDeleteRugId(null);
     }
@@ -523,8 +515,7 @@ export function useJobDetailActions({
       toast.success(`Report sent to ${job.client_email}!`);
       return true;
     } catch (error) {
-      console.error('Email send error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to send email');
+      handleMutationError(error, 'JobDetailActions', extractErrorMessage(error, 'Failed to send email'));
       return false;
     } finally {
       setSendingEmail(false);
@@ -544,8 +535,7 @@ export function useJobDetailActions({
       }, branding);
       toast.success('PDF downloaded successfully!');
     } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('Failed to generate PDF');
+      handleMutationError(error, 'JobDetailActions', 'Failed to generate PDF');
     }
   }, [job, branding]);
 
@@ -567,8 +557,7 @@ export function useJobDetailActions({
       await generateJobPDF(job, rugsWithClient, branding, upsellServices);
       toast.success('Complete job report downloaded!');
     } catch (error) {
-      console.error('Job PDF generation error:', error);
-      toast.error('Failed to generate job report');
+      handleMutationError(error, 'JobDetailActions', 'Failed to generate job report');
     }
   }, [job, rugs, branding, upsellServices]);
 
@@ -661,7 +650,7 @@ export function useJobDetailActions({
       });
 
       if (inviteError) {
-        console.error('Invite error:', inviteError);
+        console.error('[JobDetailActions] Invite error:', inviteError);
       }
 
       await supabase
@@ -683,8 +672,7 @@ export function useJobDetailActions({
         toast.success('Client portal link generated and copied to clipboard!');
       }
     } catch (error) {
-      console.error('Error generating portal link:', error);
-      toast.error('Failed to generate client portal link');
+      handleMutationError(error, 'JobDetailActions', 'Failed to generate client portal link');
     } finally {
       setGeneratingPortalLink(false);
     }
@@ -714,8 +702,7 @@ export function useJobDetailActions({
       toast.success('Invitation email resent successfully!');
       fetchJobDetails();
     } catch (error) {
-      console.error('Error resending invite:', error);
-      toast.error('Failed to resend invitation');
+      handleMutationError(error, 'JobDetailActions', 'Failed to resend invitation');
     } finally {
       setResendingInvite(false);
     }
