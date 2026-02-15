@@ -17,9 +17,7 @@ const Index = () => {
     }
     
     if (user) {
-      // Route based on user role — staff/admin take priority over client
       if (isAdmin || isStaff) {
-        // Staff and Admin - check if they have a company
         if (hasCompany) {
           navigate('/dashboard');
         } else {
@@ -28,13 +26,26 @@ const Index = () => {
       } else if (isClient) {
         navigate('/client/dashboard');
       } else {
-        // User has no roles yet - might be new staff signup
         navigate('/company/setup');
       }
     } else {
       navigate('/auth');
     }
   }, [user, authLoading, companyLoading, isClient, isStaff, isAdmin, hasCompany, navigate]);
+
+  // Safety timeout - prevent infinite loading screen
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.warn('[Index] Loading timeout reached - forcing navigation');
+      if (user) {
+        navigate('/dashboard');
+      } else {
+        navigate('/auth');
+      }
+    }, 8000);
+
+    return () => clearTimeout(timeout);
+  }, [user, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
