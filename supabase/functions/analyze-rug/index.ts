@@ -390,6 +390,37 @@ Deno.serve(async (req) => {
         businessAddress = profile.business_address || "";
       }
 
+      // Fetch GLOBAL corrections first (apply to all analyses)
+      let globalCorrectionsContext = "";
+      const { data: globalCorrections, error: globalError } = await supabase
+        .from("ai_global_corrections")
+        .select("*")
+        .eq("is_active", true)
+        .order("priority", { ascending: false })
+        .limit(25);
+
+      if (!globalError && globalCorrections && globalCorrections.length > 0) {
+        globalCorrectionsContext = "\n\nGLOBAL QUALITY STANDARDS (apply to all analyses):\n";
+        for (const gc of globalCorrections) {
+          if (gc.correction_type === "price_correction" && gc.original_value && gc.corrected_value) {
+            globalCorrectionsContext += `- Price: "${gc.original_value}" should be "${gc.corrected_value}"`;
+          } else if (gc.correction_type === "service_correction" && gc.original_value && gc.corrected_value) {
+            globalCorrectionsContext += `- Service "${gc.original_value}" should be "${gc.corrected_value}"`;
+          } else if (gc.correction_type === "identification_error" && gc.original_value && gc.corrected_value) {
+            globalCorrectionsContext += `- Identification: "${gc.original_value}" is actually "${gc.corrected_value}"`;
+          } else if (gc.correction_type === "missed_issue" && gc.corrected_value) {
+            globalCorrectionsContext += `- Commonly missed: ${gc.corrected_value}`;
+          } else if (gc.correction_type === "false_positive" && gc.original_value) {
+            globalCorrectionsContext += `- Avoid recommending "${gc.original_value}" incorrectly`;
+          } else {
+            continue;
+          }
+          if (gc.context) globalCorrectionsContext += ` (${gc.context})`;
+          if (gc.rug_category) globalCorrectionsContext += ` [category: ${gc.rug_category}]`;
+          globalCorrectionsContext += "\n";
+        }
+      }
+
       // Fetch recent AI feedback corrections for this user (AI Learning System)
       const { data: recentFeedback, error: feedbackError } = await supabase
         .from("ai_analysis_feedback")
@@ -499,7 +530,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
         messages: [
           {
             role: "system",
-            content: getSystemPrompt(businessName, businessPhone, businessAddress) + feedbackContext,
+            content: getSystemPrompt(businessName, businessPhone, businessAddress) + globalCorrectionsContext + feedbackContext,
           },
           {
             role: "user",
