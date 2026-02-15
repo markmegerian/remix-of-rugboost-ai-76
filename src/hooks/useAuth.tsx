@@ -129,19 +129,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // THEN check for existing session
+    // Only fetch roles here — onAuthStateChange handles ensureUserSetup
+    // to avoid duplicate concurrent calls that can hang
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) {
+        // No session — clear state and stop loading
+        setSession(null);
+        setUser(null);
+        setRoles([]);
+        setLoading(false);
+        return;
+      }
+
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(session.user);
       
-      if (session?.user) {
-        // Ensure user setup on initial load too
-        const fullName = session.user.user_metadata?.full_name || 
-                         session.user.user_metadata?.name ||
-                         session.user.email?.split('@')[0];
-        await ensureUserSetup(session.user.id, session.user.email || '', fullName);
-        
+      try {
         const userRoles = await fetchUserRoles(session.user.id);
         setRoles(userRoles);
+      } catch (err) {
+        console.error('Error fetching roles on init:', err);
       }
       setLoading(false);
     });
