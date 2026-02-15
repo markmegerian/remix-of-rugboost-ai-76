@@ -139,43 +139,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // THEN check for existing session (with retry for AbortError)
-    const attemptGetSession = async (retries = 2): Promise<void> => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
+    console.debug('[Auth] Calling getSession');
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.debug('[Auth] getSession result:', !!session?.user);
+      if (!isMounted) return;
 
-        if (session?.user) {
-          try {
-            const fullName = session.user.user_metadata?.full_name || 
-                             session.user.user_metadata?.name ||
-                             session.user.email?.split('@')[0];
-            await ensureUserSetup(session.user.id, session.user.email || '', fullName);
-            
-            const userRoles = await fetchUserRoles(session.user.id);
-            if (isMounted) setRoles(userRoles);
-          } catch (err) {
-            console.error('[Auth] Error in getSession:', err);
-            if (isMounted) setRoles([]);
-          } finally {
-            if (isMounted) setLoading(false);
-          }
-        } else {
-          if (isMounted) setLoading(false);
-        }
-      } catch (err: any) {
-        if (retries > 0 && err?.name === 'AbortError') {
-          console.warn('[Auth] getSession aborted, retrying...', retries, 'left');
-          await new Promise(r => setTimeout(r, 500));
-          return attemptGetSession(retries - 1);
-        }
-        console.error('[Auth] getSession failed:', err);
-        if (isMounted) setLoading(false);
+      if (!session?.user) {
+        setSession(null);
+        setUser(null);
+        setRoles([]);
+        setLoading(false);
+        return;
       }
-    };
-    attemptGetSession();
+
+      setSession(session);
+      setUser(session.user);
+      
+      try {
+        console.debug('[Auth] Fetching roles from getSession');
+        const userRoles = await fetchUserRoles(session.user.id);
+        console.debug('[Auth] getSession roles:', userRoles);
+        if (isMounted) setRoles(userRoles);
+      } catch (err) {
+        console.error('[Auth] Error fetching roles on init:', err);
+      }
+      if (isMounted) setLoading(false);
+    }).catch((err) => {
+      console.warn('[Auth] getSession failed:', err.name, err.message);
+      if (isMounted) {
+        setLoading(false);
+      }
+    });
 
     return () => {
       isMounted = false;
