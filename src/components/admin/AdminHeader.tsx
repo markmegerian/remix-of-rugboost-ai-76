@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Settings, Shield } from 'lucide-react';
+import { LogOut, Settings, Shield, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
@@ -34,6 +34,9 @@ export const AdminHeader = ({
         <div className="flex items-center gap-2">
           <Button onClick={() => navigate('/admin/users')} variant="outline" size="sm" className="gap-2">
             Users
+          </Button>
+          <Button onClick={() => navigate('/admin/ai-training')} variant="ghost" size="icon" title="AI Training">
+            <Brain className="h-4 w-4" />
           </Button>
           <Button onClick={() => navigate('/admin/settings')} variant="ghost" size="icon" title="Platform Settings">
             <Settings className="h-4 w-4" />
