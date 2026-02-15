@@ -7,16 +7,14 @@ export type AuditAction =
   | 'payout_completed'
   | 'payout_failed'
   | 'user_viewed'
-  | 'fee_updated'
-  | 'admin_override';
+  | 'fee_updated';
 
 export type AuditEntityType = 
   | 'platform_settings'
   | 'payout'
   | 'user'
   | 'notification_settings'
-  | 'email_template'
-  | 'job';
+  | 'email_template';
 
 interface AuditLogEntry {
   action: AuditAction;

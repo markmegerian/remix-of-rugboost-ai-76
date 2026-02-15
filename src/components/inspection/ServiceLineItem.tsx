@@ -36,7 +36,7 @@ export interface ServiceLineItemProps {
   showRugLabel?: boolean;
 }
 
-const ServiceLineItemComponent: React.FC<ServiceLineItemProps> = ({
+const ServiceLineItemInner: React.FC<ServiceLineItemProps> = ({
   service,
   category,
   isDeclined,
@@ -146,4 +146,4 @@ const ServiceLineItemComponent: React.FC<ServiceLineItemProps> = ({
   );
 };
 
-export const ServiceLineItem = React.memo(ServiceLineItemComponent);
+export const ServiceLineItem = React.memo(ServiceLineItemInner);
