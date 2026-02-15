@@ -111,17 +111,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           const currentUser = session.user;
 
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            await ensureUserSetup(currentUser.id, currentUser.email || '', 
-              currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
-          }
+          try {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              await ensureUserSetup(currentUser.id, currentUser.email || '', 
+                currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
+            }
 
-          const userRoles = await fetchUserRoles(currentUser.id);
-          setRoles(userRoles);
+            const userRoles = await fetchUserRoles(currentUser.id);
+            setRoles(userRoles);
+          } catch (err) {
+            console.error('[Auth] Error in onAuthStateChange:', err);
+            setRoles([]);
+          } finally {
+            setLoading(false);
+          }
         } else {
           setRoles([]);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
