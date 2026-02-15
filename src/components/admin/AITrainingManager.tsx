@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -70,6 +70,8 @@ export const AITrainingManager = () => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('corrections');
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Fetch global corrections
   const { data: corrections = [], isLoading: loadingCorrections } = useQuery({
@@ -206,6 +208,9 @@ export const AITrainingManager = () => {
       rug_category: rugCategory,
       priority: 1,
     });
+    setActiveTab('corrections');
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    toast.info('Feedback loaded into form — review and submit');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -216,7 +221,7 @@ export const AITrainingManager = () => {
   const activeCount = corrections.filter(c => c.is_active).length;
 
   return (
-    <Tabs defaultValue="corrections" className="space-y-6">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <TabsList>
         <TabsTrigger value="corrections" className="gap-2">
           <Sparkles className="h-4 w-4" />
@@ -240,7 +245,7 @@ export const AITrainingManager = () => {
             <CardDescription>These corrections are applied to ALL rug analyses across the platform.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Correction Type</Label>
