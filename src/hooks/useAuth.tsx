@@ -102,6 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -122,49 +123,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.debug('[Auth] Fetching roles from onAuthStateChange');
             const userRoles = await fetchUserRoles(currentUser.id);
             console.debug('[Auth] Roles fetched:', userRoles);
-            setRoles(userRoles);
+            if (isMounted) setRoles(userRoles);
           } catch (err) {
             console.error('[Auth] Error in onAuthStateChange:', err);
-            setRoles([]);
+            if (isMounted) setRoles([]);
           } finally {
-            setLoading(false);
+            if (isMounted) setLoading(false);
           }
         } else {
-          setRoles([]);
-          setLoading(false);
+          if (isMounted) {
+            setRoles([]);
+            setLoading(false);
+          }
         }
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        try {
-          const fullName = session.user.user_metadata?.full_name || 
-                           session.user.user_metadata?.name ||
-                           session.user.email?.split('@')[0];
-          await ensureUserSetup(session.user.id, session.user.email || '', fullName);
-          
-          const userRoles = await fetchUserRoles(session.user.id);
-          setRoles(userRoles);
-        } catch (err) {
-          console.error('[Auth] Error in getSession:', err);
-          setRoles([]);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
-    }).catch((err) => {
-      console.error('[Auth] getSession failed:', err);
-      setLoading(false);
-    });
+    // THEN check for existing session (with retry for AbortError)
+    const attemptGetSession = async (retries = 2): Promise<void> => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
 
-    return () => subscription.unsubscribe();
+        if (session?.user) {
+          try {
+            const fullName = session.user.user_metadata?.full_name || 
+                             session.user.user_metadata?.name ||
+                             session.user.email?.split('@')[0];
+            await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+            
+            const userRoles = await fetchUserRoles(session.user.id);
+            if (isMounted) setRoles(userRoles);
+          } catch (err) {
+            console.error('[Auth] Error in getSession:', err);
+            if (isMounted) setRoles([]);
+          } finally {
+            if (isMounted) setLoading(false);
+          }
+        } else {
+          if (isMounted) setLoading(false);
+        }
+      } catch (err: any) {
+        if (retries > 0 && err?.name === 'AbortError') {
+          console.warn('[Auth] getSession aborted, retrying...', retries, 'left');
+          await new Promise(r => setTimeout(r, 500));
+          return attemptGetSession(retries - 1);
+        }
+        console.error('[Auth] getSession failed:', err);
+        if (isMounted) setLoading(false);
+      }
+    };
+    attemptGetSession();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
