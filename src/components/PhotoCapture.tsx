@@ -314,13 +314,13 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                       <X className="h-3 w-3" />
                     </button>
                   )}
-                  <div className="absolute bottom-1 left-1 rounded-full bg-foreground/70 px-1.5 py-0.5 text-[10px] text-background font-medium">{index + 1}</div>
+                  <div className="absolute bottom-1 left-1 rounded-full bg-foreground/70 px-1.5 py-0.5 text-xs text-background font-medium">{index + 1}</div>
                 </div>
               ))}
               {remainingSlots > 0 && !disabled && (
                 <button type="button" onClick={openCamera} className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all">
                   <Camera className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground">Add</span>
+                  <span className="text-xs text-muted-foreground">Add</span>
                 </button>
               )}
             </div>

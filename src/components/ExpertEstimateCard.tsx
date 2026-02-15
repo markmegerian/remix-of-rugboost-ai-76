@@ -174,7 +174,7 @@
                              <div key={service.id || idx} className="flex items-center justify-between text-sm">
                                <div className="flex items-center gap-2">
                                  <span>{service.name}</span>
-                                 <Badge variant="destructive" className="text-[10px] h-4">
+                                 <Badge variant="destructive" className="text-xs h-4">
                                    Required
                                  </Badge>
                                </div>
@@ -204,7 +204,7 @@
                              <div key={service.id || idx} className="flex items-center justify-between text-sm">
                                <div className="flex items-center gap-2">
                                  <span>{service.name}</span>
-                                 <Badge variant="secondary" className="text-[10px] h-4">
+                                 <Badge variant="secondary" className="text-xs h-4">
                                    Recommended
                                  </Badge>
                                </div>
@@ -234,7 +234,7 @@
                              <div key={service.id || idx} className="flex items-center justify-between text-sm text-muted-foreground">
                                <div className="flex items-center gap-2">
                                  <span>{service.name}</span>
-                                 <Badge variant="outline" className="text-[10px] h-4">
+                                 <Badge variant="outline" className="text-xs h-4">
                                    Preventative
                                  </Badge>
                                </div>

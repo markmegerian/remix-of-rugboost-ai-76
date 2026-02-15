@@ -372,7 +372,7 @@ function generateConditionSummary(services: Service[]): string {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{service.name}</p>
                     {rugs.length > 1 && service.rugNumber && (
-                      <p className="text-[10px] text-muted-foreground font-medium">{service.rugNumber}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{service.rugNumber}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       ${(service.quantity * service.unitPrice).toFixed(2)}
