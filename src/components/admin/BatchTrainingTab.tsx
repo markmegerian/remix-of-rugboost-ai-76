@@ -9,13 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
   Upload, Loader2, CheckCircle, XCircle, AlertCircle, Image as ImageIcon,
-  ChevronDown, ChevronUp, Save, Trash2, RotateCcw, Undo2
+  ChevronDown, ChevronUp, Save, Trash2, RotateCcw, Undo2, Plus, FolderOpen
 } from 'lucide-react';
 import browserImageCompression from 'browser-image-compression';
 
@@ -28,6 +27,7 @@ interface BatchItem {
   error_message: string | null;
   corrections_applied: boolean;
   created_at: string;
+  session_label: string;
 }
 
 interface CorrectionForm {
@@ -38,17 +38,49 @@ interface CorrectionForm {
   rug_category: string;
 }
 
+interface Session {
+  label: string;
+  items: BatchItem[];
+  status: string; // derived: pending, analyzing, analyzed, reviewed, error, mixed
+}
+
+function deriveSessionStatus(items: BatchItem[]): string {
+  const statuses = new Set(items.map(i => i.status));
+  if (statuses.size === 1) return [...statuses][0];
+  if (statuses.has('analyzing')) return 'analyzing';
+  if (statuses.has('error') && statuses.size === 1) return 'error';
+  if (statuses.has('analyzed')) return 'analyzed';
+  return 'mixed';
+}
+
+function groupBySession(items: BatchItem[]): Session[] {
+  const map = new Map<string, BatchItem[]>();
+  for (const item of items) {
+    const label = item.session_label || 'Unnamed';
+    if (!map.has(label)) map.set(label, []);
+    map.get(label)!.push(item);
+  }
+  return Array.from(map.entries())
+    .map(([label, items]) => ({ label, items, status: deriveSessionStatus(items) }))
+    .sort((a, b) => {
+      const aDate = Math.max(...a.items.map(i => new Date(i.created_at).getTime()));
+      const bDate = Math.max(...b.items.map(i => new Date(i.created_at).getTime()));
+      return bDate - aDate;
+    });
+}
+
 export const BatchTrainingTab = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  const [sessionLabel, setSessionLabel] = useState('');
+  const [rugType, setRugType] = useState('');
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
   const [correctionForms, setCorrectionForms] = useState<Record<string, CorrectionForm[]>>({});
-  const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
 
-  // Fetch batch items
+  // Fetch all batch items
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['admin', 'batch-training-items'],
     queryFn: async () => {
@@ -56,34 +88,36 @@ export const BatchTrainingTab = () => {
         .from('ai_batch_training_items')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
       if (error) throw error;
       return data as BatchItem[];
     },
   });
 
-  // Load signed URLs for visible items
+  const sessions = groupBySession(items);
+
   const loadSignedUrls = useCallback(async (paths: string[]) => {
-    if (paths.length === 0) return;
-    const urls = await batchSignUrls(paths);
+    const missing = paths.filter(p => !signedUrls.has(p));
+    if (missing.length === 0) return;
+    const urls = await batchSignUrls(missing);
     setSignedUrls(prev => {
       const next = new Map(prev);
       urls.forEach((url, path) => next.set(path, url));
       return next;
     });
-  }, []);
+  }, [signedUrls]);
 
-  // Upload photos
+  // Upload photos into a session
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
+    const label = sessionLabel.trim() || `Session ${new Date().toLocaleString()}`;
     setUploading(true);
-    const uploadedItems: string[] = [];
+    const uploadedPaths: string[] = [];
 
     try {
       for (const file of files) {
-        // Compress
         const compressed = await browserImageCompression(file, {
           maxSizeMB: 2,
           maxWidthOrHeight: 2048,
@@ -102,13 +136,14 @@ export const BatchTrainingTab = () => {
           continue;
         }
 
-        // Create DB record
         const { error: dbError } = await supabase
           .from('ai_batch_training_items')
           .insert({
             photo_path: path,
             created_by: user!.id,
             status: 'pending',
+            session_label: label,
+            rug_type: rugType.trim() || 'Unknown',
           });
 
         if (dbError) {
@@ -116,84 +151,99 @@ export const BatchTrainingTab = () => {
           continue;
         }
 
-        uploadedItems.push(path);
+        uploadedPaths.push(path);
       }
 
-      toast.success(`Uploaded ${uploadedItems.length} of ${files.length} photos`);
+      toast.success(`Uploaded ${uploadedPaths.length} photos to "${label}"`);
       queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
-      await loadSignedUrls(uploadedItems);
+      await loadSignedUrls(uploadedPaths);
+      setSessionLabel('');
     } catch (err) {
       handleMutationError(err, 'BatchUpload');
     } finally {
       setUploading(false);
-      // Reset input
       e.target.value = '';
     }
   };
 
-  // Analyze all pending items
-  const handleAnalyzeAll = async () => {
-    const pending = items.filter(i => i.status === 'pending');
-    if (pending.length === 0) {
-      toast.info('No pending photos to analyze');
+  // Analyze an entire session — send ALL photos together (like a real job)
+  const handleAnalyzeSession = async (session: Session) => {
+    const pendingOrError = session.items.filter(i => i.status === 'pending' || i.status === 'error');
+    if (pendingOrError.length === 0 && session.status !== 'error') {
+      toast.info('No pending photos in this session');
       return;
     }
 
     setAnalyzing(true);
-    setAnalysisProgress({ current: 0, total: pending.length });
+    const allItems = session.items;
+    const allPaths = allItems.map(i => i.photo_path);
 
-    for (let i = 0; i < pending.length; i++) {
-      const item = pending[i];
-      setAnalysisProgress({ current: i + 1, total: pending.length });
-
-      // Mark as analyzing
-      await supabase
-        .from('ai_batch_training_items')
-        .update({ status: 'analyzing' })
+    // Mark all as analyzing
+    for (const item of allItems) {
+      await supabase.from('ai_batch_training_items')
+        .update({ status: 'analyzing', error_message: null })
         .eq('id', item.id);
+    }
+    queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
 
-      try {
-        const { data, error } = await supabase.functions.invoke('analyze-rug', {
-          body: {
-            photos: [item.photo_path],
-            rugInfo: {
-              clientName: 'Training Batch',
-              rugNumber: `TRAIN-${item.id.slice(0, 8)}`,
-              rugType: item.rug_type || 'Unknown',
-            },
-            userId: user!.id,
+    try {
+      // Send ALL photos together — exactly like the real platform
+      const { data, error } = await supabase.functions.invoke('analyze-rug', {
+        body: {
+          photos: allPaths,
+          rugInfo: {
+            clientName: 'Training Batch',
+            rugNumber: `TRAIN-${session.label.slice(0, 12)}`,
+            rugType: allItems[0]?.rug_type || 'Unknown',
           },
-        });
+          userId: user!.id,
+        },
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const report = data?.report || data?.analysis || JSON.stringify(data);
+      const report = data?.report || data?.analysis || JSON.stringify(data);
 
-        await supabase
-          .from('ai_batch_training_items')
+      // Store the consolidated report on ALL items in the session
+      for (const item of allItems) {
+        await supabase.from('ai_batch_training_items')
           .update({ status: 'analyzed', analysis_result: report })
           .eq('id', item.id);
-      } catch (err: any) {
-        await supabase
-          .from('ai_batch_training_items')
+      }
+
+      toast.success('Session analysis complete!');
+    } catch (err: any) {
+      for (const item of allItems) {
+        await supabase.from('ai_batch_training_items')
           .update({ status: 'error', error_message: err?.message || 'Analysis failed' })
           .eq('id', item.id);
       }
-
-      // Small delay between analyses to avoid rate limiting
-      if (i < pending.length - 1) {
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      toast.error('Analysis failed: ' + (err?.message || 'Unknown error'));
     }
 
     setAnalyzing(false);
     queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
-    toast.success('Batch analysis complete!');
   };
+
+  // Delete an entire session
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (session: Session) => {
+      for (const item of session.items) {
+        await supabase.from('ai_batch_training_items').delete().eq('id', item.id);
+        // Also delete the photo from storage
+        await supabase.storage.from('rug-photos').remove([item.photo_path]);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
+      toast.success('Session deleted');
+    },
+    onError: (err) => handleMutationError(err, 'BatchDelete'),
+  });
 
   // Save corrections as global corrections
   const saveCorrectionsMutation = useMutation({
-    mutationFn: async ({ itemId, corrections }: { itemId: string; corrections: CorrectionForm[] }) => {
+    mutationFn: async ({ session, corrections }: { session: Session; corrections: CorrectionForm[] }) => {
       for (const correction of corrections) {
         if (!correction.corrected_value) continue;
         const { error } = await supabase.from('ai_global_corrections').insert({
@@ -209,12 +259,12 @@ export const BatchTrainingTab = () => {
         if (error) throw error;
       }
 
-      // Mark item as reviewed
-      const { error } = await supabase
-        .from('ai_batch_training_items')
-        .update({ status: 'reviewed', corrections_applied: true })
-        .eq('id', itemId);
-      if (error) throw error;
+      // Mark all items as reviewed
+      for (const item of session.items) {
+        await supabase.from('ai_batch_training_items')
+          .update({ status: 'reviewed', corrections_applied: true })
+          .eq('id', item.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
@@ -224,112 +274,55 @@ export const BatchTrainingTab = () => {
     onError: (err) => handleMutationError(err, 'BatchCorrections'),
   });
 
-  const deleteItemMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('ai_batch_training_items').delete().eq('id', id);
-      if (error) throw error;
+  // Revert session to analyzed
+  const revertSessionMutation = useMutation({
+    mutationFn: async (session: Session) => {
+      for (const item of session.items) {
+        await supabase.from('ai_batch_training_items')
+          .update({ status: 'analyzed', corrections_applied: false })
+          .eq('id', item.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
-      toast.success('Item removed');
-    },
-    onError: (err) => handleMutationError(err, 'BatchDelete'),
-  });
-
-  // Retry a single failed item
-  const retryItemMutation = useMutation({
-    mutationFn: async (item: BatchItem) => {
-      // Reset to analyzing
-      await supabase
-        .from('ai_batch_training_items')
-        .update({ status: 'analyzing', error_message: null })
-        .eq('id', item.id);
-
-      const { data, error } = await supabase.functions.invoke('analyze-rug', {
-        body: {
-          photos: [item.photo_path],
-          rugInfo: {
-            clientName: 'Training Batch',
-            rugNumber: `TRAIN-${item.id.slice(0, 8)}`,
-            rugType: item.rug_type || 'Unknown',
-          },
-          userId: user!.id,
-        },
-      });
-
-      if (error) throw error;
-      const report = data?.report || data?.analysis || JSON.stringify(data);
-
-      const { error: updateError } = await supabase
-        .from('ai_batch_training_items')
-        .update({ status: 'analyzed', analysis_result: report })
-        .eq('id', item.id);
-      if (updateError) throw updateError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
-      toast.success('Re-analysis complete');
-    },
-    onError: async (err, item) => {
-      await supabase
-        .from('ai_batch_training_items')
-        .update({ status: 'error', error_message: (err as Error)?.message || 'Retry failed' })
-        .eq('id', item.id);
-      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
-      handleMutationError(err, 'BatchRetry');
-    },
-  });
-
-  // Revert a reviewed item — un-mark it and reset to analyzed
-  const revertItemMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('ai_batch_training_items')
-        .update({ status: 'analyzed', corrections_applied: false })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
-      toast.success('Item reverted to review');
+      toast.success('Session reverted to review');
     },
     onError: (err) => handleMutationError(err, 'BatchRevert'),
   });
 
-  // Toggle expand and load signed URL
-  const toggleExpand = async (item: BatchItem) => {
-    const newId = expandedItem === item.id ? null : item.id;
-    setExpandedItem(newId);
-    if (newId && !signedUrls.has(item.photo_path)) {
-      await loadSignedUrls([item.photo_path]);
-    }
-    // Init correction form if needed
-    if (newId && !correctionForms[item.id]) {
-      setCorrectionForms(prev => ({
-        ...prev,
-        [item.id]: [{ correction_type: 'service_correction', original_value: '', corrected_value: '', context: '', rug_category: '' }],
-      }));
+  // Toggle expand and load signed URLs for all photos in session
+  const toggleExpandSession = async (session: Session) => {
+    const newLabel = expandedSession === session.label ? null : session.label;
+    setExpandedSession(newLabel);
+    if (newLabel) {
+      await loadSignedUrls(session.items.map(i => i.photo_path));
+      if (!correctionForms[session.label]) {
+        setCorrectionForms(prev => ({
+          ...prev,
+          [session.label]: [{ correction_type: 'service_correction', original_value: '', corrected_value: '', context: '', rug_category: '' }],
+        }));
+      }
     }
   };
 
-  const addCorrectionRow = (itemId: string) => {
+  const addCorrectionRow = (sessionLabel: string) => {
     setCorrectionForms(prev => ({
       ...prev,
-      [itemId]: [...(prev[itemId] || []), { correction_type: 'service_correction', original_value: '', corrected_value: '', context: '', rug_category: '' }],
+      [sessionLabel]: [...(prev[sessionLabel] || []), { correction_type: 'service_correction', original_value: '', corrected_value: '', context: '', rug_category: '' }],
     }));
   };
 
-  const updateCorrectionRow = (itemId: string, index: number, field: keyof CorrectionForm, value: string) => {
+  const updateCorrectionRow = (sessionLabel: string, index: number, field: keyof CorrectionForm, value: string) => {
     setCorrectionForms(prev => ({
       ...prev,
-      [itemId]: prev[itemId].map((row, i) => i === index ? { ...row, [field]: value } : row),
+      [sessionLabel]: prev[sessionLabel].map((row, i) => i === index ? { ...row, [field]: value } : row),
     }));
   };
 
-  const removeCorrectionRow = (itemId: string, index: number) => {
+  const removeCorrectionRow = (sessionLabel: string, index: number) => {
     setCorrectionForms(prev => ({
       ...prev,
-      [itemId]: prev[itemId].filter((_, i) => i !== index),
+      [sessionLabel]: prev[sessionLabel].filter((_, i) => i !== index),
     }));
   };
 
@@ -340,124 +333,129 @@ export const BatchTrainingTab = () => {
       case 'analyzed': return <CheckCircle className="h-4 w-4 text-amber-500" />;
       case 'reviewed': return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'error': return <XCircle className="h-4 w-4 text-destructive" />;
+      case 'mixed': return <AlertCircle className="h-4 w-4 text-amber-400" />;
       default: return null;
     }
   };
 
-  const pendingCount = items.filter(i => i.status === 'pending').length;
-  const analyzedCount = items.filter(i => i.status === 'analyzed').length;
+  const pendingSessions = sessions.filter(s => s.status === 'pending' || s.status === 'error');
 
   return (
     <div className="space-y-6">
       {/* Upload Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Upload Training Photos</CardTitle>
+          <CardTitle className="text-lg">Create Training Session</CardTitle>
           <CardDescription>
-            Upload rug photos for batch AI analysis. After analysis, review results and correct mistakes to auto-create global corrections.
+            Upload all photos of a single rug as one session. The AI will analyze them together — exactly like a real job — so you can see its full reasoning across all photos.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Label
-              htmlFor="batch-upload"
-              className="flex-1 flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-6 cursor-pointer hover:border-primary/50 transition-colors"
-            >
-              {uploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Upload className="h-5 w-5 text-muted-foreground" />
-              )}
-              <span className="text-sm text-muted-foreground">
-                {uploading ? 'Uploading...' : 'Click to upload rug photos (up to 20)'}
-              </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Session Name</Label>
               <Input
-                id="batch-upload"
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleFileUpload}
-                disabled={uploading}
+                value={sessionLabel}
+                onChange={e => setSessionLabel(e.target.value)}
+                placeholder="e.g. Persian Tabriz Test #1"
               />
-            </Label>
-            <Button
-              onClick={handleAnalyzeAll}
-              disabled={analyzing || pendingCount === 0}
-              className="gap-2 shrink-0"
-            >
-              {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-              Analyze {pendingCount > 0 ? `${pendingCount} Pending` : 'All'}
-            </Button>
+            </div>
+            <div className="space-y-2">
+              <Label>Rug Type</Label>
+              <Input
+                value={rugType}
+                onChange={e => setRugType(e.target.value)}
+                placeholder="e.g. Persian, Turkish, Machine-made"
+              />
+            </div>
           </div>
 
-          {analyzing && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Analyzing photo {analysisProgress.current} of {analysisProgress.total}...</span>
-                <span>{Math.round((analysisProgress.current / analysisProgress.total) * 100)}%</span>
-              </div>
-              <Progress value={(analysisProgress.current / analysisProgress.total) * 100} />
-            </div>
-          )}
+          <Label
+            htmlFor="batch-upload"
+            className="flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-6 cursor-pointer hover:border-primary/50 transition-colors"
+          >
+            {uploading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Upload className="h-5 w-5 text-muted-foreground" />
+            )}
+            <span className="text-sm text-muted-foreground">
+              {uploading ? 'Uploading...' : 'Upload all photos for this rug (front, back, fringes, edges, issues)'}
+            </span>
+            <Input
+              id="batch-upload"
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+          </Label>
 
           <div className="flex gap-3 text-sm text-muted-foreground">
-            <span>{items.length} total</span>
+            <span>{sessions.length} sessions</span>
             <span>·</span>
-            <span>{pendingCount} pending</span>
+            <span>{items.length} total photos</span>
             <span>·</span>
-            <span>{analyzedCount} ready for review</span>
+            <span>{pendingSessions.length} awaiting analysis</span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Items List */}
+      {/* Sessions List */}
       {isLoading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : items.length === 0 ? (
+      ) : sessions.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            No training photos yet. Upload some to get started.
+            No training sessions yet. Create one above to get started.
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {items.map(item => (
-            <Card key={item.id} className={item.status === 'reviewed' ? 'opacity-60' : ''}>
+          {sessions.map(session => (
+            <Card key={session.label} className={session.status === 'reviewed' ? 'opacity-60' : ''}>
+              {/* Session Header */}
               <div
                 className="flex items-center gap-3 p-4 cursor-pointer"
-                onClick={() => toggleExpand(item)}
+                onClick={() => toggleExpandSession(session)}
               >
-                {statusIcon(item.status)}
+                {statusIcon(session.status)}
+                <FolderOpen className="h-4 w-4 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium truncate">{item.photo_path.split('/').pop()}</span>
-                    <Badge variant="outline" className="text-xs">{item.status}</Badge>
-                    {item.corrections_applied && <Badge variant="secondary" className="text-xs">Corrected</Badge>}
+                    <span className="text-sm font-medium truncate">{session.label}</span>
+                    <Badge variant="outline" className="text-xs">{session.items.length} photos</Badge>
+                    <Badge variant="outline" className="text-xs">{session.status}</Badge>
+                    {session.items[0]?.rug_type && session.items[0].rug_type !== 'Unknown' && (
+                      <Badge variant="secondary" className="text-xs">{session.items[0].rug_type}</Badge>
+                    )}
+                    {session.items[0]?.corrections_applied && <Badge variant="secondary" className="text-xs">Corrected</Badge>}
                   </div>
-                  {item.error_message && <p className="text-xs text-destructive mt-1">{item.error_message}</p>}
+                  {session.status === 'error' && (
+                    <p className="text-xs text-destructive mt-1">{session.items.find(i => i.error_message)?.error_message}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {item.status === 'error' && (
+                  {(session.status === 'pending' || session.status === 'error') && (
                     <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      disabled={retryItemMutation.isPending}
-                      onClick={(e) => { e.stopPropagation(); retryItemMutation.mutate(item); }}
-                      title="Retry analysis"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 h-8"
+                      disabled={analyzing}
+                      onClick={(e) => { e.stopPropagation(); handleAnalyzeSession(session); }}
                     >
-                      {retryItemMutation.isPending && retryItemMutation.variables?.id === item.id
-                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : <RotateCcw className="h-4 w-4" />}
+                      {analyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                      Analyze
                     </Button>
                   )}
-                  {item.status === 'reviewed' && (
+                  {session.status === 'reviewed' && (
                     <Button
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8"
-                      onClick={(e) => { e.stopPropagation(); revertItemMutation.mutate(item.id); }}
+                      onClick={(e) => { e.stopPropagation(); revertSessionMutation.mutate(session); }}
                       title="Revert to review"
                     >
                       <Undo2 className="h-4 w-4" />
@@ -467,68 +465,82 @@ export const BatchTrainingTab = () => {
                     size="icon"
                     variant="ghost"
                     className="text-destructive h-8 w-8"
-                    onClick={(e) => { e.stopPropagation(); deleteItemMutation.mutate(item.id); }}
-                    title="Delete item"
+                    onClick={(e) => { e.stopPropagation(); deleteSessionMutation.mutate(session); }}
+                    title="Delete session"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                  {expandedItem === item.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {expandedSession === session.label ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </div>
               </div>
 
-              {expandedItem === item.id && (
+              {/* Expanded Session Content — consolidated view */}
+              {expandedSession === session.label && (
                 <CardContent className="pt-0 space-y-4">
                   <Separator />
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Photo */}
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">Photo</Label>
-                      {signedUrls.has(item.photo_path) ? (
-                        <img
-                          src={signedUrls.get(item.photo_path)}
-                          alt="Training rug"
-                          className="w-full max-h-96 object-contain rounded-lg border bg-muted"
-                        />
-                      ) : (
-                        <div className="w-full h-48 flex items-center justify-center rounded-lg border bg-muted">
-                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Analysis Result */}
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">AI Analysis</Label>
-                      {item.analysis_result ? (
-                        <div className="text-sm bg-muted/50 rounded-lg p-3 max-h-96 overflow-y-auto whitespace-pre-wrap border">
-                          {item.analysis_result}
+                  {/* Photo Gallery — all session photos as thumbnails */}
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">
+                      Photos ({session.items.length}) — analyzed together as one rug
+                    </Label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                      {session.items.map((item, idx) => (
+                        <div key={item.id} className="relative aspect-square rounded-lg border overflow-hidden bg-muted">
+                          {signedUrls.has(item.photo_path) ? (
+                            <img
+                              src={signedUrls.get(item.photo_path)}
+                              alt={`Photo ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 text-center">
+                            Photo {idx + 1}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3 border">
-                          {item.status === 'pending' ? 'Not yet analyzed' : item.status === 'analyzing' ? 'Analysis in progress...' : 'No result'}
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </div>
 
-                  {/* Corrections */}
-                  {item.status === 'analyzed' && !item.corrections_applied && (
+                  {/* Consolidated AI Analysis Report */}
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">AI Analysis & Reasoning</Label>
+                    {session.items[0]?.analysis_result ? (
+                      <div className="text-sm bg-muted/50 rounded-lg p-4 max-h-[600px] overflow-y-auto whitespace-pre-wrap border leading-relaxed">
+                        {session.items[0].analysis_result}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-4 border">
+                        {session.status === 'pending' ? 'Not yet analyzed — click "Analyze" to run the AI on all photos together.'
+                          : session.status === 'analyzing' ? 'Analysis in progress...'
+                          : 'No result available'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Corrections Section */}
+                  {session.status === 'analyzed' && !session.items[0]?.corrections_applied && (
                     <div className="space-y-3">
+                      <Separator />
                       <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Corrections (auto-saved as global)</Label>
-                        <Button size="sm" variant="outline" onClick={() => addCorrectionRow(item.id)}>
-                          + Add Correction
+                        <Label className="text-sm font-medium">Corrections (auto-promoted to global)</Label>
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => addCorrectionRow(session.label)}>
+                          <Plus className="h-3.5 w-3.5" /> Add Correction
                         </Button>
                       </div>
 
-                      {(correctionForms[item.id] || []).map((row, idx) => (
+                      {(correctionForms[session.label] || []).map((row, idx) => (
                         <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end p-3 rounded-lg border bg-muted/30">
                           <div>
                             <Label className="text-xs">Type</Label>
                             <select
                               className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
                               value={row.correction_type}
-                              onChange={e => updateCorrectionRow(item.id, idx, 'correction_type', e.target.value)}
+                              onChange={e => updateCorrectionRow(session.label, idx, 'correction_type', e.target.value)}
                             >
                               <option value="service_correction">Service</option>
                               <option value="price_correction">Price</option>
@@ -541,7 +553,7 @@ export const BatchTrainingTab = () => {
                             <Label className="text-xs">AI Said</Label>
                             <Input
                               value={row.original_value}
-                              onChange={e => updateCorrectionRow(item.id, idx, 'original_value', e.target.value)}
+                              onChange={e => updateCorrectionRow(session.label, idx, 'original_value', e.target.value)}
                               placeholder="Original"
                               className="h-8 text-sm"
                             />
@@ -550,7 +562,7 @@ export const BatchTrainingTab = () => {
                             <Label className="text-xs">Should Be</Label>
                             <Input
                               value={row.corrected_value}
-                              onChange={e => updateCorrectionRow(item.id, idx, 'corrected_value', e.target.value)}
+                              onChange={e => updateCorrectionRow(session.label, idx, 'corrected_value', e.target.value)}
                               placeholder="Corrected"
                               className="h-8 text-sm"
                             />
@@ -559,7 +571,7 @@ export const BatchTrainingTab = () => {
                             <Label className="text-xs">Context</Label>
                             <Input
                               value={row.context}
-                              onChange={e => updateCorrectionRow(item.id, idx, 'context', e.target.value)}
+                              onChange={e => updateCorrectionRow(session.label, idx, 'context', e.target.value)}
                               placeholder="e.g. for Persian rugs"
                               className="h-8 text-sm"
                             />
@@ -569,7 +581,7 @@ export const BatchTrainingTab = () => {
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8 text-destructive"
-                              onClick={() => removeCorrectionRow(item.id, idx)}
+                              onClick={() => removeCorrectionRow(session.label, idx)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -580,8 +592,8 @@ export const BatchTrainingTab = () => {
                       <div className="flex gap-2">
                         <Button
                           onClick={() => saveCorrectionsMutation.mutate({
-                            itemId: item.id,
-                            corrections: correctionForms[item.id] || [],
+                            session,
+                            corrections: correctionForms[session.label] || [],
                           })}
                           disabled={saveCorrectionsMutation.isPending}
                           size="sm"
@@ -594,11 +606,11 @@ export const BatchTrainingTab = () => {
                           variant="outline"
                           size="sm"
                           onClick={async () => {
-                            // Mark as reviewed without corrections
-                            await supabase
-                              .from('ai_batch_training_items')
-                              .update({ status: 'reviewed' })
-                              .eq('id', item.id);
+                            for (const item of session.items) {
+                              await supabase.from('ai_batch_training_items')
+                                .update({ status: 'reviewed' })
+                                .eq('id', item.id);
+                            }
                             queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
                             toast.success('Marked as reviewed (no corrections needed)');
                           }}
