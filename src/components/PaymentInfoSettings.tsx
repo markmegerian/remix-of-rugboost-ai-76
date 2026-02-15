@@ -171,16 +171,30 @@ const PaymentInfoSettings = () => {
 
       const encrypted = await encryptFields(dataToEncrypt);
 
+      // SECURITY: Never store plaintext if encryption was expected but failed
+      // Only use encrypted values for sensitive fields - no plaintext fallback
+      const sensitiveFields = {
+        bank_account_number: paymentInfo.bank_account_number ? encrypted.bank_account_number : null,
+        bank_routing_number: paymentInfo.bank_routing_number ? encrypted.bank_routing_number : null,
+        paypal_email: paymentInfo.paypal_email ? encrypted.paypal_email : null,
+        venmo_handle: paymentInfo.venmo_handle ? encrypted.venmo_handle : null,
+        zelle_email: paymentInfo.zelle_email ? encrypted.zelle_email : null,
+      };
+
+      // Verify all non-empty sensitive fields were actually encrypted
+      for (const [field, value] of Object.entries(sensitiveFields)) {
+        const plainValue = paymentInfo[field as keyof PaymentInfo];
+        if (plainValue && !value) {
+          throw new Error(`Failed to encrypt ${field}. Cannot save unencrypted financial data.`);
+        }
+      }
+
       const { error } = await supabase
         .from("profiles")
         .update({
           payment_method: paymentInfo.payment_method,
           bank_name: paymentInfo.bank_name || null,
-          bank_account_number: encrypted.bank_account_number || paymentInfo.bank_account_number || null,
-          bank_routing_number: encrypted.bank_routing_number || paymentInfo.bank_routing_number || null,
-          paypal_email: encrypted.paypal_email || paymentInfo.paypal_email || null,
-          venmo_handle: encrypted.venmo_handle || paymentInfo.venmo_handle || null,
-          zelle_email: encrypted.zelle_email || paymentInfo.zelle_email || null,
+          ...sensitiveFields,
           payment_notes: paymentInfo.payment_notes || null,
         })
         .eq("user_id", user!.id);
