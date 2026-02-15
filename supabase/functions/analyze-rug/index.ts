@@ -356,6 +356,7 @@ Deno.serve(async (req) => {
     
     // AI Learning: feedback context to improve future analyses
     let feedbackContext = "";
+    let globalCorrectionsContext = "";
     
     try {
       const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -414,6 +415,36 @@ Deno.serve(async (req) => {
           } else if (fb.feedback_type === "false_positive" && fb.original_service_name) {
             feedbackContext += `- "${fb.original_service_name}" was incorrectly recommended - be more careful with this\n`;
           }
+        }
+      }
+
+      // Fetch global AI corrections (apply to ALL analyses, curated by admins)
+      const { data: globalCorrections, error: globalError } = await supabase
+        .from("ai_global_corrections")
+        .select("correction_type, original_value, corrected_value, context, rug_category")
+        .eq("is_active", true)
+        .order("priority", { ascending: false })
+        .limit(25);
+
+      if (!globalError && globalCorrections && globalCorrections.length > 0) {
+        globalCorrectionsContext = "\n\nGLOBAL QUALITY STANDARDS (apply to all analyses):\n";
+        for (const gc of globalCorrections) {
+          if (gc.correction_type === "price_correction" && gc.original_value && gc.corrected_value) {
+            globalCorrectionsContext += `- Price: "${gc.original_value}" should be "${gc.corrected_value}"`;
+          } else if (gc.correction_type === "service_correction" && gc.original_value && gc.corrected_value) {
+            globalCorrectionsContext += `- Service: "${gc.original_value}" should be "${gc.corrected_value}"`;
+          } else if (gc.correction_type === "identification_error" && gc.original_value && gc.corrected_value) {
+            globalCorrectionsContext += `- Identification: "${gc.original_value}" is actually "${gc.corrected_value}"`;
+          } else if (gc.correction_type === "missed_issue" && gc.corrected_value) {
+            globalCorrectionsContext += `- Always check for: ${gc.corrected_value}`;
+          } else if (gc.correction_type === "false_positive" && gc.original_value) {
+            globalCorrectionsContext += `- Avoid incorrectly recommending: "${gc.original_value}"`;
+          } else {
+            continue;
+          }
+          if (gc.rug_category) globalCorrectionsContext += ` (for ${gc.rug_category} rugs)`;
+          if (gc.context) globalCorrectionsContext += ` — ${gc.context}`;
+          globalCorrectionsContext += "\n";
         }
       }
     } catch (priceError) {
@@ -499,7 +530,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
         messages: [
           {
             role: "system",
-            content: getSystemPrompt(businessName, businessPhone, businessAddress) + feedbackContext,
+            content: getSystemPrompt(businessName, businessPhone, businessAddress) + globalCorrectionsContext + feedbackContext,
           },
           {
             role: "user",

@@ -53,6 +53,7 @@ const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminUserDetail = lazy(() => import("./pages/admin/AdminUserDetail"));
 const AdminPayouts = lazy(() => import("./pages/admin/AdminPayouts"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminAITraining = lazy(() => import("./pages/admin/AdminAITraining"));
 
 // Utility Pages
 const ScreenshotGenerator = lazy(() => import("./pages/ScreenshotGenerator"));
@@ -173,8 +174,9 @@ const App = () => {
                      <Route path="/admin/users" element={<AdminUsers />} />
                      <Route path="/admin/users/:userId" element={<AdminUserDetail />} />
                      <Route path="/admin/payouts" element={<AdminPayouts />} />
-                     <Route path="/admin/settings" element={<AdminSettings />} />
-                     <Route path="/admin/audit-log" element={<AdminAuditLog />} />
+                      <Route path="/admin/settings" element={<AdminSettings />} />
+                      <Route path="/admin/ai-training" element={<AdminAITraining />} />
+                      <Route path="/admin/audit-log" element={<AdminAuditLog />} />
                    </Route>
 
                 <Route path="*" element={<NotFound />} />
