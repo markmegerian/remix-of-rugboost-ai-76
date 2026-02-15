@@ -15,7 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
   Upload, Loader2, CheckCircle, XCircle, AlertCircle, Image as ImageIcon,
-  ChevronDown, ChevronUp, Save, Trash2
+  ChevronDown, ChevronUp, Save, Trash2, RotateCcw, Undo2
 } from 'lucide-react';
 import browserImageCompression from 'browser-image-compression';
 
@@ -236,6 +236,66 @@ export const BatchTrainingTab = () => {
     onError: (err) => handleMutationError(err, 'BatchDelete'),
   });
 
+  // Retry a single failed item
+  const retryItemMutation = useMutation({
+    mutationFn: async (item: BatchItem) => {
+      // Reset to analyzing
+      await supabase
+        .from('ai_batch_training_items')
+        .update({ status: 'analyzing', error_message: null })
+        .eq('id', item.id);
+
+      const { data, error } = await supabase.functions.invoke('analyze-rug', {
+        body: {
+          photos: [item.photo_path],
+          rugInfo: {
+            clientName: 'Training Batch',
+            rugNumber: `TRAIN-${item.id.slice(0, 8)}`,
+            rugType: item.rug_type || 'Unknown',
+          },
+          userId: user!.id,
+        },
+      });
+
+      if (error) throw error;
+      const report = data?.report || data?.analysis || JSON.stringify(data);
+
+      const { error: updateError } = await supabase
+        .from('ai_batch_training_items')
+        .update({ status: 'analyzed', analysis_result: report })
+        .eq('id', item.id);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
+      toast.success('Re-analysis complete');
+    },
+    onError: async (err, item) => {
+      await supabase
+        .from('ai_batch_training_items')
+        .update({ status: 'error', error_message: (err as Error)?.message || 'Retry failed' })
+        .eq('id', item.id);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
+      handleMutationError(err, 'BatchRetry');
+    },
+  });
+
+  // Revert a reviewed item — un-mark it and reset to analyzed
+  const revertItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('ai_batch_training_items')
+        .update({ status: 'analyzed', corrections_applied: false })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'batch-training-items'] });
+      toast.success('Item reverted to review');
+    },
+    onError: (err) => handleMutationError(err, 'BatchRevert'),
+  });
+
   // Toggle expand and load signed URL
   const toggleExpand = async (item: BatchItem) => {
     const newId = expandedItem === item.id ? null : item.id;
@@ -377,12 +437,38 @@ export const BatchTrainingTab = () => {
                   </div>
                   {item.error_message && <p className="text-xs text-destructive mt-1">{item.error_message}</p>}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  {item.status === 'error' && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      disabled={retryItemMutation.isPending}
+                      onClick={(e) => { e.stopPropagation(); retryItemMutation.mutate(item); }}
+                      title="Retry analysis"
+                    >
+                      {retryItemMutation.isPending && retryItemMutation.variables?.id === item.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <RotateCcw className="h-4 w-4" />}
+                    </Button>
+                  )}
+                  {item.status === 'reviewed' && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={(e) => { e.stopPropagation(); revertItemMutation.mutate(item.id); }}
+                      title="Revert to review"
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant="ghost"
                     className="text-destructive h-8 w-8"
                     onClick={(e) => { e.stopPropagation(); deleteItemMutation.mutate(item.id); }}
+                    title="Delete item"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
