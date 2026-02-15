@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, ArrowUpCircle, Brain, MessageSquare, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowUpCircle, Brain, MessageSquare, Loader2, BookOpen } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+
+// ─── Shared types & constants ────────────────────────────────────────────────
 
 const CORRECTION_TYPES = [
   { value: 'service_correction', label: 'Service Correction' },
@@ -61,6 +63,18 @@ interface UserFeedback {
   user_id: string;
 }
 
+interface TrainingExample {
+  id: string;
+  rug_category: string;
+  rug_description: string | null;
+  example_input: string | null;
+  example_output: string | null;
+  photo_descriptions: string | null;
+  key_learnings: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 const emptyForm = {
   correction_type: 'service_correction' as CorrectionType,
   original_value: '',
@@ -70,14 +84,36 @@ const emptyForm = {
   priority: 1,
 };
 
+const emptyExampleForm = {
+  rug_category: '',
+  rug_description: '',
+  example_input: '',
+  example_output: '',
+  photo_descriptions: '',
+  key_learnings: '',
+};
+
+const typeLabel = (type: string) =>
+  CORRECTION_TYPES.find(t => t.value === type)?.label || type;
+
+// ─── Main component ──────────────────────────────────────────────────────────
+
 export const AITrainingManager = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Corrections state
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
 
-  // Fetch global corrections
+  // Examples state
+  const [exFormOpen, setExFormOpen] = useState(false);
+  const [editingExId, setEditingExId] = useState<string | null>(null);
+  const [exForm, setExForm] = useState(emptyExampleForm);
+
+  // ─── Queries ─────────────────────────────────────────────────────────────
+
   const { data: corrections = [], isLoading: correctionsLoading } = useQuery({
     queryKey: ['ai-global-corrections'],
     queryFn: async () => {
@@ -90,7 +126,6 @@ export const AITrainingManager = () => {
     },
   });
 
-  // Fetch user feedback queue
   const { data: feedbackQueue = [], isLoading: feedbackLoading } = useQuery({
     queryKey: ['ai-feedback-queue'],
     queryFn: async () => {
@@ -104,6 +139,20 @@ export const AITrainingManager = () => {
     },
   });
 
+  const { data: examples = [], isLoading: examplesLoading } = useQuery({
+    queryKey: ['ai-training-examples'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_training_examples')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as TrainingExample[];
+    },
+  });
+
+  // ─── Correction mutations ────────────────────────────────────────────────
+
   const saveMutation = useMutation({
     mutationFn: async (values: typeof form & { id?: string }) => {
       const payload = {
@@ -115,17 +164,11 @@ export const AITrainingManager = () => {
         priority: values.priority,
         created_by: user!.id,
       };
-
       if (values.id) {
-        const { error } = await supabase
-          .from('ai_global_corrections')
-          .update(payload)
-          .eq('id', values.id);
+        const { error } = await supabase.from('ai_global_corrections').update(payload).eq('id', values.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('ai_global_corrections')
-          .insert(payload);
+        const { error } = await supabase.from('ai_global_corrections').insert(payload);
         if (error) throw error;
       }
     },
@@ -139,10 +182,7 @@ export const AITrainingManager = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('ai_global_corrections')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from('ai_global_corrections').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -154,23 +194,66 @@ export const AITrainingManager = () => {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await supabase
-        .from('ai_global_corrections')
-        .update({ is_active })
-        .eq('id', id);
+      const { error } = await supabase.from('ai_global_corrections').update({ is_active }).eq('id', id);
       if (error) throw error;
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ai-global-corrections'] }),
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // ─── Example mutations ──────────────────────────────────────────────────
+
+  const saveExampleMutation = useMutation({
+    mutationFn: async (values: typeof emptyExampleForm & { id?: string }) => {
+      const payload = {
+        rug_category: values.rug_category,
+        rug_description: values.rug_description || null,
+        example_input: values.example_input || null,
+        example_output: values.example_output || null,
+        photo_descriptions: values.photo_descriptions || null,
+        key_learnings: values.key_learnings || null,
+      };
+      if (values.id) {
+        const { error } = await supabase.from('ai_training_examples').update(payload).eq('id', values.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('ai_training_examples').insert(payload);
+        if (error) throw error;
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-global-corrections'] });
+      queryClient.invalidateQueries({ queryKey: ['ai-training-examples'] });
+      toast.success(editingExId ? 'Example updated' : 'Example added');
+      resetExForm();
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-    setFormOpen(false);
-  };
+  const deleteExampleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('ai_training_examples').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-training-examples'] });
+      toast.success('Example deleted');
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const toggleExampleActiveMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase.from('ai_training_examples').update({ is_active }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ai-training-examples'] }),
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // ─── Form helpers ────────────────────────────────────────────────────────
+
+  const resetForm = () => { setForm(emptyForm); setEditingId(null); setFormOpen(false); };
+  const resetExForm = () => { setExForm(emptyExampleForm); setEditingExId(null); setExFormOpen(false); };
 
   const openEdit = (c: GlobalCorrection) => {
     setForm({
@@ -185,12 +268,24 @@ export const AITrainingManager = () => {
     setFormOpen(true);
   };
 
+  const openEditExample = (ex: TrainingExample) => {
+    setExForm({
+      rug_category: ex.rug_category,
+      rug_description: ex.rug_description || '',
+      example_input: ex.example_input || '',
+      example_output: ex.example_output || '',
+      photo_descriptions: ex.photo_descriptions || '',
+      key_learnings: ex.key_learnings || '',
+    });
+    setEditingExId(ex.id);
+    setExFormOpen(true);
+  };
+
   const promoteFromFeedback = (fb: UserFeedback) => {
     let original = '';
     let corrected = '';
     let context = '';
     const type = fb.feedback_type as CorrectionType;
-
     if (fb.feedback_type === 'price_correction') {
       original = fb.original_service_name ? `${fb.original_service_name}: $${fb.original_price}` : '';
       corrected = fb.corrected_price ? `$${fb.corrected_price}` : '';
@@ -205,17 +300,8 @@ export const AITrainingManager = () => {
     } else if (fb.feedback_type === 'false_positive') {
       original = fb.original_service_name || '';
     }
-
     if (fb.rug_type) context = `for ${fb.rug_type} rugs`;
-
-    setForm({
-      correction_type: type,
-      original_value: original,
-      corrected_value: corrected,
-      context,
-      rug_category: fb.rug_origin || '',
-      priority: 1,
-    });
+    setForm({ correction_type: type, original_value: original, corrected_value: corrected, context, rug_category: fb.rug_origin || '', priority: 1 });
     setEditingId(null);
     setFormOpen(true);
   };
@@ -225,24 +311,33 @@ export const AITrainingManager = () => {
     saveMutation.mutate(editingId ? { ...form, id: editingId } : form);
   };
 
-  const typeLabel = (type: string) =>
-    CORRECTION_TYPES.find(t => t.value === type)?.label || type;
+  const handleExSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!exForm.rug_category.trim()) { toast.error('Rug category is required'); return; }
+    saveExampleMutation.mutate(editingExId ? { ...exForm, id: editingExId } : exForm);
+  };
+
+  // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
       <Tabs defaultValue="corrections" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="corrections" className="gap-2">
             <Brain className="h-4 w-4" />
-            Global Corrections ({corrections.length})
+            Corrections ({corrections.length})
+          </TabsTrigger>
+          <TabsTrigger value="examples" className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            Examples ({examples.length})
           </TabsTrigger>
           <TabsTrigger value="feedback" className="gap-2">
             <MessageSquare className="h-4 w-4" />
-            User Feedback Queue ({feedbackQueue.length})
+            Feedback ({feedbackQueue.length})
           </TabsTrigger>
         </TabsList>
 
-        {/* GLOBAL CORRECTIONS TAB */}
+        {/* ── CORRECTIONS TAB ─────────────────────────────────────────── */}
         <TabsContent value="corrections" className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
@@ -250,16 +345,12 @@ export const AITrainingManager = () => {
             </p>
             <Dialog open={formOpen} onOpenChange={(o) => { if (!o) resetForm(); else setFormOpen(true); }}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" /> Add Correction
-                </Button>
+                <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add Correction</Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <DialogTitle>{editingId ? 'Edit' : 'Add'} Global Correction</DialogTitle>
-                  <DialogDescription>
-                    This correction will improve AI analysis accuracy for all users.
-                  </DialogDescription>
+                  <DialogDescription>This correction will improve AI analysis accuracy for all users.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -267,9 +358,7 @@ export const AITrainingManager = () => {
                     <Select value={form.correction_type} onValueChange={(v) => setForm(f => ({ ...f, correction_type: v as CorrectionType }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {CORRECTION_TYPES.map(t => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                        ))}
+                        {CORRECTION_TYPES.map(t => (<SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -283,7 +372,7 @@ export const AITrainingManager = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Context</Label>
-                    <Textarea value={form.context} onChange={e => setForm(f => ({ ...f, context: e.target.value }))} placeholder='e.g. "for Persian wool rugs" or "when fringe is under 2 inches"' rows={2} />
+                    <Textarea value={form.context} onChange={e => setForm(f => ({ ...f, context: e.target.value }))} placeholder='e.g. "for Persian wool rugs"' rows={2} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -310,12 +399,10 @@ export const AITrainingManager = () => {
           {correctionsLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : corrections.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                <Brain className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                <p>No global corrections yet. Add one or promote from user feedback.</p>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="py-8 text-center text-muted-foreground">
+              <Brain className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p>No global corrections yet. Add one or promote from user feedback.</p>
+            </CardContent></Card>
           ) : (
             <div className="space-y-3">
               {corrections.map(c => (
@@ -324,33 +411,17 @@ export const AITrainingManager = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline">{typeLabel(c.correction_type)}</Badge>
-                        <Badge variant={c.is_active ? 'default' : 'secondary'} className="text-xs">
-                          Priority {c.priority}
-                        </Badge>
+                        <Badge variant={c.is_active ? 'default' : 'secondary'} className="text-xs">Priority {c.priority}</Badge>
                         {c.rug_category && <Badge variant="secondary" className="text-xs">{c.rug_category}</Badge>}
                       </div>
-                      {c.original_value && (
-                        <p className="text-sm"><span className="text-muted-foreground">From:</span> {c.original_value}</p>
-                      )}
-                      {c.corrected_value && (
-                        <p className="text-sm"><span className="text-muted-foreground">To:</span> <span className="font-medium">{c.corrected_value}</span></p>
-                      )}
-                      {c.context && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">{c.context}</p>
-                      )}
+                      {c.original_value && <p className="text-sm"><span className="text-muted-foreground">From:</span> {c.original_value}</p>}
+                      {c.corrected_value && <p className="text-sm"><span className="text-muted-foreground">To:</span> <span className="font-medium">{c.corrected_value}</span></p>}
+                      {c.context && <p className="text-xs text-muted-foreground mt-1 italic">{c.context}</p>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Switch
-                        checked={c.is_active}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: c.id, is_active: checked })}
-                        title={c.is_active ? 'Active' : 'Inactive'}
-                      />
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)} title="Edit">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(c.id)} title="Delete">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <Switch checked={c.is_active} onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: c.id, is_active: checked })} />
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -359,7 +430,99 @@ export const AITrainingManager = () => {
           )}
         </TabsContent>
 
-        {/* USER FEEDBACK QUEUE TAB */}
+        {/* ── TRAINING EXAMPLES TAB ───────────────────────────────────── */}
+        <TabsContent value="examples" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Gold-standard analyses used as few-shot examples to teach the AI through demonstration.
+            </p>
+            <Dialog open={exFormOpen} onOpenChange={(o) => { if (!o) resetExForm(); else setExFormOpen(true); }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add Example</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingExId ? 'Edit' : 'Add'} Training Example</DialogTitle>
+                  <DialogDescription>Provide a gold-standard rug analysis the AI should emulate.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleExSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Rug Category *</Label>
+                      <Input value={exForm.rug_category} onChange={e => setExForm(f => ({ ...f, rug_category: e.target.value }))} placeholder="e.g. persian_wool, turkish_kilim" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Brief Description</Label>
+                      <Input value={exForm.rug_description} onChange={e => setExForm(f => ({ ...f, rug_description: e.target.value }))} placeholder="e.g. 8x10 hand-knotted Persian Tabriz" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Example Input (rug details provided)</Label>
+                    <Textarea value={exForm.example_input} onChange={e => setExForm(f => ({ ...f, example_input: e.target.value }))} placeholder="The rug details that were provided to the AI..." rows={3} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Photo Descriptions</Label>
+                    <Textarea value={exForm.photo_descriptions} onChange={e => setExForm(f => ({ ...f, photo_descriptions: e.target.value }))} placeholder="Text describing what the photos showed (since we can't store images in the prompt)" rows={3} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Gold-Standard Output (the perfect analysis)</Label>
+                    <Textarea value={exForm.example_output} onChange={e => setExForm(f => ({ ...f, example_output: e.target.value }))} placeholder="The PERFECT analysis/estimate letter..." rows={8} className="font-mono text-xs" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Key Learnings</Label>
+                    <Textarea value={exForm.key_learnings} onChange={e => setExForm(f => ({ ...f, key_learnings: e.target.value }))} placeholder='e.g. "Correct pricing for silk rug cleaning", "How to identify moth damage"' rows={2} />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" onClick={resetExForm}>Cancel</Button>
+                    <Button type="submit" disabled={saveExampleMutation.isPending}>
+                      {saveExampleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      {editingExId ? 'Update' : 'Add'} Example
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {examplesLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : examples.length === 0 ? (
+            <Card><CardContent className="py-8 text-center text-muted-foreground">
+              <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p>No training examples yet. Add a gold-standard analysis to teach the AI by demonstration.</p>
+            </CardContent></Card>
+          ) : (
+            <div className="space-y-3">
+              {examples.map(ex => (
+                <Card key={ex.id} className={!ex.is_active ? 'opacity-60' : ''}>
+                  <CardContent className="py-4 flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <Badge variant="outline">{ex.rug_category}</Badge>
+                        {!ex.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                        <span className="text-xs text-muted-foreground">{new Date(ex.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {ex.rug_description && <p className="text-sm font-medium">{ex.rug_description}</p>}
+                      {ex.key_learnings && <p className="text-xs text-muted-foreground mt-1">{ex.key_learnings}</p>}
+                      {ex.example_output && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 font-mono">
+                          {ex.example_output.substring(0, 150)}{ex.example_output.length > 150 ? '…' : ''}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Switch checked={ex.is_active} onCheckedChange={(checked) => toggleExampleActiveMutation.mutate({ id: ex.id, is_active: checked })} />
+                      <Button variant="ghost" size="icon" onClick={() => openEditExample(ex)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteExampleMutation.mutate(ex.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── USER FEEDBACK TAB ───────────────────────────────────────── */}
         <TabsContent value="feedback" className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Review individual user corrections and promote the best ones to global standards.
@@ -368,12 +531,10 @@ export const AITrainingManager = () => {
           {feedbackLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : feedbackQueue.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                <p>No user feedback submissions yet.</p>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="py-8 text-center text-muted-foreground">
+              <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" />
+              <p>No user feedback submissions yet.</p>
+            </CardContent></Card>
           ) : (
             <div className="space-y-3">
               {feedbackQueue.map(fb => (
@@ -384,9 +545,7 @@ export const AITrainingManager = () => {
                         <Badge variant="outline">{typeLabel(fb.feedback_type)}</Badge>
                         {fb.rug_type && <Badge variant="secondary" className="text-xs">{fb.rug_type}</Badge>}
                         {fb.rug_origin && <Badge variant="secondary" className="text-xs">{fb.rug_origin}</Badge>}
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(fb.created_at!).toLocaleDateString()}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{new Date(fb.created_at!).toLocaleDateString()}</span>
                       </div>
                       {fb.original_service_name && (
                         <p className="text-sm"><span className="text-muted-foreground">Service:</span> {fb.original_service_name}
@@ -405,13 +564,7 @@ export const AITrainingManager = () => {
                       )}
                       {fb.notes && <p className="text-xs text-muted-foreground mt-1">{fb.notes}</p>}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1 shrink-0"
-                      onClick={() => promoteFromFeedback(fb)}
-                      title="Promote to global correction"
-                    >
+                    <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={() => promoteFromFeedback(fb)}>
                       <ArrowUpCircle className="h-4 w-4" />
                       Promote
                     </Button>

@@ -156,6 +156,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_training_examples: {
+        Row: {
+          created_at: string
+          example_input: string | null
+          example_output: string | null
+          id: string
+          is_active: boolean
+          key_learnings: string | null
+          photo_descriptions: string | null
+          rug_category: string
+          rug_description: string | null
+        }
+        Insert: {
+          created_at?: string
+          example_input?: string | null
+          example_output?: string | null
+          id?: string
+          is_active?: boolean
+          key_learnings?: string | null
+          photo_descriptions?: string | null
+          rug_category: string
+          rug_description?: string | null
+        }
+        Update: {
+          created_at?: string
+          example_input?: string | null
+          example_output?: string | null
+          id?: string
+          is_active?: boolean
+          key_learnings?: string | null
+          photo_descriptions?: string | null
+          rug_category?: string
+          rug_description?: string | null
+        }
+        Relationships: []
+      }
       approved_estimates: {
         Row: {
           approved_by_staff_at: string | null
