@@ -40,7 +40,7 @@ const AuthCallback = () => {
         }
 
         if (session) {
-          console.log('[AuthCallback] Session found, redirecting to dashboard');
+          console.debug('[AuthCallback] Session found, redirecting to dashboard');
           setStatus('success');
           setMessage('Email verified! Redirecting...');
           setTimeout(() => navigate('/dashboard', { replace: true }), 1000);
@@ -48,7 +48,7 @@ const AuthCallback = () => {
           // No session yet - might be waiting for token exchange
           // Listen for auth state change
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log('[AuthCallback] Auth event:', event);
+            console.debug('[AuthCallback] Auth event:', event);
             if (event === 'SIGNED_IN' && session) {
               setStatus('success');
               setMessage('Email verified! Redirecting...');

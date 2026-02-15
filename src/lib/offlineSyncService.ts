@@ -64,7 +64,7 @@ class OfflineSyncService {
   }
 
   private onOnline = () => {
-    console.log('[OfflineSync] Device came online, triggering sync');
+    console.debug('[OfflineSync] Device came online, triggering sync');
     // Restart periodic interval
     if (!this.intervalId) {
       this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
@@ -73,7 +73,7 @@ class OfflineSyncService {
   };
 
   private onOffline = () => {
-    console.log('[OfflineSync] Device went offline, pausing interval');
+    console.debug('[OfflineSync] Device went offline, pausing interval');
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -90,11 +90,11 @@ class OfflineSyncService {
     this.syncing = true;
     this.notify();
 
-    console.log(`[OfflineSync] Syncing ${pending.length} pending submissions`);
+    console.debug(`[OfflineSync] Syncing ${pending.length} pending submissions`);
 
     for (const submission of pending) {
       if (!navigator.onLine) {
-        console.log('[OfflineSync] Lost connection during sync, stopping');
+        console.debug('[OfflineSync] Lost connection during sync, stopping');
         break;
       }
 
@@ -167,7 +167,7 @@ class OfflineSyncService {
 
       // Mark as uploaded (will be cleaned up)
       await updateSubmissionStatus(submission.id, 'uploaded');
-      console.log(`[OfflineSync] Successfully synced submission ${submission.id}`);
+      console.debug(`[OfflineSync] Successfully synced submission ${submission.id}`);
     } catch (error) {
       const msg = extractErrorMessage(error);
       console.error(`[OfflineSync] Failed to sync ${submission.id}:`, msg);
