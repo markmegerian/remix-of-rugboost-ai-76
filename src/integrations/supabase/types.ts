@@ -117,6 +117,45 @@ export type Database = {
           },
         ]
       }
+      ai_batch_training_items: {
+        Row: {
+          analysis_result: string | null
+          corrections_applied: boolean
+          created_at: string
+          created_by: string
+          error_message: string | null
+          id: string
+          photo_path: string
+          rug_type: string
+          session_label: string
+          status: string
+        }
+        Insert: {
+          analysis_result?: string | null
+          corrections_applied?: boolean
+          created_at?: string
+          created_by: string
+          error_message?: string | null
+          id?: string
+          photo_path: string
+          rug_type?: string
+          session_label?: string
+          status?: string
+        }
+        Update: {
+          analysis_result?: string | null
+          corrections_applied?: boolean
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          id?: string
+          photo_path?: string
+          rug_type?: string
+          session_label?: string
+          status?: string
+        }
+        Relationships: []
+      }
       ai_global_corrections: {
         Row: {
           context: string | null
