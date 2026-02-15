@@ -142,15 +142,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        // Ensure user setup on initial load too
-        const fullName = session.user.user_metadata?.full_name || 
-                         session.user.user_metadata?.name ||
-                         session.user.email?.split('@')[0];
-        await ensureUserSetup(session.user.id, session.user.email || '', fullName);
-        
-        const userRoles = await fetchUserRoles(session.user.id);
-        setRoles(userRoles);
+        try {
+          const fullName = session.user.user_metadata?.full_name || 
+                           session.user.user_metadata?.name ||
+                           session.user.email?.split('@')[0];
+          await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+          
+          const userRoles = await fetchUserRoles(session.user.id);
+          setRoles(userRoles);
+        } catch (err) {
+          console.error('[Auth] Error in getSession:', err);
+          setRoles([]);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
       }
+    }).catch((err) => {
+      console.error('[Auth] getSession failed:', err);
       setLoading(false);
     });
 
