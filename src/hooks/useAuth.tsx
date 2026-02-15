@@ -102,9 +102,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    console.debug('[Auth] useEffect: setting up auth listener');
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.debug('[Auth] onAuthStateChange:', event, !!session?.user);
+        if (!isMounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -112,15 +118,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const currentUser = session.user;
 
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            const fullName = currentUser.user_metadata?.full_name || 
-                             currentUser.user_metadata?.name ||
-                             currentUser.email?.split('@')[0];
-            await ensureUserSetup(currentUser.id, currentUser.email || '', fullName);
+            console.debug('[Auth] Running ensureUserSetup for', event);
+            await ensureUserSetup(currentUser.id, currentUser.email || '', 
+              currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
+            console.debug('[Auth] ensureUserSetup complete');
           }
 
+          console.debug('[Auth] Fetching roles from onAuthStateChange');
           const userRoles = await fetchUserRoles(currentUser.id);
-          setRoles(userRoles);
-          setLoading(false);
+          console.debug('[Auth] Roles fetched:', userRoles);
+          if (isMounted) {
+            setRoles(userRoles);
+            setLoading(false);
+          }
         } else {
           setRoles([]);
           setLoading(false);
@@ -129,11 +139,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // THEN check for existing session
-    // Only fetch roles here — onAuthStateChange handles ensureUserSetup
-    // to avoid duplicate concurrent calls that can hang
+    console.debug('[Auth] Calling getSession');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.debug('[Auth] getSession result:', !!session?.user);
+      if (!isMounted) return;
+
       if (!session?.user) {
-        // No session — clear state and stop loading
         setSession(null);
         setUser(null);
         setRoles([]);
@@ -145,15 +156,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session.user);
       
       try {
+        console.debug('[Auth] Fetching roles from getSession');
         const userRoles = await fetchUserRoles(session.user.id);
-        setRoles(userRoles);
+        console.debug('[Auth] getSession roles:', userRoles);
+        if (isMounted) setRoles(userRoles);
       } catch (err) {
         console.error('Error fetching roles on init:', err);
       }
-      setLoading(false);
+      if (isMounted) setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
