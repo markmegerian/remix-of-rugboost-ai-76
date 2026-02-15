@@ -36,7 +36,7 @@ export interface ServiceLineItemProps {
   showRugLabel?: boolean;
 }
 
-export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
+const ServiceLineItemInner: React.FC<ServiceLineItemProps> = ({
   service,
   category,
   isDeclined,
@@ -52,7 +52,7 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
       <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 opacity-60">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <X className="h-4 w-4 text-muted-foreground" />
+            <X className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <span className="text-sm text-muted-foreground line-through">{service.name}</span>
           </div>
           {showRugLabel && service.rugNumber && (
@@ -66,8 +66,9 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
           size="sm"
           className="h-7 text-xs text-primary"
           onClick={onRestore}
+          aria-label="Restore declined service"
         >
-          <Check className="h-3 w-3 mr-1" />
+          <Check className="h-3 w-3 mr-1" aria-hidden="true" />
           Restore
         </Button>
       </div>
@@ -85,7 +86,7 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Check className="h-4 w-4 text-primary flex-shrink-0" />
+            <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
             <span className="text-sm font-medium">{service.name}</span>
             {category === 'high_cost' && (
               <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
@@ -136,6 +137,7 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
           size="sm"
           className="h-7 text-xs text-muted-foreground hover:text-destructive"
           onClick={onDecline}
+          aria-label="Decline this service"
         >
           Decline
         </Button>
@@ -143,3 +145,5 @@ export const ServiceLineItem: React.FC<ServiceLineItemProps> = ({
     </div>
   );
 };
+
+export const ServiceLineItem = React.memo(ServiceLineItemInner);
