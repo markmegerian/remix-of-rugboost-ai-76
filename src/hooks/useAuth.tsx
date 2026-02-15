@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // 2. User already has any roles (prevents role accumulation)
       if (hasClientRole || hasAnyRole) {
         // User is a client or already has roles - do NOT assign staff
-        console.log('User has existing roles, skipping staff assignment');
+        console.debug('User has existing roles, skipping staff assignment');
       } else if (!hasStaffRole) {
         // Only assign staff if user has ZERO roles (true new internal user)
         const { error: insertError } = await supabase
@@ -109,20 +109,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer to avoid deadlock - ensure setup for new signups (especially OAuth)
-          setTimeout(async () => {
-            // For new signups or OAuth, ensure user has required records
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              const fullName = session.user.user_metadata?.full_name || 
-                               session.user.user_metadata?.name ||
-                               session.user.email?.split('@')[0];
-              await ensureUserSetup(session.user.id, session.user.email || '', fullName);
-            }
-            
-            const userRoles = await fetchUserRoles(session.user.id);
-            setRoles(userRoles);
-            setLoading(false);
-          }, 0);
+          const currentUser = session.user;
+
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            const fullName = currentUser.user_metadata?.full_name || 
+                             currentUser.user_metadata?.name ||
+                             currentUser.email?.split('@')[0];
+            await ensureUserSetup(currentUser.id, currentUser.email || '', fullName);
+          }
+
+          const userRoles = await fetchUserRoles(currentUser.id);
+          setRoles(userRoles);
+          setLoading(false);
         } else {
           setRoles([]);
           setLoading(false);
