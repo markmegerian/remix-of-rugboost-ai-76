@@ -104,18 +104,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // Safety timeout - if loading hasn't resolved after 10s, force it
-    const safetyTimeout = setTimeout(() => {
-      if (isMounted) {
-        console.warn('[Auth] Safety timeout - forcing loading to false');
-        setLoading(false);
-      }
-    }, 10000);
-
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -124,66 +116,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           try {
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              console.debug('[Auth] Running ensureUserSetup for', event);
-              await ensureUserSetup(currentUser.id, currentUser.email || '',
-                currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
-              console.debug('[Auth] ensureUserSetup complete');
+              await ensureUserSetup(
+                currentUser.id,
+                currentUser.email || '',
+                currentUser.user_metadata?.full_name ||
+                  currentUser.user_metadata?.name ||
+                  currentUser.email?.split('@')[0]
+              );
             }
 
-            console.debug('[Auth] Fetching roles from onAuthStateChange');
             const userRoles = await fetchUserRoles(currentUser.id);
-            console.debug('[Auth] Roles fetched:', userRoles);
             if (isMounted) setRoles(userRoles);
           } catch (err) {
-            console.error('[Auth] Error in onAuthStateChange:', err);
+            console.error('[Auth] Error in auth state change:', err);
             if (isMounted) setRoles([]);
           } finally {
             if (isMounted) setLoading(false);
           }
         } else {
-          if (isMounted) {
-            setRoles([]);
-            setLoading(false);
-          }
+          setRoles([]);
+          setLoading(false);
         }
       }
     );
 
-    console.debug('[Auth] Calling getSession');
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.debug('[Auth] getSession result:', !!session?.user);
-      if (!isMounted) return;
-
-      if (!session?.user) {
-        setSession(null);
-        setUser(null);
-        setRoles([]);
-        setLoading(false);
-        return;
-      }
-
-      setSession(session);
-      setUser(session.user);
-      
-      try {
-        console.debug('[Auth] Fetching roles from getSession');
-        const userRoles = await fetchUserRoles(session.user.id);
-        console.debug('[Auth] getSession roles:', userRoles);
-        if (isMounted) setRoles(userRoles);
-      } catch (err) {
-        console.error('[Auth] Error fetching roles on init:', err);
-      }
-      if (isMounted) setLoading(false);
-    }).catch((err) => {
-      console.warn('[Auth] getSession failed:', err.name, err.message);
-      if (isMounted) {
-        setLoading(false);
-      }
-    });
-
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
