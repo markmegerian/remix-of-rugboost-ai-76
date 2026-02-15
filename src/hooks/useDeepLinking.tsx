@@ -32,10 +32,10 @@ export function useDeepLinking() {
   const navigate = useNavigate();
 
   const handleDeepLink = useCallback((url: string) => {
-    console.log('[DeepLink] Received:', url);
+    console.debug('[DeepLink] Received:', url);
     
     const path = parseDeepLinkPath(url);
-    console.log('[DeepLink] Parsed path:', path);
+    console.debug('[DeepLink] Parsed path:', path);
     
     // Check if this is a known route
     const isKnownRoute = KNOWN_ROUTES.some(route => 
@@ -55,11 +55,11 @@ export function useDeepLinking() {
         ? `${path}${url.slice(queryStart)}`
         : path;
       
-      console.log('[DeepLink] Navigating to:', fullPath);
+      console.debug('[DeepLink] Navigating to:', fullPath);
       navigate(fullPath, { replace: true });
     } else {
       // Unknown route - go to dashboard
-      console.log('[DeepLink] Unknown route, going to dashboard');
+      console.debug('[DeepLink] Unknown route, going to dashboard');
       navigate('/dashboard', { replace: true });
     }
   }, [navigate]);
@@ -70,18 +70,18 @@ export function useDeepLinking() {
       return;
     }
 
-    console.log('[DeepLink] Setting up listener for scheme:', APP_SCHEME);
+    console.debug('[DeepLink] Setting up listener for scheme:', APP_SCHEME);
 
     // Listen for app URL open events (deep links)
     const listener = App.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
-      console.log('[DeepLink] appUrlOpen event:', event.url);
+      console.debug('[DeepLink] appUrlOpen event:', event.url);
       handleDeepLink(event.url);
     });
 
     // Check if app was opened via a deep link (cold start)
     App.getLaunchUrl().then(launchUrl => {
       if (launchUrl?.url) {
-        console.log('[DeepLink] App launched with URL:', launchUrl.url);
+        console.debug('[DeepLink] App launched with URL:', launchUrl.url);
         handleDeepLink(launchUrl.url);
       }
     });
