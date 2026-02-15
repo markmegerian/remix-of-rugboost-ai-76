@@ -100,7 +100,7 @@
     padding-right: env(safe-area-inset-right);
     /* Smooth scrolling for iOS WebView */
     -webkit-overflow-scrolling: touch;
-    /* overscroll-behavior-y removed to fix desktop scroll wheel in iframe */
+    /* overscroll-behavior-y: contain — intentionally removed: breaks scroll wheel delegation in Lovable's iframe preview */
     /* Ensure body can scroll */
     overflow-y: auto;
     min-height: 100vh;
@@ -108,7 +108,12 @@
 
   /* Safe area aware sticky headers */
   .sticky-header {
-    padding-top: max(env(safe-area-inset-top), 0px);
+    padding-top: max(env(safe-area-inset-top, 0px), 0px);
+    top: env(safe-area-inset-top, 0);
+  }
+
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   /* Safe area aware fixed bottom elements */
