@@ -216,7 +216,7 @@ export default function AddStaffServiceModal({
                     <SelectItem key={name} value={name}>
                       <span className="flex items-center gap-2">
                         {name}
-                        <Badge variant="outline" className="text-[10px] h-4 ml-1">
+                        <Badge variant="outline" className="text-xs h-4 ml-1">
                           {unit.label}
                         </Badge>
                       </span>
@@ -288,7 +288,7 @@ export default function AddStaffServiceModal({
                 className={autoQuantity !== null ? 'bg-muted' : ''}
               />
               {autoQuantity !== null && (
-                <p className="text-[10px] text-muted-foreground">Auto-calculated from dimensions</p>
+                <p className="text-xs text-muted-foreground">Auto-calculated from dimensions</p>
               )}
             </div>
             <div className="space-y-2">
@@ -309,7 +309,7 @@ export default function AddStaffServiceModal({
                 className={isVariablePrice ? 'border-amber-300 focus-visible:ring-amber-400' : ''}
               />
               {!isAdmin && !isVariablePrice && (
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Only admins can modify pricing
                 </p>
               )}
@@ -337,7 +337,7 @@ export default function AddStaffServiceModal({
               placeholder="Explain why this service is needed (e.g., 'AI missed visible fringe damage on left edge')"
               rows={3}
             />
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               This note will be visible to the client and recorded for audit purposes.
             </p>
           </div>

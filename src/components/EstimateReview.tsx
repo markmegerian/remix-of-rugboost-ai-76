@@ -709,7 +709,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                           )}
                           <Badge
                             variant={SERVICE_CATEGORIES[categorizeService(service.name)].badgeVariant}
-                            className="text-[10px]"
+                            className="text-xs"
                           >
                             {categorizeService(service.name) === 'required' ? 'Required' : 
                              categorizeService(service.name) === 'recommended' ? 'Recommended' : 'Preventative'}
@@ -719,7 +719,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="text-[10px] gap-1 border-primary/50 text-primary">
+                                  <Badge variant="outline" className="text-xs gap-1 border-primary/50 text-primary">
                                     <UserPlus className="h-3 w-3" />
                                     Staff Added
                                   </Badge>

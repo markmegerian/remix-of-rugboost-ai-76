@@ -523,7 +523,7 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                       <ImagePlus className="h-5 w-5 text-muted-foreground" />
                     </button>
                   </div>
-                  <span className="text-[10px] text-muted-foreground">Add Issue</span>
+                  <span className="text-xs text-muted-foreground">Add Issue</span>
                 </div>
               </div>
             </div>
