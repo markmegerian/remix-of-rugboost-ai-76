@@ -14,7 +14,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Trash2, ArrowUpCircle, Pencil, X, Check, MessageSquare, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Trash2, ArrowUpCircle, Pencil, X, Check, MessageSquare, Sparkles, Loader2, FlaskConical } from 'lucide-react';
+import { BatchTrainingTab } from './BatchTrainingTab';
 
 const CORRECTION_TYPES = [
   { value: 'service_correction', label: 'Service Correction' },
@@ -225,6 +226,10 @@ export const AITrainingManager = () => {
           <MessageSquare className="h-4 w-4" />
           User Feedback ({feedbackItems.length})
         </TabsTrigger>
+        <TabsTrigger value="batch" className="gap-2">
+          <FlaskConical className="h-4 w-4" />
+          Batch Training
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="corrections" className="space-y-6">
@@ -399,6 +404,10 @@ export const AITrainingManager = () => {
             )}
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="batch">
+        <BatchTrainingTab />
       </TabsContent>
     </Tabs>
   );
