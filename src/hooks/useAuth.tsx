@@ -111,16 +111,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           const currentUser = session.user;
 
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            const fullName = currentUser.user_metadata?.full_name || 
-                             currentUser.user_metadata?.name ||
-                             currentUser.email?.split('@')[0];
-            await ensureUserSetup(currentUser.id, currentUser.email || '', fullName);
-          }
+          try {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              console.debug('[Auth] Running ensureUserSetup for', event);
+              await ensureUserSetup(currentUser.id, currentUser.email || '',
+                currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
+              console.debug('[Auth] ensureUserSetup complete');
+            }
 
-          const userRoles = await fetchUserRoles(currentUser.id);
-          setRoles(userRoles);
-          setLoading(false);
+            console.debug('[Auth] Fetching roles from onAuthStateChange');
+            const userRoles = await fetchUserRoles(currentUser.id);
+            console.debug('[Auth] Roles fetched:', userRoles);
+            setRoles(userRoles);
+          } catch (err) {
+            console.error('[Auth] Error in onAuthStateChange:', err);
+            setRoles([]);
+          } finally {
+            setLoading(false);
+          }
         } else {
           setRoles([]);
           setLoading(false);
