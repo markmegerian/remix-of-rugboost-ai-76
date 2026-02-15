@@ -119,7 +119,7 @@ export function useCapacitor(): UseCapacitorReturn {
       const receivedHandle = await PushNotifications.addListener(
         'pushNotificationReceived',
         (notification: PushNotificationSchema) => {
-          console.log('Push notification received:', notification);
+          console.debug('Push notification received:', notification);
         }
       );
       listenerHandlesRef.current.push(receivedHandle);
@@ -127,7 +127,7 @@ export function useCapacitor(): UseCapacitorReturn {
       const actionHandle = await PushNotifications.addListener(
         'pushNotificationActionPerformed',
         (action: ActionPerformed) => {
-          console.log('Push notification action performed:', action);
+          console.debug('Push notification action performed:', action);
         }
       );
       listenerHandlesRef.current.push(actionHandle);
