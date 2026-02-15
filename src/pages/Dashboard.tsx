@@ -91,8 +91,9 @@ const Dashboard = () => {
               className="gap-2"
               disabled={!canCreateJobs}
               title={!canCreateJobs ? 'Subscription required to create new jobs' : undefined}
+              aria-label="Create new job"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
               <span className="hidden md:inline">New Job</span>
             </Button>
             {isAdmin && (
@@ -102,11 +103,11 @@ const Dashboard = () => {
               </Button>
             )}
             <NotificationBell />
-            <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden md:flex">
-              <Settings className="h-4 w-4" />
+            <Button onClick={() => navigate('/settings')} variant="ghost" size="icon" className="hidden md:flex" aria-label="Settings">
+              <Settings className="h-4 w-4" aria-hidden="true" />
             </Button>
-            <Button onClick={handleSignOut} variant="ghost" size="icon" className="hidden md:flex">
-              <LogOut className="h-4 w-4" />
+            <Button onClick={handleSignOut} variant="ghost" size="icon" className="hidden md:flex" aria-label="Sign out">
+              <LogOut className="h-4 w-4" aria-hidden="true" />
             </Button>
             <MobileNav isAdmin={isAdmin} onSignOut={handleSignOut} />
           </div>
@@ -135,6 +136,7 @@ const Dashboard = () => {
                   key={i}
                   className={`bg-card animate-fade-in-up ${extraClass ?? ''}`}
                   style={delay > 0 ? { animationDelay: `${delay}ms`, opacity: 0 } : undefined}
+                  aria-label={`${c.label}: ${c.value}`}
                 >
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-3">
@@ -153,11 +155,11 @@ const Dashboard = () => {
             return (
               <>
                 {/* Mobile: horizontal scroll strip */}
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory md:hidden -mx-4 px-4">
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory md:hidden -mx-4 px-4" aria-label="Dashboard statistics">
                   {cards.map((c, i) => renderCard(c, i, 'min-w-[160px] flex-shrink-0 snap-start'))}
                 </div>
                 {/* Desktop: grid */}
-                <div className="hidden md:grid md:grid-cols-4 gap-4">
+                <div className="hidden md:grid md:grid-cols-4 gap-4" aria-label="Dashboard statistics">
                   {cards.map((c, i) => renderCard(c, i))}
                 </div>
               </>
@@ -179,7 +181,7 @@ const Dashboard = () => {
           {isLoading ? (
             <DashboardJobTableSkeleton />
           ) : (
-            <Card className="shadow-medium animate-fade-in-up" style={{ animationDelay: '250ms', opacity: 0 }}>
+            <Card className="shadow-medium animate-fade-in-up" style={{ animationDelay: '250ms', opacity: 0 }} aria-label="Job list">
               <CardHeader>
                 <CardTitle className="font-display text-lg flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-primary" />
@@ -203,10 +205,12 @@ const Dashboard = () => {
                 ) : (
                   <>
                     {/* Mobile card list with pull-to-refresh */}
-                    <PullToRefresh onRefresh={refetch} className="md:hidden space-y-3">
-                      {filteredJobs.map((job: JobWithDetails) => (
-                        <JobCard key={job.id} job={job} />
-                      ))}
+                    <PullToRefresh onRefresh={refetch} className="md:hidden">
+                      <div className="space-y-3" role="list">
+                        {filteredJobs.map((job: JobWithDetails) => (
+                          <JobCard key={job.id} job={job} />
+                        ))}
+                      </div>
                     </PullToRefresh>
 
                     {/* Desktop table */}
