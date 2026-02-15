@@ -102,15 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    let isMounted = true;
-    console.debug('[Auth] useEffect: setting up auth listener');
-
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.debug('[Auth] onAuthStateChange:', event, !!session?.user);
-        if (!isMounted) return;
-        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -118,57 +112,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const currentUser = session.user;
 
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            console.debug('[Auth] Running ensureUserSetup for', event);
             await ensureUserSetup(currentUser.id, currentUser.email || '', 
               currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
-            console.debug('[Auth] ensureUserSetup complete');
           }
 
-          console.debug('[Auth] Fetching roles from onAuthStateChange');
           const userRoles = await fetchUserRoles(currentUser.id);
-          console.debug('[Auth] Roles fetched:', userRoles);
-          if (isMounted) {
-            setRoles(userRoles);
-            setLoading(false);
-          }
+          setRoles(userRoles);
         } else {
           setRoles([]);
-          setLoading(false);
         }
+        setLoading(false);
       }
     );
 
     // THEN check for existing session
-    console.debug('[Auth] Calling getSession');
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.debug('[Auth] getSession result:', !!session?.user);
-      if (!isMounted) return;
-
-      if (!session?.user) {
-        setSession(null);
-        setUser(null);
-        setRoles([]);
-        setLoading(false);
-        return;
-      }
-
       setSession(session);
-      setUser(session.user);
+      setUser(session?.user ?? null);
       
-      try {
-        console.debug('[Auth] Fetching roles from getSession');
-        const userRoles = await fetchUserRoles(session.user.id);
-        console.debug('[Auth] getSession roles:', userRoles);
-        if (isMounted) setRoles(userRoles);
-      } catch (err) {
-        console.error('Error fetching roles on init:', err);
+      if (session?.user) {
+        try {
+          const userRoles = await fetchUserRoles(session.user.id);
+          setRoles(userRoles);
+        } catch (err) {
+          console.error('Error fetching roles on init:', err);
+        }
       }
-      if (isMounted) setLoading(false);
+      setLoading(false);
     });
 
+    // Safety timeout — never stay stuck on loading for more than 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading((current) => {
+        if (current) {
+          console.warn('[Auth] Safety timeout: forcing loading=false');
+        }
+        return false;
+      });
+    }, 5000);
+
     return () => {
-      isMounted = false;
       subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
