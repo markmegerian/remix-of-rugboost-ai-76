@@ -102,12 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    let isMounted = true;
-
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!isMounted) return;
-        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -116,22 +113,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           try {
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              await ensureUserSetup(
-                currentUser.id,
-                currentUser.email || '',
-                currentUser.user_metadata?.full_name ||
-                  currentUser.user_metadata?.name ||
-                  currentUser.email?.split('@')[0]
-              );
+              console.debug('[Auth] Running ensureUserSetup for', event);
+              await ensureUserSetup(currentUser.id, currentUser.email || '',
+                currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0]);
+              console.debug('[Auth] ensureUserSetup complete');
             }
 
+            console.debug('[Auth] Fetching roles from onAuthStateChange');
             const userRoles = await fetchUserRoles(currentUser.id);
-            if (isMounted) setRoles(userRoles);
+            console.debug('[Auth] Roles fetched:', userRoles);
+            setRoles(userRoles);
           } catch (err) {
-            console.error('[Auth] Error in auth state change:', err);
-            if (isMounted) setRoles([]);
+            console.error('[Auth] Error in onAuthStateChange:', err);
+            setRoles([]);
           } finally {
-            if (isMounted) setLoading(false);
+            setLoading(false);
           }
         } else {
           setRoles([]);
@@ -140,10 +136,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    // THEN check for existing session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        try {
+          const fullName = session.user.user_metadata?.full_name || 
+                           session.user.user_metadata?.name ||
+                           session.user.email?.split('@')[0];
+          await ensureUserSetup(session.user.id, session.user.email || '', fullName);
+          
+          const userRoles = await fetchUserRoles(session.user.id);
+          setRoles(userRoles);
+        } catch (err) {
+          console.error('[Auth] Error in getSession:', err);
+          setRoles([]);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    }).catch((err) => {
+      console.error('[Auth] getSession failed:', err);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
