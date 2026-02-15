@@ -117,6 +117,45 @@ export type Database = {
           },
         ]
       }
+      ai_global_corrections: {
+        Row: {
+          context: string | null
+          corrected_value: string | null
+          correction_type: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          original_value: string | null
+          priority: number
+          rug_category: string | null
+        }
+        Insert: {
+          context?: string | null
+          corrected_value?: string | null
+          correction_type: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          original_value?: string | null
+          priority?: number
+          rug_category?: string | null
+        }
+        Update: {
+          context?: string | null
+          corrected_value?: string | null
+          correction_type?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          original_value?: string | null
+          priority?: number
+          rug_category?: string | null
+        }
+        Relationships: []
+      }
       approved_estimates: {
         Row: {
           approved_by_staff_at: string | null
