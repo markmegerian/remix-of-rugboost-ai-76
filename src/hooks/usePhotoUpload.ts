@@ -50,7 +50,7 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
     const compressedPhoto = await compressImage(photo);
     const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
 
-    console.debug(`Uploading photo: ${fileName}, size: ${(compressedPhoto.size / 1024).toFixed(0)}KB, type: ${compressedPhoto.type}`);
+    console.log(`Uploading photo: ${fileName}, size: ${(compressedPhoto.size / 1024).toFixed(0)}KB, type: ${compressedPhoto.type}`);
     
     const { data, error: uploadError } = await supabase.storage
       .from(bucket)

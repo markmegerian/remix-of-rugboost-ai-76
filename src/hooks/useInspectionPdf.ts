@@ -73,7 +73,7 @@ async function saveAndOpenPdfNative(
       directory: Directory.Cache,
     });
 
-    console.debug('[PDF] Saved to:', result.uri);
+    console.log('[PDF] Saved to:', result.uri);
 
     await Share.share({
       title: filename.replace('.pdf', ''),

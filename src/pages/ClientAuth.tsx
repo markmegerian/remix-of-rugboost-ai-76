@@ -260,7 +260,7 @@ const ClientAuth = () => {
         // Record failed attempt and apply exponential backoff
         const { lockoutSeconds, failedAttempts } = recordFailedAttempt(loginEmail);
         
-        console.debug(`[Security] Failed login attempt #${failedAttempts} for: ${loginEmail.substring(0, 3)}***`);
+        console.log(`[Security] Failed login attempt #${failedAttempts} for: ${loginEmail.substring(0, 3)}***`);
         
         if (lockoutSeconds > 0) {
           setLockoutRemaining(lockoutSeconds);

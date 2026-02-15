@@ -47,8 +47,6 @@ import EditClientInfoDialog from '@/components/EditClientInfoDialog';
 import ResponsiveFormSheet from '@/components/ResponsiveFormSheet';
 import ExpertEstimateCard from '@/components/ExpertEstimateCard';
 import { useJobDetailActions } from '@/hooks/useJobDetailActions';
-import { useRugAnalysis } from '@/hooks/useRugAnalysis';
-import { useClientPortal } from '@/hooks/useClientPortal';
 import ClientLogisticsCard from '@/components/job-detail/ClientLogisticsCard';
 import RugGalleryCard from '@/components/job-detail/RugGalleryCard';
 import ClientApprovalCard from '@/components/job-detail/ClientApprovalCard';
@@ -198,66 +196,49 @@ const JobDetail = () => {
     fetchJobDetails();
   }, [fetchJobDetails]);
 
-  // Rug CRUD hook
+  // Extract all mutation/action functions into custom hook
   const {
     addingRug,
     savingJob,
     savingRug,
     savingClientInfo,
-    confirmDeleteRugId,
-    setConfirmDeleteRugId,
-    uploadProgress,
-    isUploadingPhotos,
-    resetUploadProgress,
-    handleAddRug: handleAddRugAction,
-    handleEditJob: handleEditJobAction,
-    handleSaveClientInfo: handleSaveClientInfoAction,
-    handleEditRug: handleEditRugAction,
-    handleDeleteRug,
-  } = useJobDetailActions({
-    job,
-    userId: user?.id,
-    companyId,
-    fetchJobDetails,
-  });
-
-  // Analysis hook
-  const {
     analyzingAll,
     analyzingRugId,
     reanalyzingRugId,
+    sendingEmail,
+    generatingPortalLink,
+    resendingInvite,
+    confirmDeleteRugId,
+    setConfirmDeleteRugId,
     analysisStage,
     analysisRugNumber,
     analysisCurrent,
     analysisTotal,
     imageAnnotations,
+    uploadProgress,
+    isUploadingPhotos,
+    resetUploadProgress,
     performRugAnalysis,
     handleAnalyzeAllRugs,
-  } = useRugAnalysis({
-    job,
-    rugs,
-    userId: user?.id,
-    fetchJobDetails,
-  });
-
-  // Client portal / email / PDF hook
-  const {
-    sendingEmail,
-    generatingPortalLink,
-    resendingInvite,
+    handleAddRug: handleAddRugAction,
+    handleEditJob: handleEditJobAction,
+    handleSaveClientInfo: handleSaveClientInfoAction,
+    handleEditRug: handleEditRugAction,
+    handleDeleteRug,
     handleSendEmail: handleSendEmailAction,
     handleDownloadPDF,
     handleDownloadJobPDF,
     handleOpenEmailPreview: checkEmailPreviewReady,
     generateClientPortalLink,
     handleResendInvite,
-  } = useClientPortal({
+  } = useJobDetailActions({
     job,
     rugs,
     approvedEstimates,
     branding,
     upsellServices,
     clientPortalStatus,
+    userId: user?.id,
     jobId,
     companyId,
     fetchJobDetails,

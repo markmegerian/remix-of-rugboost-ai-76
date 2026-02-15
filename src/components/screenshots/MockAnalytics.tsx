@@ -70,7 +70,7 @@ const MockAnalytics = forwardRef<HTMLDivElement>((_, ref) => {
                     className={`w-full rounded-t-md transition-all ${isHighlighted ? 'bg-gradient-to-t from-primary to-primary/70' : 'bg-gradient-to-t from-muted-foreground/30 to-muted-foreground/20'}`}
                     style={{ height: `${height}%` }}
                   />
-                  <span className="text-xs text-muted-foreground font-medium">{month.month.slice(0, 1)}</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">{month.month.slice(0, 1)}</span>
                 </div>
               );
             })}
@@ -91,7 +91,7 @@ const MockAnalytics = forwardRef<HTMLDivElement>((_, ref) => {
                     className={`w-full rounded-t-md transition-all ${isHighlighted ? 'bg-gradient-to-t from-accent to-accent/70' : 'bg-gradient-to-t from-muted-foreground/30 to-muted-foreground/20'}`}
                     style={{ height: `${height}%` }}
                   />
-                  <span className="text-xs text-muted-foreground font-medium">{month.month.slice(0, 1)}</span>
+                  <span className="text-[10px] text-muted-foreground font-medium">{month.month.slice(0, 1)}</span>
                 </div>
               );
             })}

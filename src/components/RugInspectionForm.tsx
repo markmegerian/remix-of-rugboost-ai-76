@@ -198,11 +198,11 @@ const RugInspectionForm: React.FC<RugInspectionFormProps> = ({ onSubmit, isLoadi
               onChange={handleInputChange}
             />
             {dimensionFormat === 'ft_in' ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground">
                 Use ft.in format (e.g. 9.06 = 9′ 6″). Always use two digits for inches.
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground">
                 Enter decimal feet (e.g. 9.50 = 9½ feet).
               </p>
             )}
@@ -222,11 +222,11 @@ const RugInspectionForm: React.FC<RugInspectionFormProps> = ({ onSubmit, isLoadi
               onChange={handleInputChange}
             />
             {dimensionFormat === 'ft_in' ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground">
                 Use ft.in format (e.g. 6.08 = 6′ 8″). Always use two digits for inches.
               </p>
             ) : (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground">
                 Enter decimal feet (e.g. 6.67 = 6 ft 8 in).
               </p>
             )}

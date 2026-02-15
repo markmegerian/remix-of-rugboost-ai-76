@@ -271,7 +271,7 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
             )}
           </span>
         </div>
-        <div className="flex gap-1" role="progressbar" aria-valuenow={currentStep + 1} aria-valuemin={1} aria-valuemax={totalRequiredSteps} aria-label={`Step ${currentStep + 1} of ${totalRequiredSteps}: ${PHOTO_STEPS[currentStep].title}`}>
+        <div className="flex gap-1">
           {PHOTO_STEPS.map((step, index) => (
             <button
               key={step.id}
@@ -279,7 +279,6 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                 setCaptureMode('guided');
                 setCurrentStep(index);
               }}
-              aria-label={`Step ${index + 1}: ${step.title}${getPhotoForStep(step.id) ? ' (captured)' : ''}`}
               className={cn(
                 "h-2 flex-1 rounded-full transition-all",
                 getPhotoForStep(step.id)
@@ -352,7 +351,7 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                 <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
                   <img
                     src={URL.createObjectURL(getPhotoForStep(PHOTO_STEPS[currentStep].id)!.file)}
-                    alt={`Photo for step: ${PHOTO_STEPS[currentStep].title}`}
+                    alt={PHOTO_STEPS[currentStep].title}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute top-2 right-2 flex gap-2">
@@ -362,18 +361,16 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                       variant="secondary"
                       onClick={openCamera}
                       className="gap-1"
-                      aria-label={`Retake photo for ${PHOTO_STEPS[currentStep].title}`}
                     >
-                      <Camera className="h-3 w-3" aria-hidden="true" />
+                      <Camera className="h-3 w-3" />
                       Retake
                     </Button>
                     <button
                       type="button"
                       onClick={() => removePhoto(PHOTO_STEPS[currentStep].id)}
                       className="rounded-full bg-destructive p-1.5 text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                      aria-label={`Remove photo for ${PHOTO_STEPS[currentStep].title}`}
                     >
-                      <X className="h-3 w-3" aria-hidden="true" />
+                      <X className="h-3 w-3" />
                     </button>
                   </div>
                   <div className="absolute bottom-2 left-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground flex items-center gap-1">
@@ -395,9 +392,8 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                       size="sm"
                       onClick={openCamera}
                       className="gap-1.5"
-                      aria-label="Take photo with camera"
                     >
-                      <Camera className="h-4 w-4" aria-hidden="true" />
+                      <Camera className="h-4 w-4" />
                       Camera
                     </Button>
                     <Button
@@ -406,9 +402,8 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                       size="sm"
                       onClick={openGallery}
                       className="gap-1.5"
-                      aria-label="Choose photo from gallery"
                     >
-                      <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                      <ImagePlus className="h-4 w-4" />
                       Gallery
                     </Button>
                   </div>
@@ -425,9 +420,8 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
               onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
               disabled={currentStep === 0}
               className="flex-1"
-              aria-label="Previous step"
             >
-              <ChevronLeft className="h-4 w-4 mr-1" aria-hidden="true" />
+              <ChevronLeft className="h-4 w-4 mr-1" />
               Previous
             </Button>
             {currentStep < totalRequiredSteps - 1 ? (
@@ -436,10 +430,9 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                 variant="outline"
                 onClick={() => setCurrentStep(currentStep + 1)}
                 className="flex-1"
-                aria-label="Next step"
               >
                 Next
-                <ChevronRight className="h-4 w-4 ml-1" aria-hidden="true" />
+                <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
               <Button
@@ -447,10 +440,9 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                 variant={allRequiredComplete ? "default" : "outline"}
                 onClick={skipToAdditional}
                 className="flex-1"
-                aria-label={allRequiredComplete ? "Add issue photos" : "Skip to issue photos"}
               >
                 {allRequiredComplete ? "Add Issue Photos" : "Skip to Issues"}
-                <SkipForward className="h-4 w-4 ml-1" aria-hidden="true" />
+                <SkipForward className="h-4 w-4 ml-1" />
               </Button>
             )}
           </div>
@@ -503,9 +495,8 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                       type="button"
                       onClick={() => removePhoto(photo.stepId)}
                       className="absolute top-2 right-2 rounded-full bg-destructive p-1.5 text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                      aria-label={`Remove issue photo ${index + 1}`}
                     >
-                      <X className="h-3 w-3" aria-hidden="true" />
+                      <X className="h-3 w-3" />
                     </button>
                     <div className="absolute bottom-2 left-2 rounded-full bg-foreground/70 px-2 py-0.5 text-xs text-background">
                       Issue {index + 1}
@@ -519,20 +510,20 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                       type="button"
                       onClick={openCamera}
                       className="p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-                      aria-label="Take photo with camera"
+                      title="Take photo"
                     >
-                      <Camera className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                      <Camera className="h-5 w-5 text-muted-foreground" />
                     </button>
                     <button
                       type="button"
                       onClick={openGallery}
                       className="p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-                      aria-label="Choose from gallery"
+                      title="Choose from gallery"
                     >
-                      <ImagePlus className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                      <ImagePlus className="h-5 w-5 text-muted-foreground" />
                     </button>
                   </div>
-                  <span className="text-xs text-muted-foreground">Add Issue</span>
+                  <span className="text-[10px] text-muted-foreground">Add Issue</span>
                 </div>
               </div>
             </div>

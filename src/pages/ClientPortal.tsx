@@ -1,16 +1,79 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, X, LogOut, History, Download } from 'lucide-react';
+import { 
+  Loader2, X, LogOut, History, Download
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import ExpertInspectionReport from '@/components/ExpertInspectionReport';
+import { categorizeService } from '@/lib/serviceCategories';
+import { getServiceDeclineConsequence } from '@/lib/serviceCategories';
+import { batchSignUrls } from '@/hooks/useSignedUrls';
+import { openExternalUrl } from '@/lib/navigation';
+import { LifecycleErrorState, LifecycleAlert } from '@/components/LifecycleErrorState';
+import { 
+  LifecycleStatus, 
+  isEstimateSent, 
+  isStatusLocked, 
+  LIFECYCLE_ERRORS 
+} from '@/lib/lifecycleStateMachine';
 import { useInspectionPdf } from '@/hooks/useInspectionPdf';
-import { useClientPortalData } from '@/hooks/useClientPortalData';
-import { useClientPayment } from '@/hooks/useClientPayment';
+
+interface ServiceItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  priority: 'high' | 'medium' | 'low';
+  adjustedTotal: number;
+  pricingFactors?: string[];
+}
+
+interface PhotoAnnotations {
+  photoIndex: number;
+  annotations: Array<{
+    label: string;
+    location: string;
+    x: number;
+    y: number;
+  }>;
+}
+
+interface RugData {
+  id: string;
+  rug_number: string;
+  rug_type: string;
+  length: number | null;
+  width: number | null;
+  photo_urls: string[] | null;
+  analysis_report: string | null;
+  image_annotations: PhotoAnnotations[] | null;
+  estimate_id: string;
+  services: ServiceItem[];
+  total: number;
+}
+
+interface JobData {
+  id: string;
+  job_number: string;
+  client_name: string;
+  status: string;
+  created_at: string;
+}
+
+interface BusinessBranding {
+  business_name: string | null;
+  business_phone: string | null;
+  business_email: string | null;
+  business_address?: string | null;
+  logo_path?: string | null;
+}
 
 const ClientPortal = () => {
   const { accessToken } = useParams<{ accessToken: string }>();
@@ -18,32 +81,420 @@ const ClientPortal = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const { generateAndDownload, isGenerating } = useInspectionPdf();
 
-  const {
-    loading,
-    job,
-    rugs,
-    branding,
-    hasAccess,
-    clientJobAccessId,
-  } = useClientPortalData({ accessToken, user, authLoading });
+  const [loading, setLoading] = useState(true);
+  const [job, setJob] = useState<JobData | null>(null);
+  const [rugs, setRugs] = useState<RugData[]>([]);
+  const [branding, setBranding] = useState<BusinessBranding | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [clientJobAccessId, setClientJobAccessId] = useState<string | null>(null);
+  const [staffUserId, setStaffUserId] = useState<string | null>(null);
 
-  const { proceedToPayment, isProcessing } = useClientPayment({
-    job,
-    rugs,
-    clientJobAccessId,
-    accessToken,
-    user,
-  });
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        // Redirect to client auth with the token
+        navigate(`/client/auth?token=${accessToken}`);
+      } else {
+        // Check if user needs to set up their password
+        if (user.user_metadata?.needs_password_setup) {
+          // Fetch branding first for the password setup page
+          fetchBrandingForPasswordSetup();
+        } else {
+          checkAccessAndLoadData();
+        }
+      }
+    }
+  }, [user, authLoading, accessToken]);
+
+  const fetchBrandingForPasswordSetup = async () => {
+    try {
+      // Use secure RPC function to validate token and get staff user
+      const { data: tokenData, error: tokenError } = await supabase
+        .rpc('validate_access_token', { _token: accessToken })
+        .single();
+
+      let businessName = 'Rug Cleaning';
+      
+      if (!tokenError && tokenData?.staff_user_id) {
+        const { data: brandingData } = await supabase
+          .from('profiles')
+          .select('business_name')
+          .eq('user_id', tokenData.staff_user_id)
+          .single();
+        
+        if (brandingData?.business_name) {
+          businessName = brandingData.business_name;
+        }
+      }
+      
+      // Redirect to password setup
+      navigate(`/client/set-password?token=${accessToken}&business=${encodeURIComponent(businessName)}`);
+    } catch (error) {
+      console.error('Error fetching branding:', error);
+      navigate(`/client/set-password?token=${accessToken}`);
+    }
+  };
+
+  const checkAccessAndLoadData = async () => {
+    if (!accessToken || !user) return;
+
+    setLoading(true);
+    try {
+      // Use secure RPC function to validate token
+      const { data: tokenData, error: tokenError } = await supabase
+        .rpc('validate_access_token', { _token: accessToken })
+        .single();
+
+      if (tokenError || !tokenData) {
+        toast.error(LIFECYCLE_ERRORS.INVALID_TOKEN);
+        navigate('/');
+        return;
+      }
+
+      // Validate that client has access to this specific job's company
+      const jobCompanyId = tokenData.company_id as string | null;
+
+      // Build access data structure from RPC result
+      const accessData = {
+        id: tokenData.access_id as string,
+        job_id: tokenData.job_id as string,
+        client_id: tokenData.client_id as string | null,
+        company_id: jobCompanyId,
+        jobs: {
+          id: tokenData.job_id as string,
+          job_number: tokenData.job_number as string,
+          client_name: tokenData.client_name as string,
+          status: tokenData.job_status as string,
+          user_id: tokenData.staff_user_id as string
+        }
+      };
+
+      // Check if job status allows client access
+      const jobStatus = tokenData.job_status as LifecycleStatus;
+      if (!isEstimateSent(jobStatus)) {
+        toast.error('This estimate is not ready for viewing yet.');
+        navigate('/');
+        return;
+      }
+      
+
+      // Check if user's client account is linked
+      const { data: clientAccount } = await supabase
+        .from('client_accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!clientAccount) {
+        // Create client account and link
+        const { data: newClient, error: createError } = await supabase
+          .from('client_accounts')
+          .insert({
+            user_id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || '',
+          })
+          .select('id')
+          .single();
+
+        if (createError) throw createError;
+
+        // Link to job access
+        await supabase
+          .from('client_job_access')
+          .update({ client_id: newClient.id })
+          .eq('id', accessData.id);
+
+        // Add client role
+        await supabase
+          .from('user_roles')
+          .insert({ user_id: user.id, role: 'client' })
+          .select();
+      } else if (!accessData.client_id) {
+        // Link existing client to this job access
+        await supabase
+          .from('client_job_access')
+          .update({ client_id: clientAccount.id })
+          .eq('id', accessData.id);
+      }
+
+      // Track first access
+      const { error: trackingError } = await supabase.rpc('update_client_access_tracking', {
+        _access_token: accessToken,
+        _first_accessed: true,
+        _password_set: false,
+      });
+      if (trackingError) {
+        console.error('Error updating access tracking:', trackingError);
+      }
+
+      setHasAccess(true);
+      setClientJobAccessId(accessData.id);
+      setStaffUserId((accessData.jobs as any).user_id);
+
+      // Fetch full job data including created_at
+      const { data: fullJobData } = await supabase
+        .from('jobs')
+        .select('id, job_number, client_name, status, created_at')
+        .eq('id', accessData.job_id)
+        .single();
+
+      const jobData: JobData = fullJobData ? {
+        id: fullJobData.id,
+        job_number: fullJobData.job_number,
+        client_name: fullJobData.client_name,
+        status: fullJobData.status,
+        created_at: fullJobData.created_at,
+      } : {
+        ...(accessData.jobs as any),
+        created_at: new Date().toISOString(),
+      };
+      setJob(jobData);
+
+      // Fetch branding including logo
+      const { data: brandingData } = await supabase
+        .from('profiles')
+        .select('business_name, business_phone, business_email, business_address, logo_path')
+        .eq('user_id', (accessData.jobs as any).user_id)
+        .single();
+
+      if (brandingData) {
+        setBranding(brandingData);
+      }
+
+      // Fetch rugs for this job
+      const { data: rugsData, error: rugsError } = await supabase
+        .from('inspections')
+        .select(`
+          id,
+          rug_number,
+          rug_type,
+          length,
+          width,
+          photo_urls,
+          analysis_report,
+          image_annotations
+        `)
+        .eq('job_id', jobData.id);
+
+      if (rugsError) throw rugsError;
+
+      // Fetch approved estimates separately (RLS uses job_id directly)
+      const { data: estimatesData, error: estimatesError } = await supabase
+        .from('approved_estimates')
+        .select('id, inspection_id, services, total_amount')
+        .eq('job_id', jobData.id);
+
+      if (estimatesError) throw estimatesError;
+
+      // Create a map of inspection_id -> estimate for quick lookup
+      const estimateMap = new Map<string, { id: string; services: unknown; total_amount: number }>();
+      (estimatesData || []).forEach(est => {
+        estimateMap.set(est.inspection_id, est);
+      });
+
+      const processedRugs: RugData[] = (rugsData || [])
+        .filter(r => estimateMap.has(r.id))
+        .map(r => {
+          const estimate = estimateMap.get(r.id)!;
+          // Process services to ensure adjustedTotal is set
+          const rawServices = Array.isArray(estimate.services) ? estimate.services as ServiceItem[] : [];
+          const processedServices = rawServices.map(svc => ({
+            ...svc,
+            // Use adjustedTotal if provided, otherwise calculate from quantity * unitPrice
+            adjustedTotal: svc.adjustedTotal ?? (svc.quantity * svc.unitPrice),
+          }));
+          return {
+            id: r.id,
+            rug_number: r.rug_number,
+            rug_type: r.rug_type,
+            length: r.length,
+            width: r.width,
+            photo_urls: r.photo_urls,
+            analysis_report: r.analysis_report,
+            image_annotations: Array.isArray(r.image_annotations) ? r.image_annotations as unknown as PhotoAnnotations[] : null,
+            estimate_id: estimate.id,
+            services: processedServices,
+            total: estimate.total_amount,
+          };
+        });
+
+      setRugs(processedRugs);
+      
+      // Preload only first 3 photos per rug for faster initial load
+      // Additional photos load on-demand when user clicks to view more
+      const initialPhotoPaths = processedRugs.flatMap(rug => 
+        (rug.photo_urls || []).slice(0, 3)
+      );
+      if (initialPhotoPaths.length > 0) {
+        await batchSignUrls(initialPhotoPaths);
+      }
+    } catch (error) {
+      console.error('Error loading portal data:', error);
+      toast.error('Failed to load portal data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate total - all services are included (expert decides, not client)
+  const calculateTotal = () => {
+    return rugs.reduce((sum, rug) => sum + rug.total, 0);
+  };
+
+  const handleProceedToPayment = async (declinedServiceIds: Set<string> = new Set()) => {
+    setIsProcessingPayment(true);
+    try {
+      // Filter services - exclude declined ones
+      const servicesForCheckout: { 
+        rugNumber: string; 
+        rugId: string;
+        estimateId: string;
+        services: ServiceItem[] 
+      }[] = [];
+      
+      rugs.forEach(rug => {
+        // Filter out declined services (required services can never be declined)
+        const filteredServices = rug.services.filter(service => 
+          !declinedServiceIds.has(service.id)
+        );
+        
+        if (filteredServices.length > 0) {
+          servicesForCheckout.push({
+            rugNumber: rug.rug_number,
+            rugId: rug.id,
+            estimateId: rug.estimate_id,
+            services: filteredServices,
+          });
+        }
+      });
+
+      // Calculate total based on filtered services
+      const total = servicesForCheckout.reduce((sum, rug) => 
+        sum + rug.services.reduce((s, svc) => s + svc.quantity * svc.unitPrice, 0), 0
+      );
+
+      // Save client service selections to database before checkout
+      for (const rugSelection of servicesForCheckout) {
+        const selectionTotal = rugSelection.services.reduce(
+          (sum, s) => sum + (s.quantity * s.unitPrice), 0
+        );
+        
+        // First try to find existing selection
+        const { data: existingSelection } = await supabase
+          .from('client_service_selections')
+          .select('id')
+          .eq('client_job_access_id', clientJobAccessId!)
+          .eq('approved_estimate_id', rugSelection.estimateId)
+          .maybeSingle();
+        
+        if (existingSelection) {
+          // Update existing
+          await supabase
+            .from('client_service_selections')
+            .update({
+              selected_services: rugSelection.services as unknown as any,
+              total_selected: selectionTotal,
+            })
+            .eq('id', existingSelection.id);
+        } else {
+          // Insert new
+          await supabase
+            .from('client_service_selections')
+            .insert({
+              client_job_access_id: clientJobAccessId!,
+              approved_estimate_id: rugSelection.estimateId,
+              selected_services: rugSelection.services as unknown as any,
+              total_selected: selectionTotal,
+            });
+        }
+      }
+
+      // Log declined services for audit trail
+      if (declinedServiceIds.size > 0) {
+        const allServices = rugs.flatMap(rug => 
+          rug.services.map(s => ({ ...s, rugId: rug.id }))
+        );
+        
+        const declinedServicesToLog = allServices.filter(s => declinedServiceIds.has(s.id));
+        
+        for (const service of declinedServicesToLog) {
+          const category = categorizeService(service.name);
+          const consequence = getServiceDeclineConsequence(service.name, category);
+          
+          // Find the inspection_id for this rug
+          const rug = rugs.find(r => r.services.some(s => s.id === service.id));
+          if (!rug) continue;
+          
+          await supabase
+            .from('declined_services')
+            .upsert({
+              job_id: job?.id,
+              inspection_id: rug.id,
+              service_id: service.id,
+              service_name: service.name,
+              service_category: category,
+              unit_price: service.unitPrice,
+              quantity: service.quantity,
+              declined_amount: service.unitPrice * service.quantity,
+              decline_consequence: consequence,
+              acknowledged_at: new Date().toISOString(),
+            }, {
+              onConflict: 'job_id,service_id',
+              ignoreDuplicates: false,
+            });
+        }
+      }
+
+      // Call edge function to create Stripe checkout session
+      // Build platform-aware URLs (web uses origin, native uses web URL for Stripe redirect)
+      // Note: Stripe redirects must use web URLs, not custom schemes
+      const baseUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      const successUrl = `${baseUrl}/client/payment-success?session_id={CHECKOUT_SESSION_ID}&token=${accessToken}`;
+      const cancelUrl = `${baseUrl}/client/payment-cancelled?token=${accessToken}&job=${job?.id}`;
+      
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          jobId: job?.id,
+          clientJobAccessId,
+          selectedServices: servicesForCheckout,
+          totalAmount: total,
+          customerEmail: user?.email,
+          successUrl,
+          cancelUrl,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      // Redirect to Stripe Checkout - use Capacitor-safe navigation
+      if (data.checkoutUrl) {
+        // For payment flows, always use direct navigation (critical flow)
+        openExternalUrl(data.checkoutUrl, { critical: true });
+        return; // Don't reset processing state - we're leaving the page
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error('Failed to process payment. Please try again.');
+      setIsProcessingPayment(false);
+    } finally {
+      // Only reset if still processing (means we never left the page)
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
 
-  // ── Loading skeleton ────────────────────────────────────
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background">
+        {/* Skeleton Header */}
         <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
           <div className="container mx-auto flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-3">
@@ -61,6 +512,7 @@ const ClientPortal = () => {
         </header>
 
         <main className="container mx-auto px-4 py-8">
+          {/* Welcome Card Skeleton */}
           <Card className="mb-6">
             <CardHeader>
               <Skeleton className="h-6 w-64 mb-2" />
@@ -71,6 +523,7 @@ const ClientPortal = () => {
             </CardContent>
           </Card>
 
+          {/* Main Content Skeleton */}
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               {[1, 2].map((i) => (
@@ -107,6 +560,7 @@ const ClientPortal = () => {
               ))}
             </div>
 
+            {/* Order Summary Skeleton */}
             <div className="lg:col-span-1">
               <Card className="sticky top-24">
                 <CardHeader>
@@ -132,7 +586,6 @@ const ClientPortal = () => {
     );
   }
 
-  // ── Access denied ───────────────────────────────────────
   if (!hasAccess || !job) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -149,11 +602,11 @@ const ClientPortal = () => {
     );
   }
 
-  // ── Main render ─────────────────────────────────────────
-  const totalAmount = rugs.reduce((sum, rug) => sum + rug.total, 0);
+  const totalAmount = calculateTotal();
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
@@ -168,21 +621,19 @@ const ClientPortal = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                generateAndDownload({
-                  type: 'inspection',
-                  jobId: job.id,
-                  jobNumber: job.job_number,
-                  clientName: job.client_name,
-                  rugs,
-                  totalAmount,
-                  createdAt: job.created_at,
-                  branding,
-                })
-              }
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => generateAndDownload({
+                type: 'inspection',
+                jobId: job.id,
+                jobNumber: job.job_number,
+                clientName: job.client_name,
+                rugs,
+                totalAmount,
+                createdAt: job.created_at,
+                branding,
+              })}
               disabled={isGenerating}
               className="gap-1"
             >
@@ -193,9 +644,9 @@ const ClientPortal = () => {
               )}
               <span className="hidden sm:inline">Download PDF</span>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
+            <Button 
+              variant="outline" 
+              size="sm" 
               onClick={() => navigate('/client/dashboard')}
               className="gap-1 hidden sm:flex"
             >
@@ -205,7 +656,7 @@ const ClientPortal = () => {
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user?.email}
             </span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} aria-label="Sign out">
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -213,36 +664,32 @@ const ClientPortal = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Expert Inspection Report */}
         <ExpertInspectionReport
           rugs={rugs}
           clientName={job.client_name}
           jobNumber={job.job_number}
           businessName={branding?.business_name || null}
-          onApprove={proceedToPayment}
-          isProcessing={isProcessing}
+          onApprove={handleProceedToPayment}
+          isProcessing={isProcessingPayment}
           totalAmount={totalAmount}
         />
 
+        {/* Contact Info */}
         {branding && (
           <Card className="mt-6">
             <CardContent className="py-4">
               <p className="text-sm text-center text-muted-foreground">
                 Questions? Contact us at{' '}
                 {branding.business_email && (
-                  <a
-                    href={`mailto:${branding.business_email}`}
-                    className="text-primary hover:underline"
-                  >
+                  <a href={`mailto:${branding.business_email}`} className="text-primary hover:underline">
                     {branding.business_email}
                   </a>
                 )}
                 {branding.business_phone && (
                   <>
                     {branding.business_email && ' or '}
-                    <a
-                      href={`tel:${branding.business_phone}`}
-                      className="text-primary hover:underline"
-                    >
+                    <a href={`tel:${branding.business_phone}`} className="text-primary hover:underline">
                       {branding.business_phone}
                     </a>
                   </>

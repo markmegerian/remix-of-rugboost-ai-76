@@ -58,7 +58,7 @@ const MockEstimate = forwardRef<HTMLDivElement>((_, ref) => {
                     )}
                     <span className="text-sm text-foreground">{service.name}</span>
                     {service.isRequired && (
-                      <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Required</span>
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Required</span>
                     )}
                   </div>
                   <span className="text-sm font-medium text-foreground">${service.price.toFixed(0)}</span>

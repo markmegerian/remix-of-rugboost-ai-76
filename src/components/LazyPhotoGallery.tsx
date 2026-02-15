@@ -124,7 +124,7 @@ const LazyPhotoGalleryComponent: React.FC<LazyPhotoGalleryProps> = ({
               
               {/* Badge showing annotation count */}
               {hasAnnotations && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-xs font-bold shadow border border-white">
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[10px] font-bold shadow border border-white">
                   {photoAnnotations.length}
                 </div>
               )}
@@ -144,7 +144,7 @@ const LazyPhotoGalleryComponent: React.FC<LazyPhotoGalleryProps> = ({
             ) : (
               <>
                 <ChevronDown className="h-4 w-4" />
-                <span className="text-xs font-medium">+{hiddenCount} more</span>
+                <span className="text-[10px] font-medium">+{hiddenCount} more</span>
               </>
             )}
           </button>

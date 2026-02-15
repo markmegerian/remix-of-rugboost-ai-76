@@ -408,7 +408,6 @@ const AccountSettings = () => {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    aria-label={showCurrentPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                   >
                     {showCurrentPassword ? (
@@ -438,7 +437,6 @@ const AccountSettings = () => {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    aria-label={showNewPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowNewPassword(!showNewPassword)}
                   >
                     {showNewPassword ? (
@@ -473,7 +471,6 @@ const AccountSettings = () => {
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    aria-label={showConfirmNewPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
                   >
                     {showConfirmNewPassword ? (

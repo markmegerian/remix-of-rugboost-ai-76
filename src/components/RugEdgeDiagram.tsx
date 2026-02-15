@@ -44,7 +44,7 @@ const RugEdgeDiagramComponent = ({
 
   const labelClass = (edge: RugEdge) =>
     cn(
-      'text-xs select-none pointer-events-none',
+      'text-[10px] select-none pointer-events-none',
       isSelected(edge) ? 'fill-primary font-semibold' : 'fill-muted-foreground',
     );
 
@@ -91,7 +91,7 @@ const RugEdgeDiagramComponent = ({
           y={y + rugH / 2}
           textAnchor="middle"
           dominantBaseline="middle"
-          className="text-xs fill-muted-foreground/60 select-none pointer-events-none"
+          className="text-[11px] fill-muted-foreground/60 select-none pointer-events-none"
         >
           RUG
         </text>
@@ -198,7 +198,7 @@ const RugEdgeDiagramComponent = ({
                 }
               }}
               className={cn(
-                'text-xs px-2 py-0.5 rounded-full border transition-colors',
+                'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
                 allActive
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-background text-muted-foreground border-border hover:border-primary/50',

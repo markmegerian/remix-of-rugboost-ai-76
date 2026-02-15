@@ -411,7 +411,7 @@ const JobTimeline: React.FC<JobTimelineProps> = ({
               
               {/* Label */}
               <span className={cn(
-                "mt-1.5 text-xs text-center leading-tight font-medium",
+                "mt-1.5 text-[10px] text-center leading-tight font-medium",
                 isCurrent ? "text-primary" : "text-muted-foreground",
                 isNextStep && "text-primary/70"
               )}>

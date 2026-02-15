@@ -143,7 +143,7 @@ const ServiceCatalogSettingsComponent = ({ userId }: ServiceCatalogSettingsProps
                 />
                 <span className="text-sm font-medium">{service}</span>
               </div>
-              <Badge variant="secondary" className="text-xs">Fixed</Badge>
+              <Badge variant="secondary" className="text-[10px]">Fixed</Badge>
             </div>
           ))}
         </CardContent>
@@ -174,7 +174,7 @@ const ServiceCatalogSettingsComponent = ({ userId }: ServiceCatalogSettingsProps
                 />
                 <span className="text-sm font-medium">{service}</span>
               </div>
-              <Badge variant="outline" className="text-xs">Variable</Badge>
+              <Badge variant="outline" className="text-[10px]">Variable</Badge>
             </div>
           ))}
         </CardContent>

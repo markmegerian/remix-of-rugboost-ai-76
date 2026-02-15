@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { compressImage } from '@/lib/imageCompression';
-import { extractErrorMessage } from '@/lib/errorHandler';
 import {
   getPendingSubmissions,
   getPhotosForSubmission,
@@ -24,21 +23,19 @@ class OfflineSyncService {
 
   /** Start watching for connectivity and periodically syncing */
   start() {
+    // Listen for online events
     window.addEventListener('online', this.onOnline);
-    window.addEventListener('offline', this.onOffline);
 
-    // Only run interval when online to avoid wasted CPU
-    if (navigator.onLine) {
-      this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
-    }
+    // Periodic check
+    this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
 
+    // Initial sync attempt
     this.refreshCount();
     this.trySync();
   }
 
   stop() {
     window.removeEventListener('online', this.onOnline);
-    window.removeEventListener('offline', this.onOffline);
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -64,20 +61,8 @@ class OfflineSyncService {
   }
 
   private onOnline = () => {
-    console.debug('[OfflineSync] Device came online, triggering sync');
-    // Restart periodic interval
-    if (!this.intervalId) {
-      this.intervalId = setInterval(() => this.trySync(), SYNC_INTERVAL_MS);
-    }
+    console.log('[OfflineSync] Device came online, triggering sync');
     this.trySync();
-  };
-
-  private onOffline = () => {
-    console.debug('[OfflineSync] Device went offline, pausing interval');
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
   };
 
   /** Manually trigger a sync attempt */
@@ -90,11 +75,11 @@ class OfflineSyncService {
     this.syncing = true;
     this.notify();
 
-    console.debug(`[OfflineSync] Syncing ${pending.length} pending submissions`);
+    console.log(`[OfflineSync] Syncing ${pending.length} pending submissions`);
 
     for (const submission of pending) {
       if (!navigator.onLine) {
-        console.debug('[OfflineSync] Lost connection during sync, stopping');
+        console.log('[OfflineSync] Lost connection during sync, stopping');
         break;
       }
 
@@ -104,15 +89,6 @@ class OfflineSyncService {
       }
 
       await this.syncSubmission(submission);
-    }
-
-    // Remove permanently failed submissions
-    const staleSubmissions = await getPendingSubmissions();
-    for (const sub of staleSubmissions) {
-      if (sub.retryCount >= MAX_RETRIES) {
-        await deleteSubmission(sub.id);
-        console.warn(`[OfflineSync] Permanently failed submission ${sub.id} removed after ${MAX_RETRIES} retries`);
-      }
     }
 
     // Clean up completed
@@ -167,9 +143,9 @@ class OfflineSyncService {
 
       // Mark as uploaded (will be cleaned up)
       await updateSubmissionStatus(submission.id, 'uploaded');
-      console.debug(`[OfflineSync] Successfully synced submission ${submission.id}`);
+      console.log(`[OfflineSync] Successfully synced submission ${submission.id}`);
     } catch (error) {
-      const msg = extractErrorMessage(error);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[OfflineSync] Failed to sync ${submission.id}:`, msg);
       await updateSubmissionStatus(submission.id, 'failed', msg);
     }

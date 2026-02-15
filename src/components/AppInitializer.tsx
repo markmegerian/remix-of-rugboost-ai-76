@@ -109,7 +109,7 @@ async function hideSplashScreen() {
     await SplashScreen.hide({
       fadeOutDuration: 300,
     });
-    console.debug('[AppInitializer] Splash screen hidden');
+    console.log('[AppInitializer] Splash screen hidden');
   } catch (error) {
     console.warn('[AppInitializer] Failed to hide splash screen:', error);
   }

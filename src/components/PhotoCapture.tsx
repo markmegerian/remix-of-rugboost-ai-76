@@ -40,7 +40,6 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const [photoItems, setPhotoItems] = useState<PhotoItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [failedUploads, setFailedUploads] = useState<string[]>([]);
-  const [showAll, setShowAll] = useState(false);
   // Track all object URLs for proper cleanup
   const objectUrlsRef = useRef<string[]>([]);
 
@@ -288,50 +287,37 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       )}
 
       {/* Photo thumbnails grid */}
-      {hasPhotos && (() => {
-        const THUMBNAIL_LIMIT = 12;
-        const visibleItems = showAll ? photoItems : photoItems.slice(0, THUMBNAIL_LIMIT);
-        const hasMore = photoItems.length > THUMBNAIL_LIMIT && !showAll;
-
-        return (
-          <>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-              {visibleItems.map((item, index) => (
-                <div key={item.id} className={cn("relative aspect-square rounded-lg overflow-hidden bg-muted shadow-sm animate-in fade-in zoom-in-95 duration-200", item.status === 'error' && "ring-2 ring-destructive")}>
-                  <img src={item.preview} alt={`Photo ${index + 1}`} loading="lazy" className="w-full h-full object-cover" />
-                  {item.status === 'uploading' && (
-                    <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    </div>
-                  )}
-                  {item.status === 'error' && (
-                    <button type="button" onClick={() => retryUpload(item.id)} className="absolute inset-0 bg-destructive/80 flex flex-col items-center justify-center gap-1 text-destructive-foreground">
-                      <RotateCcw className="h-5 w-5" /><span className="text-xs font-medium">Retry</span>
-                    </button>
-                  )}
-                  {item.status !== 'uploading' && (
-                    <button type="button" onClick={() => removePhoto(item.id)} className="absolute top-1 right-1 rounded-full bg-foreground/80 p-1 text-background hover:bg-foreground transition-colors">
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                  <div className="absolute bottom-1 left-1 rounded-full bg-foreground/70 px-1.5 py-0.5 text-xs text-background font-medium">{index + 1}</div>
+      {hasPhotos && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+          {photoItems.map((item, index) => (
+            <div key={item.id} className={cn("relative aspect-square rounded-lg overflow-hidden bg-muted shadow-sm animate-in fade-in zoom-in-95 duration-200", item.status === 'error' && "ring-2 ring-destructive")}>
+              <img src={item.preview} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+              {item.status === 'uploading' && (
+                <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              ))}
-              {remainingSlots > 0 && !disabled && (
-                <button type="button" onClick={openCamera} className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all">
-                  <Camera className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Add</span>
+              )}
+              {item.status === 'error' && (
+                <button type="button" onClick={() => retryUpload(item.id)} className="absolute inset-0 bg-destructive/80 flex flex-col items-center justify-center gap-1 text-destructive-foreground">
+                  <RotateCcw className="h-5 w-5" /><span className="text-xs font-medium">Retry</span>
                 </button>
               )}
+              {item.status !== 'uploading' && (
+                <button type="button" onClick={() => removePhoto(item.id)} className="absolute top-1 right-1 rounded-full bg-foreground/80 p-1 text-background hover:bg-foreground transition-colors">
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              <div className="absolute bottom-1 left-1 rounded-full bg-foreground/70 px-1.5 py-0.5 text-[10px] text-background font-medium">{index + 1}</div>
             </div>
-            {hasMore && (
-              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setShowAll(true)}>
-                Show all ({photoItems.length})
-              </Button>
-            )}
-          </>
-        );
-      })()}
+          ))}
+          {remainingSlots > 0 && !disabled && (
+            <button type="button" onClick={openCamera} className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all">
+              <Camera className="h-5 w-5 text-muted-foreground" />
+              <span className="text-[10px] text-muted-foreground">Add</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Drag overlay */}
       {isDragOver && hasPhotos && (
