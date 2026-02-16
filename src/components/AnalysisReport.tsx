@@ -10,6 +10,7 @@ import type { AnalysisReportProps, PhotoAnnotations } from '@/components/analysi
 
 const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
   report,
+  structuredFindings,
   rugInfo,
   photoUrls = [],
   imageAnnotations = [],
@@ -121,7 +122,11 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
       />
 
       {/* Analysis Report */}
-      <ReportContent report={report} approvedEstimate={approvedEstimate} />
+      <ReportContent
+        report={report}
+        structuredFindings={structuredFindings}
+        approvedEstimate={approvedEstimate}
+      />
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3">

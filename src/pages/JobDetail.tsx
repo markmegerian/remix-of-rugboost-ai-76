@@ -479,6 +479,7 @@ const JobDetail = () => {
             <Suspense fallback={<DialogLoadingFallback />}>
               <AnalysisReport
                 report={selectedRug.analysis_report || ''}
+                structuredFindings={selectedRug.structured_findings as any}
                 rugInfo={{
                   clientName: job.client_name,
                   rugNumber: selectedRug.rug_number,

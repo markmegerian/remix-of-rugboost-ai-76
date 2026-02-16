@@ -1,18 +1,130 @@
 import React, { useMemo } from 'react';
-import { Wrench } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Wrench } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { ApprovedEstimate } from './types';
+import { Badge } from '@/components/ui/badge';
+import type { ApprovedEstimate, StructuredFindings } from './types';
 
 interface ReportContentProps {
   report: string;
+  structuredFindings?: StructuredFindings | null;
   approvedEstimate?: ApprovedEstimate | null;
 }
 
-const ReportContent: React.FC<ReportContentProps> = ({ report, approvedEstimate }) => {
+const severityBadgeClass: Record<string, string> = {
+  minor: 'bg-blue-100 text-blue-700 border-blue-300',
+  moderate: 'bg-amber-100 text-amber-700 border-amber-300',
+  severe: 'bg-orange-100 text-orange-700 border-orange-300',
+  critical: 'bg-red-100 text-red-700 border-red-300',
+};
+
+const formatConfidence = (value?: number) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  return `${Math.round(value * 100)}%`;
+};
+
+const formatFlag = (flag: string) => flag.replace(/[_-]+/g, ' ');
+
+const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ findings }) => {
+  const damages = Array.isArray(findings.damages) ? findings.damages : [];
+  const reviewFlags = Array.isArray(findings.reviewFlags) ? findings.reviewFlags : [];
+  const profile = findings.rugProfile;
+
+  if (!profile && damages.length === 0 && reviewFlags.length === 0 && !findings.summary) {
+    return null;
+  }
+
+  return (
+    <Card className="shadow-medium border-primary/20">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          Structured Findings
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {findings.summary && (
+          <p className="text-sm text-foreground/85 leading-relaxed">{findings.summary}</p>
+        )}
+
+        {profile && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground">Origin</p>
+              <p className="font-medium">{profile.origin || '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Construction</p>
+              <p className="font-medium">{profile.construction || '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Fiber</p>
+              <p className="font-medium">{profile.fiber || '—'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Confidence</p>
+              <p className="font-medium">{formatConfidence(profile.confidence) || '—'}</p>
+            </div>
+          </div>
+        )}
+
+        {damages.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-foreground">Damage Summary ({damages.length})</p>
+            <div className="space-y-2">
+              {damages.map((dmg, idx) => {
+                const severity = (dmg.severity || 'moderate').toLowerCase();
+                return (
+                  <div key={dmg.id || idx} className="rounded-md border bg-muted/20 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{dmg.description || 'Observed damage'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(dmg.category || 'other').toUpperCase()} • {dmg.location || 'location not specified'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={severityBadgeClass[severity] || severityBadgeClass.moderate}>
+                          {severity}
+                        </Badge>
+                        {formatConfidence(dmg.confidence) && (
+                          <Badge variant="secondary">{formatConfidence(dmg.confidence)}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {reviewFlags.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Review Flags
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {reviewFlags.map((flag, i) => (
+                <Badge key={`${flag}-${i}`} variant="outline" className="capitalize">
+                  {formatFlag(flag)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const ReportContent: React.FC<ReportContentProps> = ({ report, structuredFindings, approvedEstimate }) => {
   const reportElements = useMemo(() => formatReport(report, approvedEstimate), [report, approvedEstimate]);
 
   return (
-    <Card className="shadow-medium overflow-hidden">
+    <div className="space-y-4">
+      {structuredFindings && <StructuredFindingsPanel findings={structuredFindings} />}
+      <Card className="shadow-medium overflow-hidden">
       <CardHeader className="border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
         <CardTitle className="flex items-center gap-2 font-display">
           <Wrench className="h-5 w-5 text-primary" />
@@ -34,7 +146,8 @@ const ReportContent: React.FC<ReportContentProps> = ({ report, approvedEstimate 
           {reportElements}
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 };
 
