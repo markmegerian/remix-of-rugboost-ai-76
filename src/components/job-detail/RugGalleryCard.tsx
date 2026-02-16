@@ -17,6 +17,7 @@ interface Rug {
   analysis_report: string | null;
   image_annotations: unknown;
   system_services: unknown;
+  structured_findings: unknown;
   created_at: string;
   estimate_approved?: boolean;
 }

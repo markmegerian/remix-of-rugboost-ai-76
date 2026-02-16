@@ -257,7 +257,7 @@ export const useJobDetail = (jobId: string | undefined, userId: string | undefin
         serviceCompletions = completionsData || [];
       }
 
-      const rugs = (rugsResult.data || []) as Rug[];
+      const rugs = (rugsResult.data || []) as unknown as Rug[];
       const allPhotoPaths = rugs.flatMap(rug => rug.photo_urls || []);
       if (allPhotoPaths.length > 0) {
         await batchSignUrls(allPhotoPaths);
