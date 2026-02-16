@@ -24,6 +24,37 @@ const formatConfidence = (value?: number) => {
 
 const formatFlag = (flag: string) => flag.replace(/[_-]+/g, ' ');
 
+const formatServiceType = (serviceType?: string) => {
+  if (!serviceType) return 'Service';
+
+  const map: Record<string, string> = {
+    cleaning: 'Standard Wash',
+    wash: 'Standard Wash',
+    overnight_soaking: 'Overnight Soaking',
+    soaking: 'Overnight Soaking',
+    overcasting: 'Overcasting',
+    overcast: 'Overcasting',
+    binding: 'Persian Binding',
+    persian_binding: 'Persian Binding',
+    hand_fringe: 'Hand Fringe',
+    fringe: 'Hand Fringe',
+    machine_fringe: 'Machine Fringe',
+    stain_removal: 'Stain Removal',
+    repair: 'Repair',
+    reweave: 'Reweave',
+    padding: 'Padding',
+  };
+
+  const key = serviceType.toLowerCase().trim();
+  if (map[key]) return map[key];
+
+  return serviceType
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
 const formatMoney = (value?: number, currency = 'USD') => {
   if (typeof value !== 'number' || Number.isNaN(value)) return '—';
   return new Intl.NumberFormat('en-US', {
@@ -40,6 +71,11 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
   const profile = findings.rugProfile;
   const totals = findings.totals;
   const currency = totals?.currency || 'USD';
+  const damageById = new Map(
+    damages
+      .filter((d) => !!d.id)
+      .map((d) => [d.id as string, d]),
+  );
 
   if (!profile && damages.length === 0 && reviewFlags.length === 0 && recommendedServices.length === 0 && !findings.summary && !totals) {
     return null;
@@ -111,31 +147,49 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
         )}
 
         {recommendedServices.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-foreground">Recommended Services ({recommendedServices.length})</p>
-            <div className="space-y-2">
-              {recommendedServices.map((svc, idx) => (
-                <div key={`${svc.serviceType || 'service'}-${idx}`} className="rounded-md border bg-muted/20 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium">{svc.serviceType || 'Service'}</p>
-                      {svc.reason && <p className="text-xs text-muted-foreground mt-0.5">{svc.reason}</p>}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {(svc.pricingModel || 'fixed').toUpperCase()} • Qty {svc.quantity ?? '—'} {svc.unit || ''}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-primary">{formatMoney(svc.estimatedCost, currency)}</p>
-                      <p className="text-xs text-muted-foreground">@ {formatMoney(svc.unitPrice, currency)}</p>
-                      {formatConfidence(svc.confidence) && (
-                        <Badge variant="secondary" className="mt-1">{formatConfidence(svc.confidence)}</Badge>
-                      )}
+          <details className="group rounded-md border bg-muted/10 p-3" open>
+            <summary className="cursor-pointer list-none text-sm font-semibold text-foreground flex items-center justify-between">
+              <span>Recommended Services ({recommendedServices.length})</span>
+              <span className="text-xs text-muted-foreground group-open:hidden">tap to expand</span>
+            </summary>
+            <div className="space-y-2 mt-3">
+              {recommendedServices.map((svc, idx) => {
+                const related = (svc.relatedDamageIds || [])
+                  .map((id) => damageById.get(id))
+                  .filter(Boolean);
+
+                return (
+                  <div key={`${svc.serviceType || 'service'}-${idx}`} className="rounded-md border bg-muted/20 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{formatServiceType(svc.serviceType)}</p>
+                        {svc.reason && <p className="text-xs text-muted-foreground mt-0.5">{svc.reason}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {(svc.pricingModel || 'fixed').toUpperCase()} • Qty {svc.quantity ?? '—'} {svc.unit || ''}
+                        </p>
+                        {related.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {related.map((dmg, i) => (
+                              <Badge key={`${dmg?.id || 'dmg'}-${i}`} variant="outline" className="text-[10px]">
+                                {(dmg?.severity || 'moderate').toUpperCase()} · {dmg?.location || 'damage link'}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-primary">{formatMoney(svc.estimatedCost, currency)}</p>
+                        <p className="text-xs text-muted-foreground">@ {formatMoney(svc.unitPrice, currency)}</p>
+                        {formatConfidence(svc.confidence) && (
+                          <Badge variant="secondary" className="mt-1">{formatConfidence(svc.confidence)}</Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
+          </details>
         )}
 
         {totals && (
