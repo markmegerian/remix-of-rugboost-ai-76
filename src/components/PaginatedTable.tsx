@@ -35,8 +35,8 @@ const PaginatedTable: React.FC<PaginatedTableProps> = ({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-sm text-muted-foreground">
         <span>Showing</span>
         <Select
           value={pageSize.toString()}
@@ -58,8 +58,8 @@ const PaginatedTable: React.FC<PaginatedTableProps> = ({
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
           {startItem}-{endItem} of {totalItems}
         </span>
         <div className="flex items-center gap-1">

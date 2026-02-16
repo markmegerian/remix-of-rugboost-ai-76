@@ -255,20 +255,20 @@ const JobsFilter = ({
       {/* Mobile Filter Drawer */}
       {isMobile && (
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <DrawerContent className="max-h-[85vh]">
+          <DrawerContent className="max-h-[90vh]">
             <DrawerHeader>
               <DrawerTitle>Filters</DrawerTitle>
             </DrawerHeader>
-            <div className="overflow-y-auto px-4 space-y-4">
+            <div className="overflow-y-auto px-4 space-y-4 pb-safe-bottom">
               <FilterSelects filters={filters} updateFilter={updateFilter} isAdmin={isAdmin} clients={clients} />
             </div>
-            <DrawerFooter className="flex-row gap-2">
+            <DrawerFooter className="flex-row gap-2 pb-safe-bottom">
               {hasActiveFilters && (
-                <Button variant="outline" className="flex-1" onClick={() => { clearFilters(); setDrawerOpen(false); }}>
+                <Button variant="outline" className="flex-1 min-h-[44px]" onClick={() => { clearFilters(); setDrawerOpen(false); }}>
                   Clear All
                 </Button>
               )}
-              <Button className="flex-1" onClick={() => setDrawerOpen(false)}>
+              <Button className="flex-1 min-h-[44px]" onClick={() => setDrawerOpen(false)}>
                 Done
               </Button>
             </DrawerFooter>

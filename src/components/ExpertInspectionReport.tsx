@@ -334,7 +334,7 @@ function generateConditionSummary(services: Service[]): string {
                        )}
                        <div className="min-w-0">
                          <CardTitle className="text-lg truncate">{rug.rug_number}</CardTitle>
-                         <CardDescription>
+                         <CardDescription className="break-words">
                            {rug.rug_type} • {rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : 'Dimensions TBD'}
                          </CardDescription>
                        </div>
@@ -915,7 +915,7 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = React.memo(({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
-            <span className="text-sm font-medium">{service.name}</span>
+            <span className="text-sm font-medium break-words">{service.name}</span>
             {category === 'high_cost' && (
               <span className="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
                 Structural
