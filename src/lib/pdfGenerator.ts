@@ -705,62 +705,89 @@ async function buildJobPdfDocument(
   
   yPos = drawSectionHeader(doc, 'RUG BREAKDOWN & SERVICES', margin, yPos, contentWidth);
   yPos += 8;
-  
+
+  const currency = (amount: number) =>
+    `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   let grandTotal = 0;
-  
+  const tableRows: Array<[string, string, string]> = [];
+
   for (const rug of rugs) {
     const costs = extractRugCosts(rug);
     if (!costs || costs.items.length === 0) continue;
-    
-    if (yPos > pageHeight - 80) {
-      doc.addPage();
-      drawElegantBorder(doc, pageWidth, pageHeight);
-      yPos = 30;
-    }
-    
+
     const dimensionStr = costs.dimensions ? ` (${costs.dimensions})` : '';
-    yPos = drawRugEntryHeader(doc, `Rug #${costs.rugNumber}: ${costs.rugType}${dimensionStr}`, margin, yPos, contentWidth);
-    yPos += 4;
-    
-    for (const item of costs.items) {
-      doc.setFontSize(9);
-      doc.setFont(FONT.family, FONT.normal);
-      doc.setTextColor(...COLORS.text);
-      doc.text(`- ${item.service}`, margin + 8, yPos);
-      
-      doc.setFont(FONT.family, FONT.italic);
-      doc.setTextColor(...COLORS.gold);
-      doc.text(`$${item.cost.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-      yPos += 5;
-    }
-    
-    yPos += 2;
-    drawGoldRule(doc, margin + 8, yPos, contentWidth - 16);
-    yPos += 6;
-    
-    doc.setFontSize(10);
-    doc.setFont(FONT.family, FONT.bold);
-    doc.setTextColor(...COLORS.navy);
-    doc.text('Subtotal', margin + 8, yPos);
-    
-    doc.setTextColor(...COLORS.gold);
-    doc.text(`$${costs.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-    yPos += 8;
-    
+    const rugLabel = `Rug #${costs.rugNumber}: ${costs.rugType}${dimensionStr}`;
+
+    costs.items.forEach((item) => {
+      tableRows.push([rugLabel, item.service, currency(item.cost)]);
+    });
+
+    tableRows.push(['', 'Subtotal', currency(costs.subtotal)]);
     if (costs.specialNote) {
-      doc.setFontSize(8);
-      doc.setFont(FONT.family, FONT.italic);
-      doc.setTextColor(...COLORS.textMuted);
-      const noteLines = doc.splitTextToSize(`* ${costs.specialNote}`, contentWidth - 16);
-      noteLines.forEach((line: string) => {
-        doc.text(line, margin + 8, yPos);
-        yPos += 4;
-      });
+      tableRows.push(['', `Note: ${costs.specialNote}`, '']);
     }
-    
+    tableRows.push(['', '', '']);
+
     grandTotal += costs.subtotal;
+  }
+
+  if (tableRows.length === 0) {
+    doc.setFontSize(10);
+    doc.setFont(FONT.family, FONT.italic);
+    doc.setTextColor(...COLORS.textMuted);
+    doc.text('No itemized service costs were found in the analysis output.', margin, yPos);
     yPos += 10;
   }
+
+  autoTable(doc, {
+    startY: yPos,
+    head: [['Rug', 'Service', 'Amount']],
+    body: tableRows,
+    margin: { left: margin, right: margin },
+    styles: {
+      font: FONT.family,
+      fontSize: 8.5,
+      textColor: COLORS.text,
+      lineColor: COLORS.borderLight,
+      lineWidth: 0.2,
+      cellPadding: 2.2,
+      valign: 'middle',
+    },
+    headStyles: {
+      fillColor: COLORS.lightBlue,
+      textColor: COLORS.navy,
+      fontStyle: FONT.bold,
+      lineColor: COLORS.border,
+      lineWidth: 0.3,
+    },
+    columnStyles: {
+      0: { cellWidth: 62, fontStyle: FONT.bold },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 28, halign: 'right', textColor: COLORS.gold, fontStyle: FONT.bold },
+    },
+    didParseCell: (data) => {
+      const row = data.row.raw as string[];
+      if (!row) return;
+      const service = row[1] || '';
+
+      if (service === 'Subtotal') {
+        data.cell.styles.fillColor = COLORS.cream;
+        data.cell.styles.fontStyle = FONT.bold;
+        data.cell.styles.textColor = COLORS.navy;
+      }
+
+      if (service.startsWith('Note:')) {
+        data.cell.styles.fontStyle = FONT.italic;
+        data.cell.styles.textColor = COLORS.textMuted;
+      }
+    },
+    didDrawPage: () => {
+      drawElegantBorder(doc, pageWidth, pageHeight);
+    },
+  });
+
+  yPos = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : yPos + 10;
   
   // ============ TOTAL INVESTMENT ============
   
@@ -989,13 +1016,17 @@ We invite you to proceed with all recommended services, or we would be pleased t
     }
   }
   
-  // Add page numbers to all pages
+  // Add page numbers + footer metadata to all pages
   const totalPages = doc.getNumberOfPages();
+  const generatedAt = format(new Date(), 'MMM d, yyyy h:mm a');
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setFont(FONT.family, FONT.normal);
     doc.setTextColor(...COLORS.textMuted);
+
+    doc.text(`${businessName} • Estimate #${job.job_number}`, margin, pageHeight - 8);
+    doc.text(`Generated ${generatedAt}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
   }
   
@@ -1124,11 +1155,14 @@ export const generatePDF = async (
   }
   
   const totalPages = doc.getNumberOfPages();
+  const generatedAt = format(new Date(), 'MMM d, yyyy h:mm a');
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setFont(FONT.family, FONT.normal);
     doc.setTextColor(...COLORS.textMuted);
+    doc.text(`${businessName} • Rug #${rug.rug_number}`, margin, pageHeight - 8);
+    doc.text(`Generated ${generatedAt}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
   }
   
