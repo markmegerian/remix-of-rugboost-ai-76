@@ -182,22 +182,22 @@ const ClientDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md pt-safe-top">
+        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-4">
+          <div className="flex items-center gap-3 min-w-0">
             <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground">
+              <h1 className="font-display text-lg sm:text-xl font-bold text-foreground truncate">
                 {branding?.business_name || 'Rug Cleaning'}
               </h1>
               <p className="text-xs text-muted-foreground">Client Portal</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user?.email}
             </span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
@@ -284,7 +284,7 @@ const ClientDashboard = () => {
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              className="w-full"
+                              className="w-full min-h-[44px]"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/client/${job.access_token}`);
@@ -353,7 +353,7 @@ const ClientDashboard = () => {
                             <Button 
                               variant="ghost" 
                               size="sm" 
-                              className="w-full"
+                              className="w-full min-h-[44px]"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/client/${job.access_token}`);

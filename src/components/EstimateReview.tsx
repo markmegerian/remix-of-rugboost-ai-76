@@ -318,12 +318,12 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="ghost"
           size="sm"
           onClick={onBack}
-          className="gap-2"
+          className="gap-2 min-h-[44px] justify-start"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Report
@@ -392,7 +392,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleAddService} className="gap-1">
+                    <Button variant="outline" size="sm" onClick={handleAddService} className="gap-1 min-h-[44px]">
                       <Plus className="h-4 w-4" />
                       Add Service
                     </Button>
@@ -494,8 +494,8 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3 flex-wrap min-w-0">
                           {/* Category Icon */}
                           {categorizeService(service.name) === 'required' && (
                             <Lock className="h-4 w-4 text-destructive flex-shrink-0" />
@@ -537,9 +537,9 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                               </Tooltip>
                             </TooltipProvider>
                           )}
-                          <span className="font-medium">{service.name}</span>
+                          <span className="font-medium break-words">{service.name}</span>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                           <div className="text-right">
                             <p className="text-sm text-muted-foreground">
                               {service.quantity} × ${service.unitPrice.toFixed(2)}
@@ -555,6 +555,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setEditingId(service.id)}
+                                className="min-h-[44px] min-w-[44px]"
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -562,7 +563,7 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleRemoveService(service.id)}
-                                className="text-destructive hover:text-destructive"
+                                className="text-destructive hover:text-destructive min-h-[44px] min-w-[44px]"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

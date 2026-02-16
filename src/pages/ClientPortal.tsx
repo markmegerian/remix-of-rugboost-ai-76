@@ -495,7 +495,7 @@ const ClientPortal = () => {
     return (
       <div className="min-h-screen bg-background">
         {/* Skeleton Header */}
-        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md pt-safe-top">
           <div className="container mx-auto flex items-center justify-between px-4 py-4">
             <div className="flex items-center gap-3">
               <Skeleton className="h-10 w-10 rounded-full" />
@@ -504,7 +504,7 @@ const ClientPortal = () => {
                 <Skeleton className="h-3 w-20" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Skeleton className="h-8 w-20" />
               <Skeleton className="h-8 w-8 rounded-full" />
             </div>
@@ -607,12 +607,12 @@ const ClientPortal = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md pt-safe-top">
+        <div className="container mx-auto flex items-center justify-between gap-2 px-4 py-4">
+          <div className="flex items-center gap-3 min-w-0">
             <img src={rugboostLogo} alt="RugBoost" className="h-10 w-10" />
             <div>
-              <h1 className="font-display text-xl font-bold text-foreground">
+              <h1 className="font-display text-lg sm:text-xl font-bold text-foreground truncate">
                 Job #{job.job_number}
               </h1>
               <p className="text-xs text-muted-foreground">
@@ -635,7 +635,7 @@ const ClientPortal = () => {
                 branding,
               })}
               disabled={isGenerating}
-              className="gap-1"
+              className="gap-1 min-h-[44px]"
             >
               {isGenerating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -656,7 +656,7 @@ const ClientPortal = () => {
             <span className="text-sm text-muted-foreground hidden sm:block">
               {user?.email}
             </span>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

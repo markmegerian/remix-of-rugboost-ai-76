@@ -118,11 +118,11 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
           /* Mobile: Full-width stacked cards, Desktop: Grid */
           <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4">
             {rugs.map((rug) => (
-              <div key={rug.id} className="border rounded-lg p-3 space-y-2">
+              <div key={rug.id} className="border rounded-lg p-3 space-y-2 overflow-hidden">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{rug.rug_number}</p>
-                    <p className="text-xs text-muted-foreground">{rug.rug_type}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{rug.rug_number}</p>
+                    <p className="text-xs text-muted-foreground truncate">{rug.rug_type}</p>
                   </div>
                   {rug.analysis_report ? (
                     <Badge variant="outline" className="border-success text-success gap-1">

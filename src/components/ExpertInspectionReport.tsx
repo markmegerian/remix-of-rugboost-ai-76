@@ -272,7 +272,7 @@ function generateConditionSummary(services: Service[]): string {
     }, []);
 
     return (
-      <div className="space-y-6 pb-20 md:pb-0">
+      <div className="space-y-6 pb-24 md:pb-0">
       {/* 1. Header Section - Trust Establishment */}
       <Card className="border-border bg-card">
          <CardHeader>
@@ -293,7 +293,7 @@ function generateConditionSummary(services: Service[]): string {
             This report outlines the services required to safely clean and preserve your {rugs.length === 1 ? 'rug' : `${rugs.length} rugs`}. 
             All recommendations are based on observed condition, material characteristics, and established industry protocols.
            </p>
-          <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="font-medium">{businessName || 'Professional Rug Care'}</span>
             <span>•</span>
             <span>Report #{jobNumber}</span>
@@ -319,7 +319,7 @@ function generateConditionSummary(services: Service[]): string {
                <CollapsibleTrigger asChild>
                 <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors pb-3">
                    <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-3">
+                     <div className="flex items-center gap-3 min-w-0">
                        {rug.photo_urls && rug.photo_urls.length > 0 ? (
                          <RugPhoto
                            filePath={rug.photo_urls[0]}
@@ -332,8 +332,8 @@ function generateConditionSummary(services: Service[]): string {
                           <ImageIcon className="h-6 w-6 text-muted-foreground" />
                          </div>
                        )}
-                       <div>
-                         <CardTitle className="text-lg">{rug.rug_number}</CardTitle>
+                       <div className="min-w-0">
+                         <CardTitle className="text-lg truncate">{rug.rug_number}</CardTitle>
                          <CardDescription>
                            {rug.rug_type} • {rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : 'Dimensions TBD'}
                          </CardDescription>
@@ -689,7 +689,7 @@ function generateConditionSummary(services: Service[]): string {
         >
           {/* Close button */}
           <button 
-            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 min-h-[44px] min-w-[44px]"
             onClick={closeLightbox}
           >
             <X className="h-6 w-6" />
@@ -703,7 +703,7 @@ function generateConditionSummary(services: Service[]): string {
           {/* Navigation - Previous */}
           {lightboxImages.length > 1 && (
             <button
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full min-h-[44px] min-w-[44px]"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLightboxNav((lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length);
@@ -765,7 +765,7 @@ function generateConditionSummary(services: Service[]): string {
           {/* Navigation - Next */}
           {lightboxImages.length > 1 && (
             <button
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 bg-black/30 rounded-full min-h-[44px] min-w-[44px]"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLightboxNav((lightboxIndex + 1) % lightboxImages.length);
@@ -964,7 +964,7 @@ const ServiceLineItem: React.FC<ServiceLineItemProps> = React.memo(({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 text-xs text-muted-foreground hover:text-destructive"
+          className="min-h-[44px] px-3 text-xs text-muted-foreground hover:text-destructive"
           onClick={onDecline}
           aria-label="Decline this service"
         >
