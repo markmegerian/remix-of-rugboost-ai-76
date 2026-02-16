@@ -252,7 +252,7 @@ const ReportContent: React.FC<ReportContentProps> = ({ report, structuredFinding
         <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-primary/20 rounded-tr-sm" />
         <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-primary/20 rounded-bl-sm" />
         <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-primary/20 rounded-br-sm" />
-        <div className="max-w-none space-y-1 relative z-10">
+        <div className="max-w-none space-y-1 relative z-10 break-words overflow-x-hidden">
           {reportElements}
         </div>
       </CardContent>

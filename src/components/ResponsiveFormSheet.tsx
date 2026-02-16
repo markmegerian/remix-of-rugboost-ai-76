@@ -38,11 +38,11 @@ const ResponsiveFormSheet: React.FC<ResponsiveFormSheetProps> = ({
   if (useMobileLayout) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
-        <DrawerContent className="max-h-[85vh]">
+        <DrawerContent className="max-h-[90vh]">
           <DrawerHeader>
             <DrawerTitle>{title}</DrawerTitle>
           </DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-4">{children}</div>
+          <div className="overflow-y-auto px-4 pb-safe-bottom">{children}</div>
         </DrawerContent>
       </Drawer>
     );

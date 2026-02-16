@@ -67,13 +67,13 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onNewInspection} className="gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="ghost" size="sm" onClick={onNewInspection} className="gap-2 min-h-[44px] justify-start">
           <ArrowLeft className="h-4 w-4" />
           New Inspection
         </Button>
         {onReanalyze && (
-          <Button variant="outline" size="sm" onClick={onReanalyze} disabled={isReanalyzing} className="gap-2">
+          <Button variant="outline" size="sm" onClick={onReanalyze} disabled={isReanalyzing} className="gap-2 min-h-[44px]">
             <RefreshCw className={`h-4 w-4 ${isReanalyzing ? 'animate-spin' : ''}`} />
             {isReanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
           </Button>
@@ -92,7 +92,7 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Client</p>
-              <p className="font-medium">{rugInfo.clientName}</p>
+              <p className="font-medium truncate" title={rugInfo.clientName}>{rugInfo.clientName}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Rug Number</p>

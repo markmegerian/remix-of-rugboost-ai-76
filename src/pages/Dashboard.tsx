@@ -71,7 +71,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md pt-safe-top">
         <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
           <div className="flex items-center gap-2 md:gap-3">
             {branding?.logo_url ? (
@@ -79,8 +79,8 @@ const Dashboard = () => {
             ) : (
               <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10 border-0" />
             )}
-            <div>
-              <h1 className="text-lg md:text-xl font-bold text-foreground font-sans">{displayName}</h1>
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-xl font-bold text-foreground font-sans truncate">{displayName}</h1>
               <p className="text-xs text-muted-foreground hidden md:block">Jobs</p>
             </div>
           </div>
@@ -88,7 +88,7 @@ const Dashboard = () => {
             <Button 
               onClick={() => navigate('/jobs/new')} 
               size="sm" 
-              className="gap-2"
+              className="gap-2 min-h-[44px]"
               disabled={!canCreateJobs}
               title={!canCreateJobs ? 'Subscription required to create new jobs' : undefined}
               aria-label="Create new job"
@@ -115,7 +115,7 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 pb-16 md:pb-8">
+      <main className="container mx-auto px-4 py-8 pb-24 md:pb-8">
         <BillingStatusBanner />
         
         <div className="space-y-6">

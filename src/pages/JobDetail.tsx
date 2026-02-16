@@ -370,7 +370,7 @@ const JobDetail = () => {
     
     return (
       <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md pt-safe-top">
           <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
             <div className="flex items-center gap-2 md:gap-3">
               <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10" />
@@ -388,7 +388,7 @@ const JobDetail = () => {
             </Button>
           </div>
         </header>
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 pb-safe-bottom">
           <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} currentPage={`${selectedRug.rug_number} – Expert Estimate`} />
           <div className="mx-auto max-w-3xl">
             <Suspense fallback={<DialogLoadingFallback />}>
@@ -458,7 +458,7 @@ const JobDetail = () => {
   if (showReport && selectedRug) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+        <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md pt-safe-top">
           <div className="container mx-auto flex items-center justify-between px-4 py-2.5 md:py-4">
             <div className="flex items-center gap-2 md:gap-3">
               <img src={rugboostLogo} alt="RugBoost" className="h-8 w-8 md:h-10 md:w-10" />
@@ -473,7 +473,7 @@ const JobDetail = () => {
             </Button>
           </div>
         </header>
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 pb-safe-bottom">
           <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} currentPage={`${selectedRug.rug_number} – Analysis Report`} />
           <div className="mx-auto max-w-3xl">
             <Suspense fallback={<DialogLoadingFallback />}>
@@ -538,7 +538,7 @@ const JobDetail = () => {
       />
       <div className="min-h-screen bg-background pb-20 md:pb-0">
       {/* Header - Mobile optimized with status visible */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur-md pt-safe-top">
         <div className="container mx-auto px-4 py-3 md:py-4">
           {/* Mobile: Compact header */}
           <div className="flex items-center justify-between gap-3">
@@ -568,7 +568,7 @@ const JobDetail = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-4 md:py-8 space-y-4 md:space-y-6">
+      <main className="container mx-auto px-4 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-8">
         {/* Breadcrumb - Hidden on mobile for cleaner UI */}
         <div className="hidden md:block">
           <JobBreadcrumb jobNumber={job.job_number} jobId={job.id} />
@@ -710,13 +710,13 @@ const JobDetail = () => {
 
         {/* Download/Email Actions for Estimates */}
         {approvedEstimates.length > 0 && rugs.some(r => r.analysis_report) && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadJobPDF} className="gap-1">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadJobPDF} className="gap-1 min-h-[44px]">
               <FileText className="h-4 w-4" />
               Download Full Report
             </Button>
             {job.client_email && (
-              <Button variant="outline" size="sm" onClick={handleOpenEmailPreview} disabled={sendingEmail} className="gap-1">
+              <Button variant="outline" size="sm" onClick={handleOpenEmailPreview} disabled={sendingEmail} className="gap-1 min-h-[44px]">
                 <Mail className="h-4 w-4" />
                 Email Report
               </Button>

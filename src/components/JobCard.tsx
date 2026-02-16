@@ -14,7 +14,7 @@ const JobCard = ({ job }: JobCardProps) => {
 
   return (
     <div
-      className="rounded-lg border border-border bg-card p-4 active:bg-muted/50 cursor-pointer transition-colors"
+      className="rounded-lg border border-border bg-card p-4 active:bg-muted/50 cursor-pointer transition-colors min-h-[44px]"
       onClick={() => navigate(`/jobs/${job.id}`)}
       role="button"
       tabIndex={0}
@@ -28,15 +28,15 @@ const JobCard = ({ job }: JobCardProps) => {
       </div>
 
       {/* Row 2: Job number + date */}
-      <div className="flex items-center justify-between gap-2 mt-1.5 text-sm text-muted-foreground">
-        <span className="font-mono">{job.job_number}</span>
-        <span>{format(new Date(job.created_at), 'MMM d, yyyy')}</span>
+      <div className="flex items-center justify-between gap-2 mt-1.5 text-sm text-muted-foreground min-w-0">
+        <span className="font-mono truncate">{job.job_number}</span>
+        <span className="shrink-0">{format(new Date(job.created_at), 'MMM d, yyyy')}</span>
       </div>
 
       {/* Row 3: Rug count + payment */}
-      <div className="flex items-center justify-between gap-2 mt-1.5">
-        <Badge variant="secondary">{job.rug_count} rugs</Badge>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 mt-1.5 min-w-0">
+        <Badge variant="secondary" className="shrink-0">{job.rug_count} rugs</Badge>
+        <div className="flex items-center gap-2 min-w-0">
           {job.total_amount > 0 && (
             <span className="text-sm font-medium text-foreground">${job.total_amount.toFixed(2)}</span>
           )}
