@@ -13,7 +13,6 @@ interface UploadProgress {
 interface UsePhotoUploadOptions {
   batchSize?: number;
   bucket?: string;
-  expirySeconds?: number;
 }
 
 interface UsePhotoUploadReturn {
@@ -26,13 +25,29 @@ interface UsePhotoUploadReturn {
 
 const DEFAULT_BATCH_SIZE = 4;
 const DEFAULT_BUCKET = 'rug-photos';
-const DEFAULT_EXPIRY = 604800; // 7 days
+
+const sanitizeFileName = (name: string): string => {
+  // Normalize and keep a safe subset for storage keys
+  return name
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 80);
+};
+
+const makeStoragePath = (userId: string, originalName: string): string => {
+  const safeName = sanitizeFileName(originalName || 'photo.jpg');
+  const uniqueSuffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  return `${userId}/${uniqueSuffix}-${safeName}`;
+};
 
 export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUploadReturn => {
   const {
     batchSize = DEFAULT_BATCH_SIZE,
     bucket = DEFAULT_BUCKET,
-    expirySeconds = DEFAULT_EXPIRY,
   } = options;
 
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -46,15 +61,14 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
   }, []);
 
   const uploadSinglePhoto = async (photo: File, userId: string): Promise<string> => {
-    // Compress image before upload to save bandwidth
     const compressedPhoto = await compressImage(photo);
-    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${photo.name}`;
+    const filePath = makeStoragePath(userId, photo.name);
 
-    console.debug(`Uploading photo: ${fileName}, size: ${(compressedPhoto.size / 1024).toFixed(0)}KB, type: ${compressedPhoto.type}`);
+    console.debug(`Uploading photo: ${filePath}, size: ${(compressedPhoto.size / 1024).toFixed(0)}KB, type: ${compressedPhoto.type}`);
     
     const { data, error: uploadError } = await supabase.storage
       .from(bucket)
-      .upload(fileName, compressedPhoto, {
+      .upload(filePath, compressedPhoto, {
         cacheControl: '3600',
         upsert: false,
       });
@@ -63,7 +77,7 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
       console.error('Upload error details:', { 
         message: uploadError.message, 
         name: uploadError.name,
-        fileName,
+        filePath,
         bucket,
         photoSize: compressedPhoto.size,
         photoType: compressedPhoto.type,
@@ -71,8 +85,6 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
       throw new Error(`Failed to upload ${photo.name}: ${uploadError.message}`);
     }
 
-    // Return the storage path instead of a signed URL
-    // Signed URLs will be generated on-demand when displaying images
     return data.path;
   };
 
@@ -99,7 +111,6 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
           const batchNumber = Math.floor(i / batchSize) + 1;
           const batch = photos.slice(i, i + batchSize);
 
-          // Upload batch in parallel
           const batchResults = await Promise.all(
             batch.map((photo) => uploadSinglePhoto(photo, userId))
           );
@@ -120,12 +131,21 @@ export const usePhotoUpload = (options: UsePhotoUploadOptions = {}): UsePhotoUpl
       } catch (err) {
         const uploadError = err instanceof Error ? err : new Error('Upload failed');
         setError(uploadError);
+
+        // Best-effort rollback to avoid orphaned files when a multi-photo upload fails midway
+        if (results.length > 0) {
+          const { error: cleanupError } = await supabase.storage.from(bucket).remove(results);
+          if (cleanupError) {
+            console.warn('Failed to clean up partial uploads:', cleanupError.message);
+          }
+        }
+
         throw uploadError;
       } finally {
         setIsUploading(false);
       }
     },
-    [batchSize, bucket, expirySeconds]
+    [batchSize, bucket]
   );
 
   return {
