@@ -161,6 +161,46 @@ ANALYSIS APPROACH:
 RESPONSE FORMAT - Your response must be valid JSON with this structure:
 {
   "letter": "The full estimate letter text here...",
+  "structuredFindings": {
+    "rugProfile": {
+      "origin": "Persian",
+      "construction": "hand-knotted",
+      "fiber": "wool",
+      "confidence": 0.84
+    },
+    "damages": [
+      {
+        "id": "dmg_1",
+        "category": "stain",
+        "severity": "moderate",
+        "location": "center field",
+        "description": "Pet urine staining with halo",
+        "photoIndices": [0, 6],
+        "confidence": 0.86
+      }
+    ],
+    "recommendedServices": [
+      {
+        "serviceType": "cleaning",
+        "reason": "Embedded soil and odor treatment required",
+        "pricingModel": "sqft",
+        "quantity": 63.0,
+        "unit": "sqft",
+        "unitPrice": 4.5,
+        "estimatedCost": 283.5,
+        "relatedDamageIds": ["dmg_1"],
+        "confidence": 0.82
+      }
+    ],
+    "totals": {
+      "subtotal": 283.5,
+      "estimatedRangeLow": 260,
+      "estimatedRangeHigh": 340,
+      "currency": "USD"
+    },
+    "reviewFlags": ["low_photo_clarity"],
+    "summary": "Hand-knotted wool rug with moderate staining and edge wear."
+  },
   "imageAnnotations": [
     {
       "photoIndex": 0,
@@ -187,6 +227,17 @@ RESPONSE FORMAT - Your response must be valid JSON with this structure:
     }
   ]
 }
+
+STRUCTUREDFINDINGS REQUIREMENTS (for the "structuredFindings" field):
+- This field is REQUIRED. Always return a complete object, even if some values are uncertain.
+- `rugProfile.confidence` and each item confidence must be between 0 and 1.
+- `damages[].category` should use clear categories: stain, structural, fringe, edge, pile, color, moisture, odor, previous_repair, other.
+- `damages[].severity` must be one of: minor, moderate, severe, critical.
+- `recommendedServices[].pricingModel` must be one of: sqft, linear_ft, fixed.
+- `recommendedServices[].estimatedCost` must always be a number (not null/TBD).
+- `totals.subtotal`, `totals.estimatedRangeLow`, and `totals.estimatedRangeHigh` must be numeric.
+- `reviewFlags` should include quality/risk flags when relevant, e.g. ["low_photo_clarity", "fiber_uncertain", "manual_measurement_needed"].
+- Keep `relatedDamageIds` linked to `damages[].id` where applicable.
 
 EDGE SUGGESTIONS (for the "edgeSuggestions" field):
 - Provide edge-specific damage observations for linear foot services (fringe, binding, overcasting, zenjireh, etc.)
@@ -582,6 +633,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
 
     // Try to parse as JSON (new structured format)
     let analysisReport: string;
+    let structuredFindings: any = null;
     let imageAnnotations: any[] = [];
     let edgeSuggestions: any[] = [];
 
@@ -595,6 +647,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
       
       const parsed = JSON.parse(cleanedContent);
       analysisReport = parsed.letter || rawContent;
+      structuredFindings = parsed.structuredFindings || null;
       imageAnnotations = parsed.imageAnnotations || [];
       edgeSuggestions = parsed.edgeSuggestions || [];
     } catch (parseError) {
@@ -628,6 +681,7 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
 
     return new Response(JSON.stringify({ 
       report: analysisReport,
+      structuredFindings: structuredFindings,
       imageAnnotations: imageAnnotations,
       edgeSuggestions: edgeSuggestions,
       modelUsed: model,

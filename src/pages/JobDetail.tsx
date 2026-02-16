@@ -91,6 +91,7 @@ interface Rug {
   analysis_report: string | null;
   image_annotations: unknown;
   system_services: unknown;
+  structured_findings: unknown;
   created_at: string;
   estimate_approved?: boolean;
 }
@@ -308,6 +309,7 @@ const JobDetail = () => {
         analysis_report: result.report,
         image_annotations: result.annotations,
         system_services: { edgeSuggestions: result.edgeSuggestions },
+        structured_findings: result.structuredFindings,
       } : null);
     }
   };

@@ -789,6 +789,7 @@ export type Database = {
           rug_number: string
           rug_type: string
           system_services: Json | null
+          structured_findings: Json | null
           user_id: string | null
           width: number | null
         }
@@ -810,6 +811,7 @@ export type Database = {
           rug_number: string
           rug_type: string
           system_services?: Json | null
+          structured_findings?: Json | null
           user_id?: string | null
           width?: number | null
         }
@@ -831,6 +833,7 @@ export type Database = {
           rug_number?: string
           rug_type?: string
           system_services?: Json | null
+          structured_findings?: Json | null
           user_id?: string | null
           width?: number | null
         }

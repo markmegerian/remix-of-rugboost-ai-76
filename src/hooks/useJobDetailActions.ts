@@ -32,6 +32,7 @@ export interface JobDetailRug {
   analysis_report: string | null;
   image_annotations: unknown;
   system_services: unknown;
+  structured_findings: unknown;
   created_at: string;
   estimate_approved?: boolean;
 }
@@ -167,6 +168,7 @@ export function useJobDetailActions({
           analysis_report: data.report,
           image_annotations: annotations,
           system_services: { edgeSuggestions: edgeSuggs },
+          structured_findings: data.structuredFindings || null,
         })
         .eq('id', rug.id);
 
@@ -180,7 +182,12 @@ export function useJobDetailActions({
       fetchJobDetails();
 
       // Return data for callers that need it (e.g. to update selectedRug)
-      return { report: data.report, annotations, edgeSuggestions: edgeSuggs };
+      return {
+        report: data.report,
+        annotations,
+        edgeSuggestions: edgeSuggs,
+        structuredFindings: data.structuredFindings || null,
+      };
     } catch (error) {
       const verb = isReanalysis ? 're-analyze' : 'analyze';
       handleMutationError(error, 'JobDetailActions', extractErrorMessage(error, `Failed to ${verb} ${rug.rug_number}`));
@@ -245,6 +252,7 @@ export function useJobDetailActions({
             analysis_report: data.report,
             image_annotations: data.imageAnnotations || [],
             system_services: { edgeSuggestions: data.edgeSuggestions || [] },
+            structured_findings: data.structuredFindings || null,
           })
           .eq('id', rug.id);
 
