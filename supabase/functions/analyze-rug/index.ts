@@ -230,14 +230,14 @@ RESPONSE FORMAT - Your response must be valid JSON with this structure:
 
 STRUCTUREDFINDINGS REQUIREMENTS (for the "structuredFindings" field):
 - This field is REQUIRED. Always return a complete object, even if some values are uncertain.
-- `rugProfile.confidence` and each item confidence must be between 0 and 1.
-- `damages[].category` should use clear categories: stain, structural, fringe, edge, pile, color, moisture, odor, previous_repair, other.
-- `damages[].severity` must be one of: minor, moderate, severe, critical.
-- `recommendedServices[].pricingModel` must be one of: sqft, linear_ft, fixed.
-- `recommendedServices[].estimatedCost` must always be a number (not null/TBD).
-- `totals.subtotal`, `totals.estimatedRangeLow`, and `totals.estimatedRangeHigh` must be numeric.
-- `reviewFlags` should include quality/risk flags when relevant, e.g. ["low_photo_clarity", "fiber_uncertain", "manual_measurement_needed"].
-- Keep `relatedDamageIds` linked to `damages[].id` where applicable.
+- "rugProfile.confidence" and each item confidence must be between 0 and 1.
+- "damages[].category" should use clear categories: stain, structural, fringe, edge, pile, color, moisture, odor, previous_repair, other.
+- "damages[].severity" must be one of: minor, moderate, severe, critical.
+- "recommendedServices[].pricingModel" must be one of: sqft, linear_ft, fixed.
+- "recommendedServices[].estimatedCost" must always be a number (not null/TBD).
+- "totals.subtotal", "totals.estimatedRangeLow", and "totals.estimatedRangeHigh" must be numeric.
+- "reviewFlags" should include quality/risk flags when relevant, e.g. ["low_photo_clarity", "fiber_uncertain", "manual_measurement_needed"].
+- Keep "relatedDamageIds" linked to "damages[].id" where applicable.
 
 EDGE SUGGESTIONS (for the "edgeSuggestions" field):
 - Provide edge-specific damage observations for linear foot services (fringe, binding, overcasting, zenjireh, etc.)
