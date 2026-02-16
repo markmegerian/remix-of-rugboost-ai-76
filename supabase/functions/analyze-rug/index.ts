@@ -4,6 +4,7 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { getCorsHeaders, handleCorsPrelight } from '../_shared/cors.ts';
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 // Sanitize string input - remove potential injection characters
 function sanitizeString(input: string): string {
@@ -393,8 +394,9 @@ Deno.serve(async (req) => {
       console.warn("UserId mismatch - using authenticated user:", authenticatedUserId);
     }
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    // Support both legacy Lovable gateway and direct Gemini API
+    if (!LOVABLE_API_KEY && !GEMINI_API_KEY) {
+      throw new Error("AI provider key is not configured (set GEMINI_API_KEY or LOVABLE_API_KEY)");
     }
 
 
@@ -564,19 +566,26 @@ ${servicePricesText}
 
 Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write a professional estimate letter following the format specified. Address it to the client by name. Calculate all costs based on the rug's square footage (${squareFootage} sq ft) and perimeter for linear services.`;
 
-    // Use Lovable AI Gateway with selected model
+    // Prefer direct Gemini API when configured; fallback to legacy Lovable gateway
     // Reduce max_tokens for Flash model since it's more concise
     const maxTokens = model === "google/gemini-2.5-flash" ? 5000 : 8000;
     const startTime = Date.now();
-    
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+
+    const useGeminiDirect = !!GEMINI_API_KEY;
+    const modelForProvider = useGeminiDirect ? model.replace("google/", "") : model;
+    const endpoint = useGeminiDirect
+      ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+      : "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const apiKey = useGeminiDirect ? GEMINI_API_KEY : LOVABLE_API_KEY;
+
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: model,
+        model: modelForProvider,
         max_tokens: maxTokens,
         messages: [
           {
@@ -598,15 +607,18 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Lovable AI Gateway error:", response.status, errorText);
-      
+      console.error("AI provider error:", response.status, errorText);
+
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Please try again in a moment.");
       }
       if (response.status === 402) {
         throw new Error("AI usage limit reached. Please add credits to your workspace.");
       }
-      throw new Error(`AI Gateway error: ${response.status}`);
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("AI provider authentication failed. Check API key configuration.");
+      }
+      throw new Error(`AI provider error: ${response.status}`);
     }
 
     // Parse response with better error handling for truncated/empty responses
