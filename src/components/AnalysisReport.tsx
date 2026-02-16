@@ -1,5 +1,5 @@
 import React, { useState, memo } from 'react';
-import { FileText, DollarSign, ArrowLeft, Download, ClipboardList, RefreshCw } from 'lucide-react';
+import { FileText, ArrowLeft, Download, ClipboardList, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -89,7 +89,7 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Client</p>
               <p className="font-medium truncate" title={rugInfo.clientName}>{rugInfo.clientName}</p>
@@ -105,6 +105,10 @@ const AnalysisReportComponent: React.FC<AnalysisReportProps> = ({
             <div>
               <p className="text-muted-foreground">Dimensions</p>
               <p className="font-medium">{rugInfo.dimensions}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Generated</p>
+              <p className="font-medium">{new Date().toLocaleDateString()}</p>
             </div>
           </div>
         </CardContent>

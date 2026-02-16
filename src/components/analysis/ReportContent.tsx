@@ -17,12 +17,23 @@ const severityBadgeClass: Record<string, string> = {
   critical: 'bg-red-100 text-red-700 border-red-300',
 };
 
+const severityRank: Record<string, number> = {
+  critical: 0,
+  severe: 1,
+  moderate: 2,
+  minor: 3,
+};
+
 const formatConfidence = (value?: number) => {
   if (typeof value !== 'number' || Number.isNaN(value)) return null;
   return `${Math.round(value * 100)}%`;
 };
 
 const formatFlag = (flag: string) => flag.replace(/[_-]+/g, ' ');
+const formatCategory = (category?: string) => {
+  if (!category) return 'OTHER';
+  return category.replace(/[_-]+/g, ' ').toUpperCase();
+};
 
 const formatServiceType = (serviceType?: string) => {
   if (!serviceType) return 'Service';
@@ -65,7 +76,13 @@ const formatMoney = (value?: number, currency = 'USD') => {
 };
 
 const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ findings }) => {
-  const damages = Array.isArray(findings.damages) ? findings.damages : [];
+  const damages = Array.isArray(findings.damages)
+    ? [...findings.damages].sort((a, b) => {
+        const sa = (a.severity || 'moderate').toLowerCase();
+        const sb = (b.severity || 'moderate').toLowerCase();
+        return (severityRank[sa] ?? 99) - (severityRank[sb] ?? 99);
+      })
+    : [];
   const reviewFlags = Array.isArray(findings.reviewFlags) ? findings.reviewFlags : [];
   const recommendedServices = Array.isArray(findings.recommendedServices) ? findings.recommendedServices : [];
   const profile = findings.rugProfile;
@@ -126,8 +143,8 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-medium">{dmg.description || 'Observed damage'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(dmg.category || 'other').toUpperCase()} • {dmg.location || 'location not specified'}
+                        <p className="text-xs text-muted-foreground break-words">
+                          {formatCategory(dmg.category)} • {dmg.location || 'location not specified'}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -160,10 +177,10 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
 
                 return (
                   <div key={`${svc.serviceType || 'service'}-${idx}`} className="rounded-md border bg-muted/20 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-medium">{formatServiceType(svc.serviceType)}</p>
-                        {svc.reason && <p className="text-xs text-muted-foreground mt-0.5">{svc.reason}</p>}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium break-words">{formatServiceType(svc.serviceType)}</p>
+                        {svc.reason && <p className="text-xs text-muted-foreground mt-0.5 break-words">{svc.reason}</p>}
                         <p className="text-xs text-muted-foreground mt-1">
                           {(svc.pricingModel || 'fixed').toUpperCase()} • Qty {svc.quantity ?? '—'} {svc.unit || ''}
                         </p>
@@ -177,7 +194,7 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right shrink-0">
                         <p className="text-sm font-semibold text-primary">{formatMoney(svc.estimatedCost, currency)}</p>
                         <p className="text-xs text-muted-foreground">@ {formatMoney(svc.unitPrice, currency)}</p>
                         {formatConfidence(svc.confidence) && (
@@ -199,12 +216,14 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-medium">{formatMoney(totals.subtotal, currency)}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Range</span>
-              <span className="font-medium">
-                {formatMoney(totals.estimatedRangeLow, currency)} – {formatMoney(totals.estimatedRangeHigh, currency)}
-              </span>
-            </div>
+            {(typeof totals.estimatedRangeLow === 'number' || typeof totals.estimatedRangeHigh === 'number') && (
+              <div className="flex justify-between text-sm gap-3">
+                <span className="text-muted-foreground">Range</span>
+                <span className="font-medium text-right">
+                  {formatMoney(totals.estimatedRangeLow, currency)} – {formatMoney(totals.estimatedRangeHigh, currency)}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -282,9 +301,9 @@ function formatReport(text: string, approvedEstimate?: ApprovedEstimate | null):
           {lineItemsBuffer.map((item, idx) => {
             const isTotal = /total|subtotal/i.test(item);
             return (
-              <div key={idx} className={`flex justify-between items-center text-base leading-relaxed ${isTotal ? 'border-t border-border pt-3 mt-3 font-semibold text-foreground' : 'text-foreground/85'}`}>
-                <span className="flex-1">{item.replace(/:\s*\$[\d,.]+$/, '')}</span>
-                <span className={`font-mono ${isTotal ? 'text-xl text-primary' : 'text-base'}`}>
+              <div key={idx} className={`flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-base leading-relaxed ${isTotal ? 'border-t border-border pt-3 mt-3 font-semibold text-foreground' : 'text-foreground/85'}`}>
+                <span className="flex-1 break-words">{item.replace(/:\s*\$[\d,.]+$/, '')}</span>
+                <span className={`font-mono shrink-0 ${isTotal ? 'text-xl text-primary' : 'text-base'}`}>
                   {item.match(/\$[\d,.]+/)?.[0] || ''}
                 </span>
               </div>
@@ -368,9 +387,9 @@ function formatReport(text: string, approvedEstimate?: ApprovedEstimate | null):
         </div>
         <div className="bg-muted/30 rounded-lg p-5 space-y-2">
           {approvedEstimate.services.map((service, idx) => (
-            <div key={service.id || idx} className="flex justify-between items-center text-base leading-relaxed text-foreground/85">
-              <span className="flex-1">{service.name}</span>
-              <span className="font-mono text-base">${(service.quantity * service.unitPrice).toFixed(2)}</span>
+            <div key={service.id || idx} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-base leading-relaxed text-foreground/85">
+              <span className="flex-1 break-words">{service.name} <span className="text-xs text-muted-foreground">({service.quantity} × ${service.unitPrice.toFixed(2)})</span></span>
+              <span className="font-mono text-base shrink-0">${(service.quantity * service.unitPrice).toFixed(2)}</span>
             </div>
           ))}
           <div className="border-t border-border pt-3 mt-3 flex justify-between items-center font-semibold text-foreground">
