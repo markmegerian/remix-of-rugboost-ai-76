@@ -24,12 +24,24 @@ const formatConfidence = (value?: number) => {
 
 const formatFlag = (flag: string) => flag.replace(/[_-]+/g, ' ');
 
+const formatMoney = (value?: number, currency = 'USD') => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency || 'USD',
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
 const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ findings }) => {
   const damages = Array.isArray(findings.damages) ? findings.damages : [];
   const reviewFlags = Array.isArray(findings.reviewFlags) ? findings.reviewFlags : [];
+  const recommendedServices = Array.isArray(findings.recommendedServices) ? findings.recommendedServices : [];
   const profile = findings.rugProfile;
+  const totals = findings.totals;
+  const currency = totals?.currency || 'USD';
 
-  if (!profile && damages.length === 0 && reviewFlags.length === 0 && !findings.summary) {
+  if (!profile && damages.length === 0 && reviewFlags.length === 0 && recommendedServices.length === 0 && !findings.summary && !totals) {
     return null;
   }
 
@@ -94,6 +106,50 @@ const StructuredFindingsPanel: React.FC<{ findings: StructuredFindings }> = ({ f
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {recommendedServices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-foreground">Recommended Services ({recommendedServices.length})</p>
+            <div className="space-y-2">
+              {recommendedServices.map((svc, idx) => (
+                <div key={`${svc.serviceType || 'service'}-${idx}`} className="rounded-md border bg-muted/20 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium">{svc.serviceType || 'Service'}</p>
+                      {svc.reason && <p className="text-xs text-muted-foreground mt-0.5">{svc.reason}</p>}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {(svc.pricingModel || 'fixed').toUpperCase()} • Qty {svc.quantity ?? '—'} {svc.unit || ''}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-primary">{formatMoney(svc.estimatedCost, currency)}</p>
+                      <p className="text-xs text-muted-foreground">@ {formatMoney(svc.unitPrice, currency)}</p>
+                      {formatConfidence(svc.confidence) && (
+                        <Badge variant="secondary" className="mt-1">{formatConfidence(svc.confidence)}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {totals && (
+          <div className="rounded-md border bg-primary/5 p-3 space-y-1">
+            <p className="text-sm font-semibold text-foreground">Estimated Totals</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium">{formatMoney(totals.subtotal, currency)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Range</span>
+              <span className="font-medium">
+                {formatMoney(totals.estimatedRangeLow, currency)} – {formatMoney(totals.estimatedRangeHigh, currency)}
+              </span>
             </div>
           </div>
         )}
