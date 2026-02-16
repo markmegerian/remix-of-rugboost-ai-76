@@ -169,6 +169,55 @@ const JobDetail = () => {
   const clientPortalStatus = jobData?.clientPortalStatus || null;
   const serviceCompletions = jobData?.serviceCompletions || [];
 
+  const planningTarget = useMemo(() => {
+    const inspected = rugs
+      .map((r) => (r.structured_findings && typeof r.structured_findings === 'object' && !Array.isArray(r.structured_findings)
+        ? r.structured_findings as any
+        : null))
+      .filter(Boolean);
+
+    if (inspected.length === 0) return null;
+
+    let subtotal = 0;
+    let low = 0;
+    let high = 0;
+    let withTotals = 0;
+    let reviewFlags = 0;
+
+    for (const sf of inspected) {
+      const totals = sf?.totals || {};
+      const hasAnyTotal =
+        typeof totals.subtotal === 'number' ||
+        typeof totals.estimatedRangeLow === 'number' ||
+        typeof totals.estimatedRangeHigh === 'number';
+
+      if (hasAnyTotal) {
+        withTotals += 1;
+        subtotal += typeof totals.subtotal === 'number' ? totals.subtotal : 0;
+        low += typeof totals.estimatedRangeLow === 'number' ? totals.estimatedRangeLow : (typeof totals.subtotal === 'number' ? totals.subtotal : 0);
+        high += typeof totals.estimatedRangeHigh === 'number' ? totals.estimatedRangeHigh : (typeof totals.subtotal === 'number' ? totals.subtotal : 0);
+      }
+
+      if (Array.isArray(sf?.reviewFlags)) reviewFlags += sf.reviewFlags.length;
+    }
+
+    if (withTotals === 0) return null;
+
+    const coverage = withTotals / Math.max(rugs.length, 1);
+    const confidenceScore = Math.max(0, Math.min(100, Math.round((coverage * 100) - Math.min(reviewFlags * 4, 35))));
+    const confidenceLabel = confidenceScore >= 75 ? 'High' : confidenceScore >= 50 ? 'Medium' : 'Low';
+
+    return {
+      subtotal,
+      low,
+      high,
+      confidenceScore,
+      confidenceLabel,
+      rugsCovered: withTotals,
+      rugsTotal: rugs.length,
+    };
+  }, [rugs]);
+
   // Compute current job status for action gating
   const hasAnalyzedRugs = rugs.some(r => r.analysis_report);
   const currentJobStatus = job ? mapLegacyStatus(
@@ -640,6 +689,41 @@ const JobDetail = () => {
             />
           );
         })()}
+
+        {planningTarget && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                AI Planning Target (Internal)
+              </CardTitle>
+              <CardDescription>
+                Guidance only — final approved estimate controls billing.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground">Suggested range</span>
+                <span className="font-semibold text-foreground">
+                  ${planningTarget.low.toFixed(2)} – ${planningTarget.high.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground">AI subtotal signal</span>
+                <span className="font-medium">${planningTarget.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground">Confidence</span>
+                <Badge variant={planningTarget.confidenceLabel === 'High' ? 'default' : planningTarget.confidenceLabel === 'Medium' ? 'secondary' : 'outline'}>
+                  {planningTarget.confidenceLabel} ({planningTarget.confidenceScore}%)
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Based on structured findings from {planningTarget.rugsCovered}/{planningTarget.rugsTotal} rugs.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Section A: Client & Logistics */}
         <ClientLogisticsCard job={job} onEditClientInfo={() => setIsEditingClientInfo(true)} />
