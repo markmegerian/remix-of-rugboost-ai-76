@@ -234,6 +234,19 @@ const drawThinDivider = (doc: jsPDF, x: number, y: number, width: number): void 
   doc.line(x, y, x + width, y);
 };
 
+const ensurePageSpace = (
+  doc: jsPDF,
+  yPos: number,
+  requiredSpace: number,
+  pageHeight: number,
+  pageWidth: number,
+): number => {
+  if (yPos <= pageHeight - requiredSpace) return yPos;
+  doc.addPage();
+  drawElegantBorder(doc, pageWidth, pageHeight);
+  return 30;
+};
+
 // ========================
 // SERVICE DESCRIPTION EXTRACTION
 // ========================
@@ -658,6 +671,7 @@ async function buildJobPdfDocument(
   drawElegantBorder(doc, pageWidth, pageHeight);
   yPos = 30;
   
+  yPos = ensurePageSpace(doc, yPos, 40, pageHeight, pageWidth);
   yPos = drawSectionHeader(doc, 'COMPREHENSIVE SERVICE DESCRIPTIONS', margin, yPos, contentWidth);
   yPos += 8;
   
@@ -666,11 +680,7 @@ async function buildJobPdfDocument(
   const servicesToShow = serviceDescriptions.length > 0 ? serviceDescriptions : defaultServices;
   
   for (const service of servicesToShow) {
-    if (yPos > pageHeight - 60) {
-      doc.addPage();
-      drawElegantBorder(doc, pageWidth, pageHeight);
-      yPos = 30;
-    }
+    yPos = ensurePageSpace(doc, yPos, 60, pageHeight, pageWidth);
     
     doc.setFontSize(11);
     doc.setFont(FONT.family, FONT.bold);
@@ -684,11 +694,7 @@ async function buildJobPdfDocument(
       doc.setTextColor(...COLORS.text);
       const descLines = doc.splitTextToSize(service.description, contentWidth - 5);
       descLines.forEach((line: string) => {
-        if (yPos > pageHeight - 30) {
-          doc.addPage();
-          drawElegantBorder(doc, pageWidth, pageHeight);
-          yPos = 30;
-        }
+        yPos = ensurePageSpace(doc, yPos, 30, pageHeight, pageWidth);
         doc.text(line, margin + 5, yPos);
         yPos += 4.5;
       });
@@ -703,6 +709,7 @@ async function buildJobPdfDocument(
   drawElegantBorder(doc, pageWidth, pageHeight);
   yPos = 30;
   
+  yPos = ensurePageSpace(doc, yPos, 40, pageHeight, pageWidth);
   yPos = drawSectionHeader(doc, 'RUG BREAKDOWN & SERVICES', margin, yPos, contentWidth);
   yPos += 8;
 
@@ -831,6 +838,7 @@ async function buildJobPdfDocument(
         yPos = 30;
       }
       
+      yPos = ensurePageSpace(doc, yPos, 44, pageHeight, pageWidth);
       yPos = drawSectionHeader(doc, 'STRONGLY RECOMMENDED ADDITIONAL PROTECTION', margin, yPos, contentWidth);
       yPos += 8;
       
@@ -903,6 +911,7 @@ async function buildJobPdfDocument(
       yPos = 30;
     }
     
+    yPos = ensurePageSpace(doc, yPos, 44, pageHeight, pageWidth);
     yPos = drawSectionHeader(doc, 'NEXT STEPS', margin, yPos, contentWidth);
     yPos += 8;
     
@@ -982,7 +991,8 @@ We invite you to proceed with all recommended services, or we would be pleased t
     doc.addPage();
     drawElegantBorder(doc, pageWidth, pageHeight);
     yPos = 30;
-    
+
+    yPos = ensurePageSpace(doc, yPos, 44, pageHeight, pageWidth);
     yPos = drawSectionHeader(doc, 'INSPECTION PHOTOS', margin, yPos, contentWidth);
     yPos += 8;
     
@@ -996,6 +1006,7 @@ We invite you to proceed with all recommended services, or we would be pleased t
       }
       
       const sizeStr = rug.length && rug.width ? ` (${rug.length}' × ${rug.width}')` : '';
+      yPos = ensurePageSpace(doc, yPos, 28, pageHeight, pageWidth);
       yPos = drawRugEntryHeader(doc, `Rug #${rug.rug_number}: ${rug.rug_type}${sizeStr}`, margin, yPos, contentWidth);
       yPos += 4;
       
@@ -1148,9 +1159,10 @@ export const generatePDF = async (
     drawElegantBorder(doc, pageWidth, pageHeight);
     yPos = 30;
     
+    yPos = ensurePageSpace(doc, yPos, 44, pageHeight, pageWidth);
     yPos = drawSectionHeader(doc, 'INSPECTION PHOTOS', margin, yPos, contentWidth);
     yPos += 8;
-    
+
     await addPhotosToPDF(doc, rug.photo_urls, yPos, margin, pageWidth, pageHeight, branding, rug.image_annotations, false, true);
   }
   
