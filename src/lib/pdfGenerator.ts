@@ -61,7 +61,7 @@ const FONT = {
   family: 'helvetica' as const,
   bold: 'bold' as const,
   normal: 'normal' as const,
-  italic: 'oblique' as const,
+  italic: 'italic' as const,
   boldItalic: 'boldoblique' as const,
 };
 
