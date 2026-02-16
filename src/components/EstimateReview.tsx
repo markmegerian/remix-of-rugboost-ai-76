@@ -51,6 +51,7 @@ export interface ServiceItem {
 
 interface EstimateReviewProps {
   report: string;
+  structuredFindings?: any;
   rugInfo: {
     rugNumber: string;
     rugType: string;
@@ -83,6 +84,7 @@ const PRIORITY_COLORS = {
 
 const EstimateReview: React.FC<EstimateReviewProps> = ({
   report,
+  structuredFindings,
   rugInfo,
   inspectionId,
   jobId,
@@ -133,11 +135,12 @@ const EstimateReview: React.FC<EstimateReviewProps> = ({
         rugDimensions,
         availableServices,
         parsedEdgeSuggestions,
+        structuredFindings,
       });
       setServices(extractedServices);
       originalServicesRef.current = extractedServices;
     }
-  }, [report, existingApprovedEstimate]);
+  }, [report, structuredFindings, existingApprovedEstimate, rugDimensions, availableServices, parsedEdgeSuggestions]);
 
 
   const handleUpdateService = (id: string, updates: Partial<ServiceItem>) => {

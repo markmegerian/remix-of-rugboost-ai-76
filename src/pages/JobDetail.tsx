@@ -394,6 +394,7 @@ const JobDetail = () => {
             <Suspense fallback={<DialogLoadingFallback />}>
               <EstimateReview
                 report={selectedRug.analysis_report || ''}
+                structuredFindings={selectedRug.structured_findings}
                 rugInfo={{
                   rugNumber: selectedRug.rug_number,
                   rugType: selectedRug.rug_type,

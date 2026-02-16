@@ -16,10 +16,27 @@ export interface ParsedServiceItem {
   reasonNote?: string;
 }
 
+interface StructuredRecommendedService {
+  serviceType?: string;
+  reason?: string;
+  pricingModel?: 'sqft' | 'linear_ft' | 'fixed' | string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  estimatedCost?: number;
+  relatedDamageIds?: string[];
+  confidence?: number;
+}
+
+interface StructuredFindings {
+  recommendedServices?: StructuredRecommendedService[];
+}
+
 interface ParseContext {
   rugDimensions?: RugDimensions | null;
   availableServices?: { name: string; unitPrice: number }[];
   parsedEdgeSuggestions?: EdgeSuggestion[];
+  structuredFindings?: StructuredFindings | null;
 }
 
 function getServicePriority(serviceName: string): 'high' | 'medium' | 'low' {
@@ -62,11 +79,145 @@ function getServicePriority(serviceName: string): 'high' | 'medium' | 'low' {
   return 'medium';
 }
 
+function normalizeServiceName(serviceType: string, availableServices: { name: string; unitPrice: number }[]): string {
+  const key = serviceType.toLowerCase().trim();
+
+  const explicitMap: Record<string, string> = {
+    cleaning: 'Standard wash',
+    wash: 'Standard wash',
+    overnight_soaking: 'Overnight soaking',
+    soaking: 'Overnight soaking',
+    blocking: 'Blocking',
+    shearing: 'Sheering',
+    overcasting: 'Overcasting',
+    overcast: 'Overcasting',
+    zenjireh: 'Zenjireh',
+    persian_binding: 'Persian Binding',
+    binding: 'Persian Binding',
+    hand_fringe: 'Hand Fringe',
+    fringe: 'Hand Fringe',
+    machine_fringe: 'Machine Fringe',
+    leather_binding: 'Leather binding',
+    cotton_binding: 'Cotton Binding',
+    glue_binding: 'Glue binding',
+    padding: 'Padding',
+    stain_removal: 'Stain removal',
+    stain: 'Stain removal',
+    repair: 'Repair',
+    reweave: 'Reweave',
+    reweaving: 'Reweave',
+    odor_treatment: 'Odor treatment',
+    moth_proofing: 'Mothproofing treatment',
+    mothproofing: 'Mothproofing treatment',
+    fiber_protection: 'Scotchgard / protector',
+    protector: 'Scotchgard / protector',
+  };
+
+  if (explicitMap[key]) return explicitMap[key];
+
+  const directMatch = availableServices.find((s) => s.name.toLowerCase() === key);
+  if (directMatch) return directMatch.name;
+
+  const fuzzyMatch = availableServices.find((s) => {
+    const n = s.name.toLowerCase();
+    return n.includes(key) || key.includes(n);
+  });
+
+  if (fuzzyMatch) return fuzzyMatch.name;
+
+  return serviceType
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function parseStructuredServices(
+  services: StructuredRecommendedService[],
+  context: ParseContext,
+): ParsedServiceItem[] {
+  const { rugDimensions = null, availableServices = [], parsedEdgeSuggestions = [] } = context;
+  const parsed: ParsedServiceItem[] = [];
+
+  for (const svc of services) {
+    if (!svc || !svc.serviceType) continue;
+
+    const serviceName = normalizeServiceName(svc.serviceType, availableServices);
+    const unitConfig = getServiceUnit(serviceName);
+    const pricingModel = (svc.pricingModel || '').toLowerCase();
+
+    let quantity = Number.isFinite(svc.quantity) && (svc.quantity as number) > 0
+      ? Number(svc.quantity)
+      : 1;
+
+    let unitPrice = Number.isFinite(svc.unitPrice) && (svc.unitPrice as number) >= 0
+      ? Number(svc.unitPrice)
+      : 0;
+
+    if (unitPrice === 0 && Number.isFinite(svc.estimatedCost) && quantity > 0) {
+      unitPrice = Number(svc.estimatedCost) / quantity;
+    }
+
+    const catalogEntry = availableServices.find(a => a.name.toLowerCase() === serviceName.toLowerCase());
+    if (catalogEntry && catalogEntry.unitPrice > 0 && unitPrice === 0) {
+      unitPrice = catalogEntry.unitPrice;
+    }
+
+    const hasDims = rugDimensions && rugDimensions.lengthFt > 0 && rugDimensions.widthFt > 0;
+
+    if (hasDims && (pricingModel === 'sqft' || unitConfig.unit === 'sqft')) {
+      quantity = Math.round(calculateSquareFeet(rugDimensions!) * 100) / 100;
+      if (catalogEntry?.unitPrice && catalogEntry.unitPrice > 0) {
+        unitPrice = catalogEntry.unitPrice;
+      }
+    } else if (hasDims && (pricingModel === 'linear_ft' || unitConfig.unit === 'linear_ft')) {
+      const suggestion = getSuggestedEdgesForService(serviceName, parsedEdgeSuggestions);
+      if (suggestion && suggestion.suggestedEdges.length > 0) {
+        quantity = Math.round(calculateLinearFeet(rugDimensions!, suggestion.suggestedEdges) * 100) / 100;
+      } else {
+        quantity = Math.round((2 * (rugDimensions!.lengthFt + rugDimensions!.widthFt)) * 100) / 100;
+      }
+      if (catalogEntry?.unitPrice && catalogEntry.unitPrice > 0) {
+        unitPrice = catalogEntry.unitPrice;
+      }
+    }
+
+    parsed.push({
+      id: crypto.randomUUID(),
+      name: serviceName,
+      description: svc.reason,
+      quantity,
+      unitPrice: Math.round(unitPrice * 100) / 100,
+      priority: getServicePriority(serviceName),
+      source: 'ai',
+    });
+  }
+
+  return parsed;
+}
+
 export function parseReportForServices(
   reportText: string,
   context: ParseContext = {},
 ): ParsedServiceItem[] {
-  const { rugDimensions = null, availableServices = [], parsedEdgeSuggestions = [] } = context;
+  const { rugDimensions = null, availableServices = [], parsedEdgeSuggestions = [], structuredFindings = null } = context;
+
+  const recommendedServices = Array.isArray(structuredFindings?.recommendedServices)
+    ? structuredFindings.recommendedServices
+    : [];
+
+  const structuredServices = recommendedServices.length > 0
+    ? parseStructuredServices(recommendedServices, {
+        rugDimensions,
+        availableServices,
+        parsedEdgeSuggestions,
+      })
+    : [];
+
+  if (structuredServices.length > 0) {
+    return structuredServices;
+  }
+
   const services: ParsedServiceItem[] = [];
   const lines = reportText.split('\n');
 
