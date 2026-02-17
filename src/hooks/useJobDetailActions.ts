@@ -6,6 +6,7 @@ import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import type { AnalysisStage } from '@/components/AnalysisProgress';
 import type { BusinessBranding, UpsellService } from '@/lib/pdfGenerator';
+import { renderEstimateLetterDraft, type LetterContext, type StructuredFindings } from '@/lib/estimateLetterRenderer';
 
 // Re-export types used by the hook consumers
 export interface JobDetailJob {
@@ -162,13 +163,43 @@ export function useJobDetailActions({
       const edgeSuggs = data.edgeSuggestions || [];
       setImageAnnotations(annotations);
 
+      // Build structured findings and letter draft
+      const findings: StructuredFindings | null = data.structuredFindings || null;
+      let analysisReport = data.report as string | null;
+
+      try {
+        if (findings) {
+          const ctx: LetterContext = {
+            clientName: job.client_name,
+            businessName: branding?.business_name || 'Megerian Rug Cleaners',
+            businessPhone: branding?.business_phone || '(718) 782-7474',
+            rugs: [
+              {
+                rugNumber: rug.rug_number,
+                label:
+                  (findings.rugProfile?.fiber || '') +
+                  (findings.rugProfile?.origin ? ` ${findings.rugProfile.origin}` : '') ||
+                  rug.rug_type,
+                dimensionsLabel:
+                  rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
+                findings,
+              },
+            ],
+          };
+          const { draftText } = renderEstimateLetterDraft(ctx);
+          analysisReport = draftText;
+        }
+      } catch (e) {
+        console.error('[JobDetailActions] Failed to render estimate letter draft, falling back to AI report:', e);
+      }
+
       const { error: updateError } = await supabase
         .from('inspections')
         .update({
-          analysis_report: data.report,
+          analysis_report: analysisReport,
           image_annotations: annotations,
           system_services: { edgeSuggestions: edgeSuggs },
-          structured_findings: data.structuredFindings || null,
+          structured_findings: findings,
         })
         .eq('id', rug.id);
 
@@ -246,13 +277,42 @@ export function useJobDetailActions({
 
         setAnalysisStage('generating');
 
+        const findings: StructuredFindings | null = data.structuredFindings || null;
+        let analysisReport = data.report as string | null;
+
+        try {
+          if (findings) {
+            const ctx: LetterContext = {
+              clientName: job.client_name,
+              businessName: branding?.business_name || 'Megerian Rug Cleaners',
+              businessPhone: branding?.business_phone || '(718) 782-7474',
+              rugs: [
+                {
+                  rugNumber: rug.rug_number,
+                  label:
+                    (findings.rugProfile?.fiber || '') +
+                    (findings.rugProfile?.origin ? ` ${findings.rugProfile.origin}` : '') ||
+                    rug.rug_type,
+                  dimensionsLabel:
+                    rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
+                  findings,
+                },
+              ],
+            };
+            const { draftText } = renderEstimateLetterDraft(ctx);
+            analysisReport = draftText;
+          }
+        } catch (e) {
+          console.error('[JobDetailActions] Failed to render estimate letter draft (analyze all), falling back to AI report:', e);
+        }
+
         await supabase
           .from('inspections')
           .update({
-            analysis_report: data.report,
+            analysis_report: analysisReport,
             image_annotations: data.imageAnnotations || [],
             system_services: { edgeSuggestions: data.edgeSuggestions || [] },
-            structured_findings: data.structuredFindings || null,
+            structured_findings: findings,
           })
           .eq('id', rug.id);
 
