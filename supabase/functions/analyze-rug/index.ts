@@ -255,7 +255,9 @@ The letter should:
    - Subtotal.
 5) State the total estimate clearly with an actual dollar amount.
 6) Explain next steps and invite the client to discuss priorities or budget.
-   - Include contact details: ${businessPhone ? `"Please contact us at ${businessPhone}"` : 
+    - Include contact details: ${businessPhone ? "Please contact us at " + businessPhone : "Please contact us"}${businessAddress ? " or visit us at " + businessAddress : ""}.
+7) Close warmly, sign off with "${businessName}" or "The Team at ${businessName}".
+`;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
