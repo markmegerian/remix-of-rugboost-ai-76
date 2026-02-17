@@ -788,6 +788,7 @@ export type Database = {
           photo_urls: string[] | null
           rug_number: string
           rug_type: string
+          structured_findings: Json | null
           system_services: Json | null
           user_id: string | null
           width: number | null
@@ -809,6 +810,7 @@ export type Database = {
           photo_urls?: string[] | null
           rug_number: string
           rug_type: string
+          structured_findings?: Json | null
           system_services?: Json | null
           user_id?: string | null
           width?: number | null
@@ -830,6 +832,7 @@ export type Database = {
           photo_urls?: string[] | null
           rug_number?: string
           rug_type?: string
+          structured_findings?: Json | null
           system_services?: Json | null
           user_id?: string | null
           width?: number | null
