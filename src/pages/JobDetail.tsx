@@ -277,7 +277,6 @@ const JobDetail = () => {
     handleDeleteRug,
     handleSendEmail: handleSendEmailAction,
     handleDownloadPDF,
-    handleDownloadPhotosPDF,
     handleDownloadJobPDF,
     handleOpenEmailPreview: checkEmailPreviewReady,
     generateClientPortalLink,
@@ -739,7 +738,6 @@ const JobDetail = () => {
           onAnalyzeRug={analyzeRug}
           onViewReport={handleViewReport}
           onDownloadPDF={handleDownloadPDF}
-          onDownloadPhotosPDF={handleDownloadPhotosPDF}
           onEditRug={setEditingRug}
           onDeleteRug={(rugId) => setConfirmDeleteRugId(rugId)}
           onAddRug={() => { setAddRugIndex(rugs.length); setIsAddingRug(true); }}

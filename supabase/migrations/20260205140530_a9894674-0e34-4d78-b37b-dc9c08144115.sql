@@ -1,4 +1,3 @@
-
 -- Grant table permissions for authenticated role
 GRANT ALL ON public.companies TO authenticated;
 GRANT ALL ON public.company_memberships TO authenticated;
@@ -13,9 +12,5 @@ REVOKE ALL ON public.company_service_prices FROM anon;
 
 -- Add staff role for the current user who signed up via OAuth
 INSERT INTO public.user_roles (user_id, role)
-SELECT '88f81bd8-bfed-4d60-81bf-29f3fd6dfd64', 'staff'
-WHERE EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE id = '88f81bd8-bfed-4d60-81bf-29f3fd6dfd64'
-)
+VALUES ('88f81bd8-bfed-4d60-81bf-29f3fd6dfd64', 'staff')
 ON CONFLICT (user_id, role) DO NOTHING;

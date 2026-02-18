@@ -6,7 +6,6 @@ import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import type { AnalysisStage } from '@/components/AnalysisProgress';
 import type { BusinessBranding, UpsellService } from '@/lib/pdfGenerator';
-import { renderEstimateLetterDraft, type LetterContext, type StructuredFindings } from '@/lib/estimateLetterRenderer';
 
 // Re-export types used by the hook consumers
 export interface JobDetailJob {
@@ -163,43 +162,13 @@ export function useJobDetailActions({
       const edgeSuggs = data.edgeSuggestions || [];
       setImageAnnotations(annotations);
 
-      // Build structured findings and letter draft
-      const findings: StructuredFindings | null = data.structuredFindings || null;
-      let analysisReport = data.report as string | null;
-
-      try {
-        if (findings) {
-          const ctx: LetterContext = {
-            clientName: job.client_name,
-            businessName: branding?.business_name || 'Megerian Rug Cleaners',
-            businessPhone: branding?.business_phone || '(718) 782-7474',
-            rugs: [
-              {
-                rugNumber: rug.rug_number,
-                label:
-                  (findings.rugProfile?.fiber || '') +
-                  (findings.rugProfile?.origin ? ` ${findings.rugProfile.origin}` : '') ||
-                  rug.rug_type,
-                dimensionsLabel:
-                  rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
-                findings,
-              },
-            ],
-          };
-          const { draftText } = renderEstimateLetterDraft(ctx);
-          analysisReport = draftText;
-        }
-      } catch (e) {
-        console.error('[JobDetailActions] Failed to render estimate letter draft, falling back to AI report:', e);
-      }
-
       const { error: updateError } = await supabase
         .from('inspections')
         .update({
-          analysis_report: analysisReport,
+          analysis_report: data.report,
           image_annotations: annotations,
           system_services: { edgeSuggestions: edgeSuggs },
-          structured_findings: findings as any,
+          structured_findings: data.structuredFindings || null,
         })
         .eq('id', rug.id);
 
@@ -277,42 +246,13 @@ export function useJobDetailActions({
 
         setAnalysisStage('generating');
 
-        const findings: StructuredFindings | null = data.structuredFindings || null;
-        let analysisReport = data.report as string | null;
-
-        try {
-          if (findings) {
-            const ctx: LetterContext = {
-              clientName: job.client_name,
-              businessName: branding?.business_name || 'Megerian Rug Cleaners',
-              businessPhone: branding?.business_phone || '(718) 782-7474',
-              rugs: [
-                {
-                  rugNumber: rug.rug_number,
-                  label:
-                    (findings.rugProfile?.fiber || '') +
-                    (findings.rugProfile?.origin ? ` ${findings.rugProfile.origin}` : '') ||
-                    rug.rug_type,
-                  dimensionsLabel:
-                    rug.length && rug.width ? `${rug.length}' × ${rug.width}'` : '—',
-                  findings,
-                },
-              ],
-            };
-            const { draftText } = renderEstimateLetterDraft(ctx);
-            analysisReport = draftText;
-          }
-        } catch (e) {
-          console.error('[JobDetailActions] Failed to render estimate letter draft (analyze all), falling back to AI report:', e);
-        }
-
         await supabase
           .from('inspections')
           .update({
-            analysis_report: analysisReport,
+            analysis_report: data.report,
             image_annotations: data.imageAnnotations || [],
             system_services: { edgeSuggestions: data.edgeSuggestions || [] },
-            structured_findings: findings as any,
+            structured_findings: data.structuredFindings || null,
           })
           .eq('id', rug.id);
 
@@ -607,92 +547,6 @@ export function useJobDetailActions({
     }
   }, [job, branding]);
 
-  const handleDownloadPhotosPDF = useCallback(async () => {
-    if (!job || rugs.length === 0) {
-      toast.error('No rugs with photos to download');
-      return;
-    }
-
-    const allPhotoPaths = rugs.flatMap(r => r.photo_urls || []);
-    if (allPhotoPaths.length === 0) {
-      toast.error('No photos found');
-      return;
-    }
-
-    try {
-      toast.info('Generating photos PDF...');
-      const { batchSignUrls } = await import('@/hooks/useSignedUrls');
-      const signedMap = await batchSignUrls(allPhotoPaths);
-
-      const { default: jsPDF } = await import('jspdf');
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 40;
-      const usableW = pageW - margin * 2;
-      const usableH = pageH - margin * 2;
-      let isFirstPage = true;
-
-      for (const rug of rugs) {
-        const photos = rug.photo_urls || [];
-        if (photos.length === 0) continue;
-
-        for (const photoPath of photos) {
-          if (!isFirstPage) pdf.addPage();
-          isFirstPage = false;
-
-          // Add rug label at top
-          pdf.setFontSize(10);
-          pdf.setTextColor(100);
-          pdf.text(`${job.job_number} — ${rug.rug_number} (${rug.rug_type})`, margin, margin - 10);
-
-          const cleanPath = photoPath.startsWith('http') ? photoPath : photoPath;
-          const signedUrl = signedMap.get(cleanPath.replace(/.*\/rug-photos\//, '').replace(/\?.*/, '')) || signedMap.get(cleanPath);
-
-          if (signedUrl) {
-            try {
-              const resp = await fetch(signedUrl);
-              const blob = await resp.blob();
-              const dataUrl = await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-              });
-
-              const img = new Image();
-              await new Promise<void>((resolve, reject) => {
-                img.onload = () => resolve();
-                img.onerror = reject;
-                img.src = dataUrl;
-              });
-
-              const imgRatio = img.width / img.height;
-              let drawW = usableW;
-              let drawH = drawW / imgRatio;
-              if (drawH > usableH) {
-                drawH = usableH;
-                drawW = drawH * imgRatio;
-              }
-              const x = margin + (usableW - drawW) / 2;
-              const y = margin + (usableH - drawH) / 2;
-
-              pdf.addImage(dataUrl, 'JPEG', x, y, drawW, drawH);
-            } catch (e) {
-              pdf.setFontSize(12);
-              pdf.setTextColor(180);
-              pdf.text('Photo could not be loaded', pageW / 2, pageH / 2, { align: 'center' });
-            }
-          }
-        }
-      }
-
-      pdf.save(`${job.job_number}-photos.pdf`);
-      toast.success('Photos PDF downloaded!');
-    } catch (error) {
-      handleMutationError(error, 'JobDetailActions', 'Failed to generate photos PDF');
-    }
-  }, [job, rugs]);
-
   const handleDownloadJobPDF = useCallback(async () => {
     if (!job || rugs.length === 0) {
       toast.error('No rugs to include in the report');
@@ -901,7 +755,6 @@ export function useJobDetailActions({
     handleDeleteRug,
     handleSendEmail,
     handleDownloadPDF,
-    handleDownloadPhotosPDF,
     handleDownloadJobPDF,
     handleOpenEmailPreview,
     generateClientPortalLink,

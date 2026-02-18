@@ -65,10 +65,5 @@ EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Assign admin role to platform owner
 INSERT INTO public.user_roles (user_id, role)
-SELECT '94db7bee-b556-45c3-81d6-376cc69bcf06', 'admin'
-WHERE EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE id = '94db7bee-b556-45c3-81d6-376cc69bcf06'
-)
+VALUES ('94db7bee-b556-45c3-81d6-376cc69bcf06', 'admin')
 ON CONFLICT (user_id, role) DO NOTHING;
-

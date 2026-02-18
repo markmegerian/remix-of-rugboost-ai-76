@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Loader2, Eye, Download, Trash2, Edit2, CheckCircle, Clock, Sparkles, FlaskConical, Image, FileDown } from 'lucide-react';
+import { Plus, Loader2, Eye, Download, Trash2, Edit2, CheckCircle, Clock, Sparkles, FlaskConical, Image } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +41,6 @@ interface RugGalleryCardProps {
   onAnalyzeRug: (rug: Rug) => void;
   onViewReport: (rug: Rug) => void;
   onDownloadPDF: (rug: Rug) => void;
-  onDownloadPhotosPDF: () => void;
   onEditRug: (rug: Rug) => void;
   onDeleteRug: (rugId: string) => void;
   onAddRug: () => void;
@@ -57,7 +56,6 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
   onAnalyzeRug,
   onViewReport,
   onDownloadPDF,
-  onDownloadPhotosPDF,
   onEditRug,
   onDeleteRug,
   onAddRug,
@@ -75,17 +73,6 @@ const RugGalleryCard: React.FC<RugGalleryCardProps> = ({
           </CardTitle>
           {/* Mobile: Actions in a row, hidden on mobile (in bottom bar) */}
           <div className="hidden md:flex items-center gap-2">
-            {rugs.length > 0 && rugs.some(r => (r.photo_urls?.length || 0) > 0) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={onDownloadPhotosPDF}
-              >
-                <FileDown className="h-4 w-4" />
-                Photos PDF
-              </Button>
-            )}
             {rugs.length > 0 && rugs.some(r => !r.analysis_report) && (
               <StatusGatedButton 
                 actionState={actions.analyzeRug}
