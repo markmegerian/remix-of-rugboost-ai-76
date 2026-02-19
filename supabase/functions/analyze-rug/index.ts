@@ -331,18 +331,17 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
     
-    if (claimsError || !claimsData?.claims) {
-      console.error("Auth error:", claimsError);
+    if (userError || !user) {
+      console.error("Auth error:", userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized - invalid token' }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const authenticatedUserId = claimsData.claims.sub as string;
+    const authenticatedUserId = user.id;
 
     // Database-backed rate limiting
     const supabaseServiceKeyForRL = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -613,13 +612,16 @@ Please examine the attached ${resolvedPhotoUrls.length} photograph(s) and write 
     let data;
     try {
       const responseText = await response.text();
+      console.log("AI Gateway response length:", responseText.length, "status:", response.status);
       if (!responseText || responseText.trim() === '') {
         console.error("Empty response from AI Gateway");
         throw new Error("Empty response from AI - please try again");
       }
       data = JSON.parse(responseText);
     } catch (jsonError) {
-      console.error("Failed to parse AI Gateway response:", jsonError);
+      if (jsonError instanceof SyntaxError) {
+        console.error("Failed to parse AI Gateway response as JSON. First 500 chars:", (jsonError as any).message);
+      }
       throw new Error("Invalid response from AI - please try again");
     }
 
