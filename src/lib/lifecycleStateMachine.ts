@@ -1,13 +1,31 @@
 /**
  * Job Lifecycle State Machine
- * 
+ *
  * Enforces strict sequential transitions with validation guards.
  * No skipping steps, no backward movement (except admin override).
- * 
+ *
  * State flow:
- * intake_scheduled → picked_up → inspected → estimate_sent → 
- * approved_unpaid → paid → in_service → ready → 
+ * intake_scheduled → picked_up → inspected → estimate_sent →
+ * approved_unpaid → paid → in_service → ready →
  * delivery_scheduled → delivered → closed
+ *
+ * ## Legacy Status Mapping (for migration)
+ * Map legacy job statuses to lifecycle statuses. Use mapLegacyStatus() in JobTimeline.
+ *
+ * | Legacy     | payment_status | hasPortalLink | hasAnalysis | → Lifecycle      |
+ * |------------|----------------|---------------|-------------|------------------|
+ * | completed  | any            | any           | any         | closed           |
+ * | in-progress| paid/completed | any           | any         | paid or in_service |
+ * | in-progress| other          | yes           | any         | approved_unpaid  |
+ * | in-progress| other          | no            | any         | inspected       |
+ * | active     | any            | yes           | any         | estimate_sent   |
+ * | active     | any            | no            | yes         | inspected       |
+ * | active     | any            | no            | no          | picked_up       |
+ *
+ * ## Admin Override
+ * validateTransition(..., isAdminOverride: true) allows backward transitions and
+ * skipping steps. Use for edge cases (e.g. client picks up, no delivery step).
+ * UI should restrict override_status to admin role.
  */
 
 export type LifecycleStatus = 

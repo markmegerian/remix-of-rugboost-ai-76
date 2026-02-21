@@ -7,6 +7,9 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-
 // Redirect legacy /job/:id to canonical /jobs/:id
 const JobRedirect = () => {
   const { jobId } = useParams<{ jobId: string }>();
+  if (!jobId) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return <Navigate to={`/jobs/${jobId}`} replace />;
 };
 import { AuthProvider } from "@/hooks/useAuth";

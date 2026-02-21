@@ -54,7 +54,7 @@ const NewJob = () => {
           client_email: formData.clientEmail || null,
           client_phone: formData.clientPhone || null,
           notes: formData.notes || null,
-          status: 'active',
+          status: 'intake_scheduled',
         })
         .select()
         .single();

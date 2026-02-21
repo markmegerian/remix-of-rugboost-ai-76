@@ -300,6 +300,7 @@ const JobDetail = () => {
     handleOpenEmailPreview: checkEmailPreviewReady,
     generateClientPortalLink,
     handleResendInvite,
+    handleDuplicateJob,
   } = useJobDetailActions({
     job,
     rugs,

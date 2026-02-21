@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Loader2, X, LogOut, History, Download
@@ -99,6 +99,7 @@ const ClientPortal = () => {
   const [hasAccess, setHasAccess] = useState(false);
   const [clientJobAccessId, setClientJobAccessId] = useState<string | null>(null);
   const [staffUserId, setStaffUserId] = useState<string | null>(null);
+  const approveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!authLoading) {
@@ -709,7 +710,7 @@ const ClientPortal = () => {
               variant="outline" 
               size="sm" 
               onClick={() => navigate('/client/dashboard')}
-              className="gap-1 hidden sm:flex"
+              className="gap-1 hidden sm:flex min-h-[44px] min-w-[44px]"
             >
               <History className="h-4 w-4" />
               My Jobs
@@ -724,7 +725,7 @@ const ClientPortal = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pb-24 md:pb-8">
         {/* Expert Inspection Report */}
         <ExpertInspectionReport
           rugs={rugs}
@@ -734,7 +735,26 @@ const ClientPortal = () => {
           onApprove={handleProceedToPayment}
           isProcessing={isProcessingPayment}
           totalAmount={totalAmount}
+          approveRef={approveRef}
         />
+
+        {/* Sticky mobile CTA - tap-friendly. Uses approveRef for current declined set. */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border p-4 pb-safe-bottom shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-xl font-bold">${totalAmount.toFixed(2)}</p>
+            </div>
+            <Button
+              onClick={() => approveRef.current?.()}
+              disabled={isProcessingPayment}
+              className="flex-1 min-h-[48px] text-base font-semibold"
+              size="lg"
+            >
+              {isProcessingPayment ? 'Processing...' : 'Pay Now'}
+            </Button>
+          </div>
+        </div>
 
         {/* Contact Info */}
         {branding && (

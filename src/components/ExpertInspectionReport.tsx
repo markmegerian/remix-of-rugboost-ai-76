@@ -89,6 +89,8 @@ function isSignificantValue(service: Service): boolean {
    onRequestClarification?: () => void;
    isProcessing?: boolean;
    totalAmount: number;
+   /** Optional ref for parent to trigger approval with current declined set (e.g. sticky CTA) */
+   approveRef?: React.MutableRefObject<(() => void) | null>;
  }
  
  // Group services by category
@@ -141,7 +143,8 @@ function generateConditionSummary(services: Service[]): string {
    onApprove,
    onRequestClarification,
    isProcessing = false,
-   totalAmount
+   totalAmount,
+   approveRef,
  }) => {
    const [expandedRugs, setExpandedRugs] = useState<Set<string>>(new Set(rugs.map(r => r.id)));
    const [showReport, setShowReport] = useState<string | null>(null);
@@ -218,6 +221,13 @@ function generateConditionSummary(services: Service[]): string {
     }
   }, [confirmDecline]);
   
+  useEffect(() => {
+    if (approveRef) {
+      approveRef.current = () => onApprove(declinedServices);
+      return () => { approveRef.current = null; };
+    }
+  }, [approveRef, declinedServices, onApprove]);
+
   const restoreService = useCallback((serviceId: string) => {
     setDeclinedServices(prev => {
       const next = new Set(prev);
@@ -617,7 +627,7 @@ function generateConditionSummary(services: Service[]): string {
             ref={paymentButtonRef}
             onClick={() => onApprove(declinedServices)}
             disabled={isProcessing}
-           className="w-full h-14 text-lg font-medium"
+           className="w-full min-h-[48px] h-14 text-lg font-medium"
             size="lg"
           >
             {isProcessing ? (

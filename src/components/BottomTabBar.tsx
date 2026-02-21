@@ -10,7 +10,8 @@ const tabs = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
-const HIDDEN_PREFIXES = ['/jobs/', '/job/', '/client', '/admin', '/auth'];
+// Show tab bar on /jobs/:id for mobile navigation (Dashboard/Analytics/History). Hide on /job/ (legacy), /client, /admin, /auth.
+const HIDDEN_PREFIXES = ['/job/', '/client', '/admin', '/auth'];
 
 const BottomTabBar: React.FC = () => {
   const { pathname } = useLocation();

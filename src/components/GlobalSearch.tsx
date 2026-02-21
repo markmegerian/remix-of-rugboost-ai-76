@@ -35,18 +35,18 @@ const GlobalSearch: React.FC = () => {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  // Keyboard shortcut handler
+  // Keyboard shortcut handler — depends on setOpen so it updates when searchContext becomes available
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || e.key === '/') {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen((prev) => !prev);
       }
     };
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, []);
+  }, [setOpen]);
 
   // Search function — scoped by company_id for tenant isolation
   const performSearch = useCallback(async (searchQuery: string) => {
