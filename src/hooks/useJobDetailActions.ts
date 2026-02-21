@@ -738,9 +738,9 @@ export function useJobDetailActions({
           notes: rug.notes || null,
           photo_urls: rug.photo_urls || null,
           analysis_report: rug.analysis_report || null,
-          image_annotations: rug.image_annotations || null,
-          system_services: rug.system_services || null,
-          structured_findings: rug.structured_findings || null,
+          image_annotations: (rug.image_annotations as any) || null,
+          system_services: (rug.system_services as any) || null,
+          structured_findings: (rug.structured_findings as any) || null,
         }));
 
         const { error: inspError } = await supabase.from('inspections').insert(inserts);
