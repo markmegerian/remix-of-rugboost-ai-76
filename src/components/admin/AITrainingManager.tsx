@@ -177,7 +177,7 @@ export const AITrainingManager = () => {
     let original = '';
     let corrected = '';
     let correctionType: CorrectionType = 'service_correction';
-    let rugCategory = fb.rug_type || fb.rug_origin || '';
+    const rugCategory = fb.rug_type || fb.rug_origin || '';
 
     if (fb.feedback_type === 'price_correction') {
       correctionType = 'price_correction';
