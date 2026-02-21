@@ -137,10 +137,11 @@ export const useJobsWithFilters = (filters: JobFilters) => {
           case 'month':
             matchesDate = isThisMonth(jobDate);
             break;
-          case 'quarter':
-            const threeMonthsAgo = subDays(new Date(), 90);
-            matchesDate = jobDate >= threeMonthsAgo;
-            break;
+         case 'quarter': {
+  const threeMonthsAgo = subDays(new Date(), 90);
+  matchesDate = jobDate >= threeMonthsAgo;
+  break;
+}
         }
       }
 
