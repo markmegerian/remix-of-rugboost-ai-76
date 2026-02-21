@@ -35,6 +35,14 @@ interface ServiceItem {
   pricingFactors?: string[];
 }
 
+const getServiceLineTotal = (service: ServiceItem): number => {
+  if (typeof service.adjustedTotal === 'number' && Number.isFinite(service.adjustedTotal)) {
+    return service.adjustedTotal;
+  }
+
+  return service.quantity * service.unitPrice;
+};
+
 interface PhotoAnnotations {
   photoIndex: number;
   annotations: Array<{
@@ -425,15 +433,14 @@ const ClientPortal = () => {
       });
 
       // Calculate total based on filtered services
-      const total = servicesForCheckout.reduce((sum, rug) => 
-        sum + rug.services.reduce((s, svc) => s + svc.quantity * svc.unitPrice, 0), 0
+      const total = servicesForCheckout.reduce(
+        (sum, rug) => sum + rug.services.reduce((s, svc) => s + getServiceLineTotal(svc), 0),
+        0,
       );
 
       // Save client service selections to database before checkout
       for (const rugSelection of servicesForCheckout) {
-        const selectionTotal = rugSelection.services.reduce(
-          (sum, s) => sum + (s.quantity * s.unitPrice), 0
-        );
+        const selectionTotal = rugSelection.services.reduce((sum, s) => sum + getServiceLineTotal(s), 0);
         
         // First try to find existing selection
         const { data: existingSelection } = await supabase
@@ -491,7 +498,7 @@ const ClientPortal = () => {
               service_category: category,
               unit_price: service.unitPrice,
               quantity: service.quantity,
-              declined_amount: service.unitPrice * service.quantity,
+              declined_amount: getServiceLineTotal(service),
               decline_consequence: consequence,
               acknowledged_at: new Date().toISOString(),
             }, {
