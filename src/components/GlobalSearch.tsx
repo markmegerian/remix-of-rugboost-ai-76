@@ -13,7 +13,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
-import { getRecentJobs } from '@/lib/recentJobs';
+import { getRecentJobs, type RecentJob } from '@/lib/recentJobs';
 
 interface SearchResult {
   id: string;
@@ -31,6 +31,7 @@ const GlobalSearch: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>(() => getRecentJobs());
   const navigate = useNavigate();
   const { user } = useAuth();
   const { companyId } = useCompany();
