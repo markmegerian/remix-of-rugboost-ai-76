@@ -75,6 +75,8 @@ interface BusinessBranding {
   logo_path?: string | null;
 }
 
+type UserRole = 'staff' | 'client' | 'admin';
+
 const ClientPortal = () => {
   const { accessToken } = useParams<{ accessToken: string }>();
   const navigate = useNavigate();
@@ -109,22 +111,37 @@ const ClientPortal = () => {
 
   const fetchBrandingForPasswordSetup = async () => {
     try {
-      // Use secure RPC function to validate token and get staff user
+      // Use secure RPC function to validate token and get company/staff context
       const { data: tokenData, error: tokenError } = await supabase
         .rpc('validate_access_token', { _token: accessToken })
         .single();
 
       let businessName = 'Rug Cleaning';
       
-      if (!tokenError && tokenData?.staff_user_id) {
-        const { data: brandingData } = await supabase
-          .from('profiles')
-          .select('business_name')
-          .eq('user_id', tokenData.staff_user_id)
-          .single();
-        
-        if (brandingData?.business_name) {
-          businessName = brandingData.business_name;
+      if (!tokenError && tokenData) {
+        if (tokenData.company_id) {
+          const { data: companyBranding } = await supabase
+            .from('company_branding')
+            .select('business_name')
+            .eq('company_id', tokenData.company_id)
+            .maybeSingle();
+
+          if (companyBranding?.business_name) {
+            businessName = companyBranding.business_name;
+          }
+        }
+
+        // Legacy fallback for older data where company branding may not exist yet.
+        if (businessName === 'Rug Cleaning' && tokenData.staff_user_id) {
+          const { data: profileBranding } = await supabase
+            .from('profiles')
+            .select('business_name')
+            .eq('user_id', tokenData.staff_user_id)
+            .maybeSingle();
+
+          if (profileBranding?.business_name) {
+            businessName = profileBranding.business_name;
+          }
         }
       }
       
@@ -178,6 +195,23 @@ const ClientPortal = () => {
         return;
       }
       
+
+      // Enforce strict role separation: staff/admin identities cannot become client identities.
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (rolesError) throw rolesError;
+
+      const roles = (userRoles || []).map((r) => r.role as UserRole);
+      const hasNonClientRole = roles.includes('staff') || roles.includes('admin');
+      if (hasNonClientRole) {
+        toast.error('This account is a staff/admin account. Please use a dedicated client account to access this portal link.');
+        await signOut();
+        navigate(`/client/auth?token=${accessToken}`);
+        return;
+      }
 
       // Check if user's client account is linked
       const { data: clientAccount } = await supabase
@@ -252,15 +286,35 @@ const ClientPortal = () => {
       };
       setJob(jobData);
 
-      // Fetch branding including logo
-      const { data: brandingData } = await supabase
-        .from('profiles')
-        .select('business_name, business_phone, business_email, business_address, logo_path')
-        .eq('user_id', (accessData.jobs as any).user_id)
-        .single();
+      // Prefer company branding; fall back to legacy profile branding only if needed.
+      let resolvedBranding: BusinessBranding | null = null;
 
-      if (brandingData) {
-        setBranding(brandingData);
+      if (accessData.company_id) {
+        const { data: companyBranding } = await supabase
+          .from('company_branding')
+          .select('business_name, business_phone, business_email, business_address, logo_path')
+          .eq('company_id', accessData.company_id)
+          .maybeSingle();
+
+        if (companyBranding) {
+          resolvedBranding = companyBranding;
+        }
+      }
+
+      if (!resolvedBranding) {
+        const { data: profileBranding } = await supabase
+          .from('profiles')
+          .select('business_name, business_phone, business_email, business_address, logo_path')
+          .eq('user_id', (accessData.jobs as any).user_id)
+          .maybeSingle();
+
+        if (profileBranding) {
+          resolvedBranding = profileBranding;
+        }
+      }
+
+      if (resolvedBranding) {
+        setBranding(resolvedBranding);
       }
 
       // Fetch rugs for this job

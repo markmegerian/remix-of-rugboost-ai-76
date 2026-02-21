@@ -36,6 +36,32 @@ npm i
 npm run dev
 ```
 
+### Environment bootstrap (tokens/registry)
+
+If `npm install` fails with auth errors (`403`), run:
+
+```sh
+cd /workspace/remix-of-rugboost-ai-76
+./scripts/setup-env.sh
+```
+
+This script can set up npm and GitHub auth in your home directory (not in git).
+
+To run non-interactively:
+
+```sh
+export NPM_TOKEN="<your-npm-token>"
+export GH_USER="<github-username>"
+export GH_PAT="<github-pat>"
+./scripts/setup-env.sh --non-interactive --install
+```
+
+How to get an npm token:
+- Sign in at https://www.npmjs.com/.
+- Go to Access Tokens: https://www.npmjs.com/settings/<your-username>/tokens.
+- Create a token with read access for package installs.
+- Use that value as `NPM_TOKEN`.
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
