@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { handleMutationError, extractErrorMessage } from '@/lib/errorHandler';
+import { retryWithBackoff } from '@/lib/retryWithBackoff';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import type { AnalysisStage } from '@/components/AnalysisProgress';
@@ -139,20 +140,22 @@ export function useJobDetailActions({
       await new Promise(resolve => setTimeout(resolve, isReanalysis ? 0 : 500));
       setAnalysisStage('analyzing');
 
-      const { data, error } = await supabase.functions.invoke('analyze-rug', {
-        body: {
-          photos: rug.photo_urls || [],
-          rugInfo: {
-            clientName: job.client_name,
-            rugNumber: rug.rug_number,
-            rugType: rug.rug_type,
-            length: rug.length?.toString() || '',
-            width: rug.width?.toString() || '',
-            notes: rug.notes || '',
+      const { data, error } = await retryWithBackoff(() =>
+        supabase.functions.invoke('analyze-rug', {
+          body: {
+            photos: rug.photo_urls || [],
+            rugInfo: {
+              clientName: job.client_name,
+              rugNumber: rug.rug_number,
+              rugType: rug.rug_type,
+              length: rug.length?.toString() || '',
+              width: rug.width?.toString() || '',
+              notes: rug.notes || '',
+            },
+            userId,
           },
-          userId,
-        },
-      });
+        })
+      );
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
@@ -230,20 +233,22 @@ export function useJobDetailActions({
           try {
             setAnalysisRugNumber(rug.rug_number);
 
-            const { data, error } = await supabase.functions.invoke('analyze-rug', {
-              body: {
-                photos: rug.photo_urls || [],
-                rugInfo: {
-                  clientName: job.client_name,
-                  rugNumber: rug.rug_number,
-                  rugType: rug.rug_type,
-                  length: rug.length?.toString() || '',
-                  width: rug.width?.toString() || '',
-                  notes: rug.notes || '',
+            const { data, error } = await retryWithBackoff(() =>
+              supabase.functions.invoke('analyze-rug', {
+                body: {
+                  photos: rug.photo_urls || [],
+                  rugInfo: {
+                    clientName: job.client_name,
+                    rugNumber: rug.rug_number,
+                    rugType: rug.rug_type,
+                    length: rug.length?.toString() || '',
+                    width: rug.width?.toString() || '',
+                    notes: rug.notes || '',
+                  },
+                  userId,
                 },
-                userId,
-              },
-            });
+              })
+            );
 
             if (error) throw error;
             if (data.error) throw new Error(data.error);
