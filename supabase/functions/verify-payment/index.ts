@@ -3,6 +3,21 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { getCorsHeaders, handleCorsPrelight, corsJsonResponse } from '../_shared/cors.ts';
 
+interface EstimateInspection {
+  rug_number: string | null;
+  rug_type: string | null;
+  length: number | null;
+  width: number | null;
+}
+
+interface EstimateWithInspection {
+  id: string;
+  services: unknown;
+  total_amount: number | null;
+  inspection_id: string;
+  inspections: EstimateInspection | null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -160,7 +175,7 @@ serve(async (req) => {
           .eq("job_id", jobId);
 
         // Format rug details for the email
-        const rugs = (estimates || []).map((est: any) => ({
+        const rugs = ((estimates || []) as EstimateWithInspection[]).map((est) => ({
           rugNumber: est.inspections?.rug_number || "Unknown",
           rugType: est.inspections?.rug_type || "Unknown",
           dimensions: est.inspections?.length && est.inspections?.width 
