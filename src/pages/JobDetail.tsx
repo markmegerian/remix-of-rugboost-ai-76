@@ -165,6 +165,9 @@ const JobDetail = () => {
     }
   }, [jobData]);
 
+  // Derived data from React Query (with fallbacks for local state)
+  const job = jobData?.job || null;
+
   // Add to recent jobs when viewing
   useEffect(() => {
     if (job) {
@@ -175,9 +178,6 @@ const JobDetail = () => {
       });
     }
   }, [job?.id, job?.job_number, job?.client_name]);
-
-  // Derived data from React Query (with fallbacks for local state)
-  const job = jobData?.job || null;
   const rugs = localRugs.length > 0 ? localRugs : (jobData?.rugs || []);
   const branding = jobData?.branding || null;
   const servicePrices = jobData?.servicePrices || [];
