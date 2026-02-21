@@ -291,7 +291,7 @@ function formatReport(text: string, approvedEstimate?: ApprovedEstimate | null):
   const lines = cleanText.split('\n');
   const elements: React.ReactNode[] = [];
   let lineItemsBuffer: string[] = [];
-  let skipCostSections = hasApprovedCosts;
+  const skipCostSections = hasApprovedCosts;
 
   const flushLineItems = () => {
     if (skipCostSections && lineItemsBuffer.length > 0) { lineItemsBuffer = []; return; }

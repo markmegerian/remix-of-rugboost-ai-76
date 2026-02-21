@@ -14,12 +14,10 @@ Usage: ./scripts/setup-env.sh [options]
 Options:
   --non-interactive  Use environment variables only (no prompts)
   --install          Run npm install at the end
-  --disable-proxy    Remove npm proxy settings for this user (useful for bad proxy 403s)
   -h, --help         Show this help message
 
 Environment variables:
-  NPM_TOKEN          npm auth token for npm registry
-  NPM_REGISTRY       npm registry URL (default: https://registry.npmjs.org/)
+  NPM_TOKEN          npm auth token for registry.npmjs.org
   GH_USER            GitHub username for credential helper setup
   GH_PAT             GitHub PAT for credential helper setup
 HELP
@@ -27,8 +25,6 @@ HELP
 
 NON_INTERACTIVE=false
 RUN_INSTALL=false
-DISABLE_PROXY=false
-NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,10 +34,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --install)
       RUN_INSTALL=true
-      shift
-      ;;
-    --disable-proxy)
-      DISABLE_PROXY=true
       shift
       ;;
     -h|--help)
@@ -75,18 +67,6 @@ if [[ -n "$NODE_VERSION" ]]; then
   fi
 fi
 
-# Normalize registry URL once for consistent auth host formatting
-NPM_REGISTRY="${NPM_REGISTRY%/}"
-NPM_REGISTRY_HOST="${NPM_REGISTRY#https://}"
-NPM_REGISTRY_HOST="${NPM_REGISTRY_HOST#http://}"
-
-if [[ "$DISABLE_PROXY" == "true" ]]; then
-  npm config --global delete proxy >/dev/null 2>&1 || true
-  npm config --global delete https-proxy >/dev/null 2>&1 || true
-  npm config --global delete http-proxy >/dev/null 2>&1 || true
-  echo "[ok] Cleared npm proxy settings in user config"
-fi
-
 SET_NPM="n"
 if [[ -n "${NPM_TOKEN:-}" ]]; then
   SET_NPM="y"
@@ -108,18 +88,17 @@ if [[ "$SET_NPM" =~ ^[Yy]$ ]]; then
   NPMRC_PATH="$HOME/.npmrc"
   touch "$NPMRC_PATH"
 
-  # Remove previous auth + registry lines to avoid duplicates.
-  grep -v '^//.*:_authToken=' "$NPMRC_PATH" | grep -v '^registry=' > "$NPMRC_PATH.tmp" || true
+  # Remove previous auth line for npmjs to avoid duplicates.
+  grep -v '^//registry\.npmjs\.org/:_authToken=' "$NPMRC_PATH" > "$NPMRC_PATH.tmp" || true
   mv "$NPMRC_PATH.tmp" "$NPMRC_PATH"
 
   {
-    echo "registry=${NPM_REGISTRY}"
-    echo "//${NPM_REGISTRY_HOST}/:_authToken=${NPM_TOKEN}"
+    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}"
     echo "always-auth=true"
   } >> "$NPMRC_PATH"
 
   chmod 600 "$NPMRC_PATH"
-  echo "[ok] Wrote npm auth to $NPMRC_PATH (registry: ${NPM_REGISTRY})"
+  echo "[ok] Wrote npm auth to $NPMRC_PATH"
 fi
 
 SET_GH="n"
@@ -159,11 +138,7 @@ if [[ "$RUN_INSTALL" == "false" && "$NON_INTERACTIVE" == "false" ]]; then
 fi
 
 if [[ "$RUN_INSTALL" == "true" ]]; then
-  if [[ "$DISABLE_PROXY" == "true" ]]; then
-    env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy -u npm_config_http_proxy -u npm_config_https_proxy npm install
-  else
-    npm install
-  fi
+  npm install
 fi
 
 echo

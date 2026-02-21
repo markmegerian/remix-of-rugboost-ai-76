@@ -38,41 +38,11 @@ npm run dev
 
 ### Environment bootstrap (tokens/registry)
 
-### Production readiness gate
-
-Run this before launch:
-
-```sh
-npm run readiness:prod
-```
-
-What it does:
-- verifies Node/npm,
-- runs `npm ci`,
-- runs lint, tests, and production build,
-- fails hard on install/build/lint/test errors,
-- prints specific remediation for npm `403 Forbidden` (token/registry/proxy setup).
-
-
 If `npm install` fails with auth errors (`403`), run:
 
 ```sh
 cd /workspace/remix-of-rugboost-ai-76
 ./scripts/setup-env.sh
-```
-
-If readiness is still red after that, run the registry doctor:
-
-```sh
-npm run doctor:registry
-```
-
-This checks auth, proxy behavior, and shows exactly which path is failing (token vs proxy vs registry policy).
-
-If your proxy is the issue, you can clear npm proxy config and retry:
-
-```sh
-./scripts/setup-env.sh --non-interactive --disable-proxy
 ```
 
 This script can set up npm and GitHub auth in your home directory (not in git).
@@ -81,7 +51,6 @@ To run non-interactively:
 
 ```sh
 export NPM_TOKEN="<your-npm-token>"
-export NPM_REGISTRY="https://registry.npmjs.org" # or your private mirror
 export GH_USER="<github-username>"
 export GH_PAT="<github-pat>"
 ./scripts/setup-env.sh --non-interactive --install

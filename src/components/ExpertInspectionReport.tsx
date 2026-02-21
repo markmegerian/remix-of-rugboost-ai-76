@@ -164,9 +164,9 @@ function generateConditionSummary(services: Service[]): string {
   const { finalTotal, declinedTotal, acceptedRecommended, acceptedHighCost, acceptedPreventative } = useMemo(() => {
     let accepted = requiredTotal;
     let declined = 0;
-    let recAccepted: Service[] = [];
-    let highCostAccepted: Service[] = [];
-    let prevAccepted: Service[] = [];
+    const recAccepted: Service[] = [];
+    const highCostAccepted: Service[] = [];
+    const prevAccepted: Service[] = [];
     
     allGrouped.recommended.forEach(s => {
       const cost = s.adjustedTotal;
