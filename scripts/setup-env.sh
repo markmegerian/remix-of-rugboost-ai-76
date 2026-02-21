@@ -7,6 +7,47 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+usage() {
+  cat <<'HELP'
+Usage: ./scripts/setup-env.sh [options]
+
+Options:
+  --non-interactive  Use environment variables only (no prompts)
+  --install          Run npm install at the end
+  -h, --help         Show this help message
+
+Environment variables:
+  NPM_TOKEN          npm auth token for registry.npmjs.org
+  GH_USER            GitHub username for credential helper setup
+  GH_PAT             GitHub PAT for credential helper setup
+HELP
+}
+
+NON_INTERACTIVE=false
+RUN_INSTALL=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --non-interactive)
+      NON_INTERACTIVE=true
+      shift
+      ;;
+    --install)
+      RUN_INSTALL=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[error] Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
 echo "== RugBoost Environment Setup =="
 echo "Repo: $ROOT_DIR"
 echo
@@ -26,11 +67,19 @@ if [[ -n "$NODE_VERSION" ]]; then
   fi
 fi
 
-echo
-read -r -p "Configure npm auth token now? (y/N): " SET_NPM
-if [[ "$SET_NPM" =~ ^[Yy]$ ]]; then
-  read -r -s -p "Paste NPM token (input hidden): " NPM_TOKEN
+SET_NPM="n"
+if [[ -n "${NPM_TOKEN:-}" ]]; then
+  SET_NPM="y"
+elif [[ "$NON_INTERACTIVE" == "false" ]]; then
   echo
+  read -r -p "Configure npm auth token now? (y/N): " SET_NPM
+fi
+
+if [[ "$SET_NPM" =~ ^[Yy]$ ]]; then
+  if [[ -z "${NPM_TOKEN:-}" ]]; then
+    read -r -s -p "Paste NPM token (input hidden): " NPM_TOKEN
+    echo
+  fi
   if [[ -z "$NPM_TOKEN" ]]; then
     echo "[error] Empty NPM token provided."
     exit 1
@@ -52,12 +101,22 @@ if [[ "$SET_NPM" =~ ^[Yy]$ ]]; then
   echo "[ok] Wrote npm auth to $NPMRC_PATH"
 fi
 
-echo
-read -r -p "Configure GitHub PAT helper for git push/pull now? (y/N): " SET_GH
-if [[ "$SET_GH" =~ ^[Yy]$ ]]; then
-  read -r -p "GitHub username: " GH_USER
-  read -r -s -p "GitHub PAT (input hidden): " GH_PAT
+SET_GH="n"
+if [[ -n "${GH_USER:-}" || -n "${GH_PAT:-}" ]]; then
+  SET_GH="y"
+elif [[ "$NON_INTERACTIVE" == "false" ]]; then
   echo
+  read -r -p "Configure GitHub PAT helper for git push/pull now? (y/N): " SET_GH
+fi
+
+if [[ "$SET_GH" =~ ^[Yy]$ ]]; then
+  if [[ -z "${GH_USER:-}" ]]; then
+    read -r -p "GitHub username: " GH_USER
+  fi
+  if [[ -z "${GH_PAT:-}" ]]; then
+    read -r -s -p "GitHub PAT (input hidden): " GH_PAT
+    echo
+  fi
 
   if [[ -z "$GH_USER" || -z "$GH_PAT" ]]; then
     echo "[error] Username or PAT missing."
@@ -70,9 +129,15 @@ if [[ "$SET_GH" =~ ^[Yy]$ ]]; then
   echo "[ok] Stored GitHub credentials in ~/.git-credentials"
 fi
 
-echo
-read -r -p "Attempt dependency install now (npm install)? (y/N): " RUN_INSTALL
-if [[ "$RUN_INSTALL" =~ ^[Yy]$ ]]; then
+if [[ "$RUN_INSTALL" == "false" && "$NON_INTERACTIVE" == "false" ]]; then
+  echo
+  read -r -p "Attempt dependency install now (npm install)? (y/N): " USER_RUN_INSTALL
+  if [[ "$USER_RUN_INSTALL" =~ ^[Yy]$ ]]; then
+    RUN_INSTALL=true
+  fi
+fi
+
+if [[ "$RUN_INSTALL" == "true" ]]; then
   npm install
 fi
 

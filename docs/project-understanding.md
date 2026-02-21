@@ -100,3 +100,6 @@ RugBoost is a multi-tenant SaaS workflow platform for rug-cleaning businesses. I
 
 ### AI recommendation policy
 - AI-generated service recommendations require mandatory staff review/edit before approval or client-facing execution.
+
+## Launch roadmap
+- See detailed phased plan: `docs/launch-plan.md`.
