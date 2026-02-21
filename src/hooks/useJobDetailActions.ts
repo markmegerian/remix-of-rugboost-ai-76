@@ -80,6 +80,7 @@ export function useJobDetailActions({
   companyId,
   fetchJobDetails,
 }: UseJobDetailActionsParams) {
+  const ANALYSIS_CONCURRENCY = 3;
   // Loading states
   const [addingRug, setAddingRug] = useState(false);
   const [savingJob, setSavingJob] = useState(false);
@@ -214,53 +215,59 @@ export function useJobDetailActions({
 
     setAnalyzingAll(true);
     setAnalysisTotal(pendingRugs.length);
+    setAnalysisCurrent(0);
     let successCount = 0;
     let errorCount = 0;
+    setAnalysisStage('preparing');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    setAnalysisStage('analyzing');
 
-    for (const rug of pendingRugs) {
-      try {
-        setAnalysisCurrent(successCount + errorCount + 1);
-        setAnalysisRugNumber(rug.rug_number);
-        setAnalysisStage('preparing');
+    for (let start = 0; start < pendingRugs.length; start += ANALYSIS_CONCURRENCY) {
+      const batch = pendingRugs.slice(start, start + ANALYSIS_CONCURRENCY);
 
-        await new Promise(resolve => setTimeout(resolve, 300));
-        setAnalysisStage('analyzing');
+      await Promise.all(
+        batch.map(async (rug) => {
+          try {
+            setAnalysisRugNumber(rug.rug_number);
 
-        const { data, error } = await supabase.functions.invoke('analyze-rug', {
-          body: {
-            photos: rug.photo_urls || [],
-            rugInfo: {
-              clientName: job.client_name,
-              rugNumber: rug.rug_number,
-              rugType: rug.rug_type,
-              length: rug.length?.toString() || '',
-              width: rug.width?.toString() || '',
-              notes: rug.notes || '',
-            },
-            userId,
-          },
-        });
+            const { data, error } = await supabase.functions.invoke('analyze-rug', {
+              body: {
+                photos: rug.photo_urls || [],
+                rugInfo: {
+                  clientName: job.client_name,
+                  rugNumber: rug.rug_number,
+                  rugType: rug.rug_type,
+                  length: rug.length?.toString() || '',
+                  width: rug.width?.toString() || '',
+                  notes: rug.notes || '',
+                },
+                userId,
+              },
+            });
 
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+            if (error) throw error;
+            if (data.error) throw new Error(data.error);
 
-        setAnalysisStage('generating');
+            const { error: updateError } = await supabase
+              .from('inspections')
+              .update({
+                analysis_report: data.report,
+                image_annotations: data.imageAnnotations || [],
+                system_services: { edgeSuggestions: data.edgeSuggestions || [] },
+                structured_findings: data.structuredFindings || null,
+              })
+              .eq('id', rug.id);
 
-        await supabase
-          .from('inspections')
-          .update({
-            analysis_report: data.report,
-            image_annotations: data.imageAnnotations || [],
-            system_services: { edgeSuggestions: data.edgeSuggestions || [] },
-            structured_findings: data.structuredFindings || null,
-          })
-          .eq('id', rug.id);
-
-        successCount++;
-      } catch (error) {
-        console.error(`[JobDetailActions] Analysis failed for ${rug.rug_number}:`, error);
-        errorCount++;
-      }
+            if (updateError) throw updateError;
+            successCount++;
+          } catch (error) {
+            console.error(`[JobDetailActions] Analysis failed for ${rug.rug_number}:`, error);
+            errorCount++;
+          } finally {
+            setAnalysisCurrent(prev => prev + 1);
+          }
+        })
+      );
     }
 
     setAnalysisStage('complete');
