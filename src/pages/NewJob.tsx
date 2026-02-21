@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +8,7 @@ import { usePlanFeatures } from '@/hooks/usePlanFeatures';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import JobForm from '@/components/JobForm';
+import NewJobSkeleton from '@/components/skeletons/NewJobSkeleton';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 
 const NewJob = () => {
@@ -71,11 +72,7 @@ const NewJob = () => {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <NewJobSkeleton />;
   }
 
   return (

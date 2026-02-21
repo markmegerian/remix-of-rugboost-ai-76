@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Eye, Plus, LogOut, ChevronRight, Settings, Users, TrendingUp, CheckCircle, Clock, DollarSign } from 'lucide-react';
+import { Briefcase, Eye, Plus, LogOut, ChevronRight, ChevronDown, Settings, Users, TrendingUp, CheckCircle, Clock, DollarSign, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,6 +20,15 @@ import { BillingStatusBanner } from '@/components/BillingStatusBanner';
 import { getStatusBadge, getPaymentBadge } from '@/lib/jobBadges';
 import JobCard from '@/components/JobCard';
 import PullToRefresh from '@/components/PullToRefresh';
+import EmptyState from '@/components/EmptyState';
+import { useSearchContext } from '@/contexts/SearchContext';
+import QuickCreateJobSheet from '@/components/QuickCreateJobSheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const DEFAULT_FILTERS: JobFilters = {
   search: '',
@@ -35,7 +44,9 @@ const Dashboard = () => {
   const { company, branding, hasCompany, loading: companyLoading, isCompanyAdmin } = useCompany();
   const { isAdmin } = useAdminAuth();
   const { canCreateJobs, billingStatus } = usePlanFeatures();
+  const searchContext = useSearchContext();
   const [filters, setFilters] = useState<JobFilters>(DEFAULT_FILTERS);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   
   const { 
     jobs: filteredJobs, 
@@ -85,21 +96,47 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => navigate('/jobs/new')} 
-              size="sm" 
-              className="gap-2 min-h-[44px]"
-              disabled={!canCreateJobs}
-              title={!canCreateJobs ? 'Subscription required to create new jobs' : undefined}
-              aria-label="Create new job"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden md:inline">New Job</span>
-            </Button>
+            <div className="flex">
+              <Button 
+                onClick={() => navigate('/jobs/new')} 
+                size="sm" 
+                className="gap-2 min-h-[44px] rounded-r-none"
+                disabled={!canCreateJobs}
+                title={!canCreateJobs ? 'Subscription required to create new jobs' : undefined}
+                aria-label="Create new job"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden md:inline">New Job</span>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    className="min-h-[44px] rounded-l-none px-2 border-l border-primary-foreground/20"
+                    disabled={!canCreateJobs}
+                    aria-label="More create options"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setQuickCreateOpen(true)}>
+                    Quick create (minimal form)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <QuickCreateJobSheet open={quickCreateOpen} onOpenChange={setQuickCreateOpen} />
             {isAdmin && (
               <Button onClick={() => navigate('/admin/users')} variant="outline" size="sm" className="gap-2 hidden md:flex">
                 <Users className="h-4 w-4" />
                 Users
+              </Button>
+            )}
+            {searchContext && (
+              <Button onClick={searchContext.openSearch} variant="ghost" size="icon" aria-label="Search jobs (⌘K)">
+                <Search className="h-4 w-4" />
               </Button>
             )}
             <NotificationBell />
@@ -193,15 +230,21 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent>
                 {filteredJobs.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>{activeFilterCount > 0 ? 'No jobs match your filters' : 'No jobs found'}</p>
-                    {activeFilterCount === 0 && (
-                      <Button onClick={() => navigate('/jobs/new')} className="mt-4">
-                        Create Your First Job
-                      </Button>
-                    )}
-                  </div>
+                  <EmptyState
+                    icon={Briefcase}
+                    title={activeFilterCount > 0 ? 'No jobs match your filters' : 'No jobs yet'}
+                    description={activeFilterCount > 0 ? 'Try adjusting your filters to see more jobs.' : 'Create your first job to get started.'}
+                    action={
+                      activeFilterCount === 0
+                        ? { label: 'Create your first job', onClick: () => navigate('/jobs/new') }
+                        : undefined
+                    }
+                    secondaryAction={
+                      activeFilterCount > 0
+                        ? { label: 'Clear filters', onClick: () => setFilters(DEFAULT_FILTERS) }
+                        : undefined
+                    }
+                  />
                 ) : (
                   <>
                     {/* Mobile card list with pull-to-refresh */}

@@ -157,15 +157,42 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    
-    // Process first file for guided mode, all files for additional mode
+
     if (captureMode === 'guided') {
-      processFile(files[0]);
+      // Gallery-first: when multiple files selected, assign to steps in order
+      const fromGallery = e.target === galleryInputRef.current && files.length > 1;
+      if (fromGallery) {
+        let updatedPhotoData = [...photoData];
+        let stepIndex = currentStep;
+        for (const file of files) {
+          if (stepIndex >= totalRequiredSteps) break;
+          const step = PHOTO_STEPS[stepIndex];
+          const existingIndex = updatedPhotoData.findIndex((p) => p.stepId === step.id);
+          const newPhoto: PhotoData = { file, stepId: step.id, label: step.title };
+          if (existingIndex >= 0) {
+            updatedPhotoData = [...updatedPhotoData];
+            updatedPhotoData[existingIndex] = newPhoto;
+          } else {
+            updatedPhotoData = [...updatedPhotoData, newPhoto];
+          }
+          stepIndex++;
+        }
+        setPhotoData(updatedPhotoData);
+        syncPhotos(updatedPhotoData);
+        const nextUncaptured = findNextUncapturedStep(stepIndex - 1, updatedPhotoData);
+        if (nextUncaptured !== null) {
+          setCurrentStep(nextUncaptured);
+        } else {
+          setCaptureMode('additional');
+          setCurrentStep(totalRequiredSteps - 1);
+        }
+      } else {
+        processFile(files[0]);
+      }
     } else {
-      files.forEach(file => processFile(file));
+      files.forEach((file) => processFile(file));
     }
 
-    // Reset inputs
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
@@ -243,7 +270,7 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
         ref={galleryInputRef}
         type="file"
         accept="image/*"
-        multiple={captureMode === 'additional'}
+        multiple
         onChange={handleFileSelect}
         className="hidden"
       />
@@ -396,7 +423,21 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                   <span className="text-sm font-medium text-primary">
                     Capture {PHOTO_STEPS[currentStep].title}
                   </span>
-                  <div className="flex gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Choose from gallery first to add multiple photos at once
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={openGallery}
+                      className="gap-1.5"
+                      aria-label="Choose from gallery"
+                    >
+                      <ImagePlus className="h-4 w-4" aria-hidden="true" />
+                      Choose from gallery
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
@@ -406,17 +447,6 @@ const GuidedPhotoCapture: React.FC<GuidedPhotoCaptureProps> = ({
                     >
                       <Camera className="h-4 w-4" aria-hidden="true" />
                       Camera
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={openGallery}
-                      className="gap-1.5"
-                      aria-label="Choose photo from gallery"
-                    >
-                      <ImagePlus className="h-4 w-4" aria-hidden="true" />
-                      Gallery
                     </Button>
                   </div>
                 </div>

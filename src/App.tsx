@@ -2,7 +2,13 @@ import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+
+// Redirect legacy /job/:id to canonical /jobs/:id
+const JobRedirect = () => {
+  const { jobId } = useParams<{ jobId: string }>();
+  return <Navigate to={`/jobs/${jobId}`} replace />;
+};
 import { AuthProvider } from "@/hooks/useAuth";
 import { CompanyProvider } from "@/hooks/useCompany";
 import { AppInitializer } from "@/components/AppInitializer";
@@ -15,6 +21,8 @@ import { CompanyGuard } from "@/components/CompanyGuard";
 import BottomTabBar from "@/components/BottomTabBar";
 import rugboostLogo from "@/assets/rugboost-logo.svg";
 import { offlineSyncService } from "@/lib/offlineSyncService";
+import { SearchProvider } from "@/contexts/SearchContext";
+import { KeyboardShortcutsHandler } from "@/components/KeyboardShortcutsHandler";
 
 // Skeleton fallbacks for per-route Suspense
 import DashboardSkeleton from "@/components/skeletons/DashboardSkeleton";
@@ -95,8 +103,10 @@ const App = () => {
               <Toaster />
              <OfflineBanner />
               <BrowserRouter>
+                <SearchProvider>
                 {/* Deep link handler for Capacitor native apps */}
                 <DeepLinkHandler />
+                <KeyboardShortcutsHandler />
                 {/* GlobalSearch is lazy-loaded since it's a Cmd+K dialog */}
                 <Suspense fallback={null}>
                   <GlobalSearch />
@@ -142,11 +152,7 @@ const App = () => {
                            <JobDetail />
                          </Suspense>
                        } />
-                       <Route path="/job/:jobId" element={
-                         <Suspense fallback={<JobDetailSkeleton />}>
-                           <JobDetail />
-                         </Suspense>
-                       } />
+                       <Route path="/job/:jobId" element={<JobRedirect />} />
                        <Route path="/settings" element={<AccountSettings />} />
                        <Route path="/analytics" element={
                          <Suspense fallback={<AnalyticsSkeleton />}>
@@ -183,6 +189,7 @@ const App = () => {
                  </Routes>
                 </Suspense>
                 <BottomTabBar />
+                </SearchProvider>
               </BrowserRouter>
              </TooltipProvider>
            </AppInitializer>

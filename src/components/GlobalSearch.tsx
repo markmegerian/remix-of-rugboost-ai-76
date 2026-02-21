@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Briefcase, User, FileText, Loader2 } from 'lucide-react';
+import { useSearchContext } from '@/contexts/SearchContext';
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,6 +13,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
+import { getRecentJobs } from '@/lib/recentJobs';
 
 interface SearchResult {
   id: string;
@@ -22,7 +24,10 @@ interface SearchResult {
 }
 
 const GlobalSearch: React.FC = () => {
-  const [open, setOpen] = useState(false);
+  const searchContext = useSearchContext();
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = searchContext ? searchContext.open : localOpen;
+  const setOpen = searchContext ? searchContext.setOpen : setLocalOpen;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,7 +121,12 @@ const GlobalSearch: React.FC = () => {
     setOpen(false);
     setQuery('');
     navigate(url);
+    setRecentJobs(getRecentJobs());
   };
+
+  useEffect(() => {
+    if (open) setRecentJobs(getRecentJobs());
+  }, [open]);
 
   const getIcon = (type: SearchResult['type']) => {
     switch (type) {
@@ -132,7 +142,7 @@ const GlobalSearch: React.FC = () => {
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search jobs, clients, rugs..."
+        placeholder="Search jobs... (⌘K)"
         value={query}
         onValueChange={setQuery}
       />
@@ -146,14 +156,35 @@ const GlobalSearch: React.FC = () => {
           <CommandEmpty>No results found.</CommandEmpty>
         )}
         {!loading && query.length < 2 && (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            <Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
-            <p>Type at least 2 characters to search</p>
-            <p className="mt-1 text-xs">
-              Press <kbd className="px-1 py-0.5 rounded bg-muted font-mono text-xs">⌘K</kbd> or{' '}
-              <kbd className="px-1 py-0.5 rounded bg-muted font-mono text-xs">/</kbd> anytime to search
-            </p>
-          </div>
+          <>
+            {recentJobs.length > 0 && (
+              <CommandGroup heading="Recent">
+                {recentJobs.map((job) => (
+                  <CommandItem
+                    key={job.id}
+                    onSelect={() => handleSelect(`/jobs/${job.id}`)}
+                    className="flex items-center gap-3 cursor-pointer"
+                  >
+                    <div className="rounded-md bg-muted p-1.5">
+                      <Briefcase className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="font-medium truncate">Job #{job.job_number}</p>
+                      <p className="text-xs text-muted-foreground truncate">{job.client_name}</p>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              <Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
+              <p>Type at least 2 characters to search</p>
+              <p className="mt-1 text-xs">
+                Press <kbd className="px-1 py-0.5 rounded bg-muted font-mono text-xs">⌘K</kbd> or{' '}
+                <kbd className="px-1 py-0.5 rounded bg-muted font-mono text-xs">/</kbd> anytime to search
+              </p>
+            </div>
+          </>
         )}
         {results.length > 0 && (
           <CommandGroup heading="Results">

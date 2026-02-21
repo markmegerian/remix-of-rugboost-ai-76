@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { User, Briefcase } from 'lucide-react';
+import { User, Briefcase, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import ClientSearch from './ClientSearch';
+import { useNextJobNumber } from '@/hooks/useNextJobNumber';
 
 interface JobFormData {
   jobNumber: string;
@@ -24,6 +25,7 @@ interface JobFormProps {
 }
 
 const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mode = 'create', disabled = false }) => {
+  const { nextJobNumber, isLoading: loadingNextNumber } = useNextJobNumber();
   const [formData, setFormData] = useState<JobFormData>({
     jobNumber: initialData?.jobNumber || '',
     clientName: initialData?.clientName || '',
@@ -102,7 +104,22 @@ const JobForm: React.FC<JobFormProps> = ({ onSubmit, isLoading, initialData, mod
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="jobNumber">Job Number *</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="jobNumber">Job Number *</Label>
+            {mode === 'create' && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setFormData((prev) => ({ ...prev, jobNumber: nextJobNumber }))}
+                disabled={loadingNextNumber || disabled}
+              >
+                <Wand2 className="h-3 w-3" />
+                Auto-generate
+              </Button>
+            )}
+          </div>
           <Input
             id="jobNumber"
             name="jobNumber"

@@ -19,6 +19,7 @@ import { RevenueChart } from "@/components/analytics/RevenueChart";
 import { ServicePopularityChart } from "@/components/analytics/ServicePopularityChart";
 import { MetricCard } from "@/components/analytics/MetricCard";
 import { AnalyticsSkeleton } from "@/components/skeletons/AnalyticsSkeleton";
+import EmptyState from "@/components/EmptyState";
 
 interface AnalyticsData {
   totalJobs: number;
@@ -325,6 +326,12 @@ const Analytics = () => {
           </Card>
         ) : isLoading ? (
           <AnalyticsSkeleton />
+        ) : (data?.totalJobs === 0 && data?.totalRevenue === 0) ? (
+          <EmptyState
+            icon={BarChart3}
+            title="No data for this period"
+            description={`No jobs or revenue in the selected date range. Try a different period (${dateRange === '7d' ? 'Last 7 days' : dateRange === '30d' ? 'Last 30 days' : dateRange === '90d' ? 'Last 90 days' : 'Last 12 months'}).`}
+          />
         ) : (
           <>
             {/* Metric Cards */}

@@ -143,6 +143,7 @@ export function useJobDetailActions({
       const { data, error } = await retryWithBackoff(() =>
         supabase.functions.invoke('analyze-rug', {
           body: {
+            model: 'google/gemini-2.5-flash',
             photos: rug.photo_urls || [],
             rugInfo: {
               clientName: job.client_name,
@@ -236,6 +237,7 @@ export function useJobDetailActions({
             const { data, error } = await retryWithBackoff(() =>
               supabase.functions.invoke('analyze-rug', {
                 body: {
+                  model: 'google/gemini-2.5-flash',
                   photos: rug.photo_urls || [],
                   rugInfo: {
                     clientName: job.client_name,
@@ -698,6 +700,61 @@ export function useJobDetailActions({
     }
   }, [job, jobId, rugs, approvedEstimates, companyId, fetchJobDetails]);
 
+  const handleDuplicateJob = useCallback(async (): Promise<string | null> => {
+    if (!job || !userId || !companyId) return null;
+
+    try {
+      const newJobNumber = `${job.job_number}-copy`;
+      const { data: newJob, error: jobError } = await supabase
+        .from('jobs')
+        .insert({
+          user_id: userId,
+          company_id: companyId,
+          job_number: newJobNumber,
+          client_name: job.client_name,
+          client_email: job.client_email || null,
+          client_phone: job.client_phone || null,
+          notes: job.notes || null,
+          status: 'intake_scheduled',
+        })
+        .select('id')
+        .single();
+
+      if (jobError) throw jobError;
+      if (!newJob) throw new Error('Failed to create job');
+
+      if (rugs.length > 0) {
+        const inserts = rugs.map((rug) => ({
+          user_id: userId,
+          company_id: companyId,
+          job_id: newJob.id,
+          client_name: job.client_name,
+          client_email: job.client_email || null,
+          client_phone: job.client_phone || null,
+          rug_number: rug.rug_number,
+          rug_type: rug.rug_type,
+          length: rug.length,
+          width: rug.width,
+          notes: rug.notes || null,
+          photo_urls: rug.photo_urls || null,
+          analysis_report: rug.analysis_report || null,
+          image_annotations: rug.image_annotations || null,
+          system_services: rug.system_services || null,
+          structured_findings: rug.structured_findings || null,
+        }));
+
+        const { error: inspError } = await supabase.from('inspections').insert(inserts);
+        if (inspError) throw inspError;
+      }
+
+      toast.success(`Job duplicated as #${newJobNumber}`);
+      return newJob.id;
+    } catch (error) {
+      handleMutationError(error, 'JobDetailActions', extractErrorMessage(error, 'Failed to duplicate job'));
+      return null;
+    }
+  }, [job, rugs, userId, companyId]);
+
   const handleResendInvite = useCallback(async () => {
     if (!job || !clientPortalStatus) return;
 
@@ -771,5 +828,6 @@ export function useJobDetailActions({
     handleOpenEmailPreview,
     generateClientPortalLink,
     handleResendInvite,
+    handleDuplicateJob,
   };
 }

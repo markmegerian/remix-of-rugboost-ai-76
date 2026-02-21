@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Loader2, Eye, Download, Trash2, 
   Edit2, FileText, CheckCircle, Clock, PlayCircle, Sparkles, Mail, FlaskConical,
   Link, Copy, ExternalLink, User, MapPin, Phone, Calendar, Image, 
-  MessageSquare, DollarSign, CreditCard, AlertCircle
+  MessageSquare, DollarSign, CreditCard, AlertCircle, MoreVertical, CopyPlus
 } from 'lucide-react';
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { toast } from 'sonner';
@@ -20,6 +20,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
@@ -117,6 +123,7 @@ interface Payment {
 
 // Import service categories from centralized module
 import { SERVICE_CATEGORIES, categorizeService } from '@/lib/serviceCategories';
+import { addRecentJob } from '@/lib/recentJobs';
 
 
 const JobDetail = () => {
@@ -143,6 +150,7 @@ const JobDetail = () => {
   const [compareRug, setCompareRug] = useState<Rug | null>(null);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
+  const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
   const statusAdvanceRef = useRef<HTMLButtonElement>(null);
   // Mutable state derived from query data
   const [localApprovedEstimates, setLocalApprovedEstimates] = useState<ApprovedEstimate[]>([]);
@@ -156,6 +164,17 @@ const JobDetail = () => {
       setLocalRugs(jobData.rugs);
     }
   }, [jobData]);
+
+  // Add to recent jobs when viewing
+  useEffect(() => {
+    if (job) {
+      addRecentJob({
+        id: job.id,
+        job_number: job.job_number,
+        client_name: job.client_name,
+      });
+    }
+  }, [job?.id, job?.job_number, job?.client_name]);
 
   // Derived data from React Query (with fallbacks for local state)
   const job = jobData?.job || null;
@@ -609,13 +628,52 @@ const JobDetail = () => {
                 <p className="text-xs text-muted-foreground truncate">{job.client_name}</p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => navigate('/dashboard')} className="hidden md:flex">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Jobs
-            </Button>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Job actions">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowDuplicateConfirm(true)}>
+                    <CopyPlus className="h-4 w-4 mr-2" />
+                    Duplicate job
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="outline" onClick={() => navigate('/dashboard')} className="hidden md:flex">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Jobs
+              </Button>
+            </div>
           </div>
         </div>
       </header>
+
+      {/* Duplicate Job Confirmation */}
+      <AlertDialog open={showDuplicateConfirm} onOpenChange={setShowDuplicateConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicate this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new job with the same client details and {rugs.length} rug{rugs.length !== 1 ? 's' : ''}. Photos and analysis will be copied. The new job will start at &quot;Intake Scheduled&quot; with no approvals or payments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const newId = await handleDuplicateJob();
+                setShowDuplicateConfirm(false);
+                if (newId) navigate(`/jobs/${newId}`);
+              }}
+            >
+              Duplicate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <main className="container mx-auto px-4 py-4 md:py-8 space-y-4 md:space-y-6 pb-28 md:pb-8">
         {/* Breadcrumb - Hidden on mobile for cleaner UI */}

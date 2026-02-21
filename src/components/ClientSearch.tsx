@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useDeferredValue } from 'react';
 import { Search, User, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompany } from '@/hooks/useCompany';
 
 interface Client {
   client_name: string;
@@ -15,6 +16,7 @@ interface ClientSearchProps {
 }
 
 const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValue = '' }) => {
+  const { companyId } = useCompany();
   const [query, setQuery] = useState(initialValue);
   const deferredQuery = useDeferredValue(query);
   const [results, setResults] = useState<Client[]>([]);
@@ -43,13 +45,20 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
 
       setLoading(true);
       try {
-        // Search for unique clients from existing jobs
-        const { data, error } = await supabase
+        // Search for unique clients from existing jobs (by name or email)
+        const searchTerm = `%${deferredQuery}%`;
+        let queryBuilder = supabase
           .from('jobs')
           .select('client_name, client_email, client_phone')
-          .ilike('client_name', `%${deferredQuery}%`)
+          .or(`client_name.ilike.${searchTerm},client_email.ilike.${searchTerm}`)
           .order('created_at', { ascending: false })
           .limit(10);
+
+        if (companyId) {
+          queryBuilder = queryBuilder.eq('company_id', companyId);
+        }
+
+        const { data, error } = await queryBuilder;
 
         if (error) throw error;
 
@@ -72,7 +81,7 @@ const ClientSearch: React.FC<ClientSearchProps> = ({ onSelectClient, initialValu
     };
 
     searchClients();
-  }, [deferredQuery]);
+  }, [deferredQuery, companyId]);
 
   const handleSelect = (client: Client) => {
     setQuery(client.client_name);

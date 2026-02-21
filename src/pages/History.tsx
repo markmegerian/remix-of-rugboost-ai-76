@@ -24,6 +24,7 @@ import { format, isThisYear, isThisMonth, isThisWeek, parseISO } from 'date-fns'
 import rugboostLogo from '@/assets/rugboost-logo.svg';
 import { HistorySkeleton } from '@/components/skeletons/HistorySkeleton';
 import RugPhoto from '@/components/RugPhoto';
+import EmptyState from '@/components/EmptyState';
 
 interface HistoryRug {
   id: string;
@@ -247,13 +248,21 @@ const History = () => {
             <HistorySkeleton />
           ) : timelineGroups.length === 0 ? (
             <Card>
-              <CardContent className="text-center py-12">
-                <HistoryIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">
-                  {jobs.length === 0 
-                    ? 'No completed jobs yet. Complete a job to see it in history.'
-                    : 'No jobs match your search.'}
-                </p>
+              <CardContent className="p-0">
+                <EmptyState
+                  icon={HistoryIcon}
+                  title={jobs.length === 0 ? 'No completed jobs yet' : 'No jobs match your search'}
+                  description={
+                    jobs.length === 0
+                      ? 'Complete a job to see it in history.'
+                      : 'Try a different search term.'
+                  }
+                  secondaryAction={
+                    searchQuery
+                      ? { label: 'Clear search', onClick: () => setSearchQuery('') }
+                      : undefined
+                  }
+                />
               </CardContent>
             </Card>
           ) : (
