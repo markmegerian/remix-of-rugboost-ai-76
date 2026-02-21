@@ -30,10 +30,10 @@ run_cmd() {
     pass "$name"
   else
     if [[ $code -eq 124 ]]; then
-    warn "$name (timed out)"
-  else
-    fail "$name"
-  fi
+      warn "$name (timed out)"
+    else
+      fail "$name"
+    fi
   fi
   return $code
 }

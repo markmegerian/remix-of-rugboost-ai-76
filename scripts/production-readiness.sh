@@ -22,7 +22,15 @@ print_403_help() {
 - Verify registry reachability:
     npm ping --registry "$NPM_REGISTRY"
 - If still blocked, your proxy/security policy must allow that registry host.
+- Optional quick proxy bypass test:
+    ./scripts/setup-env.sh --non-interactive --disable-proxy
 MSG
+
+  if [[ -x ./scripts/registry-doctor.sh ]]; then
+    echo
+    echo "Running registry doctor for more detail..."
+    ./scripts/registry-doctor.sh || true
+  fi
 }
 
 run_check() {

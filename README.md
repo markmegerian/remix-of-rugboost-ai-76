@@ -69,6 +69,12 @@ npm run doctor:registry
 
 This checks auth, proxy behavior, and shows exactly which path is failing (token vs proxy vs registry policy).
 
+If your proxy is the issue, you can clear npm proxy config and retry:
+
+```sh
+./scripts/setup-env.sh --non-interactive --disable-proxy
+```
+
 This script can set up npm and GitHub auth in your home directory (not in git).
 
 To run non-interactively:
