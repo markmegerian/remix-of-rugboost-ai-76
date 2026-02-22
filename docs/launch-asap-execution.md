@@ -60,7 +60,7 @@ It prints a summary with pass/warn/fail markers and exits non-zero if there are 
 - AM: Client portal conversion polish and payment flow verification.
 - PM: Final regression pass + controlled rollout prep.
 
-## 5) Go-live motion
+## 5) Go-live motion (private beta first)
 
 - Start with controlled cohort/tenant rollout.
 - Monitor key KPIs daily for two weeks:
@@ -73,3 +73,13 @@ It prints a summary with pass/warn/fail markers and exits non-zero if there are 
 ## Related docs
 - `docs/launch-plan.md`
 - `docs/project-understanding.md`
+
+
+## Private beta operating docs
+- `docs/private-beta-plan.md`
+- `docs/private-beta-checklist.md`
+
+Run beta gate:
+```bash
+npm run -s readiness:beta
+```
