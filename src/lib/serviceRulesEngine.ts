@@ -391,12 +391,13 @@ function calculateQuantity(input: InspectionInput, priceType: string): number {
   switch (priceType) {
     case 'per_sqft':
       return input.squareFootage;
-    case 'per_linear_ft':
+    case 'per_linear_ft': {
       // Estimate perimeter: assume 3:2 aspect ratio
       const area = input.squareFootage;
       const width = Math.sqrt(area * 2 / 3);
       const length = width * 1.5;
       return Math.round((2 * width + 2 * length) * 10) / 10;
+    }
     case 'flat':
       return 1;
     default:

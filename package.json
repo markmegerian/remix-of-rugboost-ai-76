@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "readiness:prod": "./scripts/production-readiness.sh",
-    "doctor:registry": "./scripts/registry-doctor.sh"
+    "doctor:registry": "./scripts/registry-doctor.sh",
+    "readiness:beta": "./scripts/private-beta-readiness.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.2",

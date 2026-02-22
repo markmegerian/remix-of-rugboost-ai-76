@@ -275,7 +275,7 @@ const extractAllServiceDescriptions = (rugs: Inspection[]): ServiceDescription[]
         const trimmedPara = para.trim();
         if (!trimmedPara || trimmedPara.length < 20) continue;
         
-        const colonMatch = trimmedPara.match(/^([A-Z][A-Za-z\s&\/\-]+?):\s*(.+)/s);
+        const colonMatch = trimmedPara.match(/^([A-Z][A-Za-z\s&/-]+?):\s*(.+)/s);
         
         if (colonMatch) {
           const name = colonMatch[1].trim();
